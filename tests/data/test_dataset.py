@@ -1,30 +1,17 @@
+"""Tests for the data adapter: `build_dataset` + normalized ground truth.
+
+Covers the same-query-across-encodings invariant, the 3x3 scope gate, agreement
+between our normalized ground truth and GraphQA's answer string, and
+determinism / JSON round-trip. Encoder wording is pinned separately in
+tests/graphqa/test_graph_text_encoder.py.
+"""
+
 import json
 
-import networkx as nx
-import pytest
-
-from gedebate.graphqa import graph_text_encoder as enc
 from gedebate.data.dataset import ENCODINGS, TASKS, build_dataset
 from gedebate.data.instance import normalized_ground_truth
 
-
-# --- vendored encoder characterization (byte-exact, incl. adjacency preamble) --
-
-def test_adjacency_encoder_exact():
-    g = nx.path_graph(4)  # 0-1-2-3
-    assert enc.encode_graph(g, "adjacency") == (
-        "In an undirected graph, (i,j) means that node i and node j are"
-        " connected with an undirected edge. "
-        "G describes a graph among nodes 0, 1, 2, and 3.\n"
-        "The edges in G are: (0, 1) (1, 2) (2, 3).\n"
-    )
-
-
-def test_friendship_says_among_nodes():
-    # Fidelity check: the released code writes "among nodes <names>".
-    g = nx.path_graph(3)
-    out = enc.encode_graph(g, "friendship")
-    assert out.startswith("G describes a friendship graph among nodes James, Robert, and John.")
+import networkx as nx
 
 
 # --- the same-query-across-encodings invariant --------------------------------
