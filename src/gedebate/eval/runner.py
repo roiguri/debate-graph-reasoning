@@ -56,10 +56,11 @@ def run_instances(model, instances: list, cfg: RunConfig, *, shard: int = 0) -> 
     Progress is loaded once up front (not per instance), so this is O(n) file I/O.
     Returns {"written", "skipped"}.
     """
+    # The manifest describes the shared *dataset* (model + seed + N); conditions
+    # live in sibling subfolders, so condition is not a manifest field.
     results.ensure_manifest(
         cfg.out_dir,
         cfg.model,
-        condition=cfg.condition,
         dataset_seed=cfg.dataset_seed,
         n_graphs=cfg.n_graphs,
     )

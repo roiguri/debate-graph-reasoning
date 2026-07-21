@@ -71,6 +71,19 @@ def test_read_missing_file_is_empty(tmp_path):
     assert results.read_rows(tmp_path / "nope.jsonl") == []
 
 
+def test_shard_file_nests_by_condition(tmp_path):
+    assert results.shard_file(tmp_path, "baseline", 2) == tmp_path / "baseline" / "shard002.jsonl"
+
+
+def test_result_files_spans_condition_subfolders(tmp_path):
+    results.append_row(results.shard_file(tmp_path, "baseline", 0),
+                       results.make_row(_edge_instances()[0], "m", _attempt()))
+    results.append_row(results.shard_file(tmp_path, "majority_vote", 0),
+                       results.make_row(_edge_instances()[0], "m", _attempt("majority_vote")))
+    files = results.result_files(tmp_path)
+    assert {f.parent.name for f in files} == {"baseline", "majority_vote"}
+
+
 # --- torn / corrupt lines -----------------------------------------------------
 
 def test_read_tolerates_torn_trailing_line(tmp_path):
@@ -85,6 +98,7 @@ def test_read_tolerates_torn_trailing_line(tmp_path):
 
 def test_read_raises_on_midfile_corruption(tmp_path):
     path = results.shard_file(tmp_path, "baseline")
+    path.parent.mkdir(parents=True, exist_ok=True)  # append_row would do this; we write directly
     good = json.dumps(results.make_row(_edge_instances()[0], "m", _attempt()))
     path.write_text(good + "\n" + "{not json}\n" + good + "\n", encoding="utf-8")
     with pytest.raises(ValueError):

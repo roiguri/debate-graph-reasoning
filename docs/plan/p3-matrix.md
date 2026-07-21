@@ -1,5 +1,11 @@
 # P3 — Baseline across the full 3×3 matrix + fragility analysis
 
+**Status: complete — premise confirmed, GO for P4.** N=200 baseline over the full
+3×3 (1800 instances, parse_ok≈1.0) reproduces encoding-fragility: incident best for
+node_degree (0.75) and connected_nodes (0.345), edge_existence encoding-insensitive
+(0.02 spread). Numbers + the go decision in
+[notes.md](../notes.md#p3-result-encoding-fragility-reproduces--fact--go-decision-p34).
+
 Goal: run the baseline over the **full task × encoding matrix at real N**, shard it
 across the cluster, and produce the **encoding-fragility result** — a per-encoding
 accuracy table plus the cross-encoding spread per task. This is the phase that
@@ -7,7 +13,7 @@ accuracy table plus the cross-encoding spread per task. This is the phase that
 model? If not, the whole debate question is moot, so we gate P4/P5 on it. See
 [overview.md](overview.md); P2 built the machinery this reuses unchanged.
 
-**Done when:** `results/p3-matrix/` holds baseline attempts for all 9 cells at
+**Done when:** `results/main/baseline/` holds baseline attempts for all 9 cells at
 N=200, a fragility table (mean/std/max−min per task) is produced from it, the
 results are pulled to the local repo, and we have a **go/no-go on the premise**
 recorded in [notes.md](../notes.md).
@@ -43,7 +49,7 @@ slices, not five.
 ### P3.1 — Run the full matrix (reuse P2 at scale)
 Launch the whole 3×3 at N=200 and let it complete, resumably, across the cluster.
 - `configs/p3-matrix.toml`: full 3×3, `n_graphs = 200`, `dataset_seed = 7`,
-  `out_dir = results/p3-matrix`, `max_new_tokens = 128`.
+  `out_dir = results/main` (condition in a `baseline/` subfolder), `max_new_tokens = 128`.
 - **The one code change:** harden `results.ensure_manifest` to guard `dataset_seed`
   **and** `n_graphs` (it already records them). `instance_id` omits N, so resuming
   an `out_dir` with a different N would skip-by-id onto *different* graphs — the
@@ -53,7 +59,7 @@ Launch the whole 3×3 at N=200 and let it complete, resumably, across the cluste
   Submit `sbatch --array=0-7%3 slurm/p3-matrix.slurm` (8 shards, ≤3 concurrent —
   safe under unknown quota). Killed shards rerun and skip done work; the union of
   shard files is the full run.
-- Done: 1800 rows in `results/p3-matrix/`, `parse_ok` ≈ 1.0 at real N.
+- Done: 1800 rows in `results/main/baseline/`, `parse_ok` ≈ 1.0 at real N.
 
 ### P3.2 — Retrieve, analyze, checkpoint the premise
 Get the results local, compute fragility, and decide go/no-go for P4/P5.

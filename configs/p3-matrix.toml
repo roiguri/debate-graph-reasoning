@@ -12,4 +12,6 @@ n_graphs = 200
 dataset_seed = 7
 max_new_tokens = 128   # connected_nodes lists can be long; edge/degree stay terse
 
-out_dir = "results/p3-matrix"
+# One shared experiment dir; conditions live in subfolders (baseline/, then
+# majority_vote/ in P4, debate/ in P5) so matched-compute can join them.
+out_dir = "results/main"

@@ -196,6 +196,27 @@ total generated tokens per instance per condition.
   up missing sample indices, and it exposes individual-sample-vs-vote accuracy — a
   number worth reporting (does the vote actually beat the average single draw?).
 
+### P3 result: encoding-fragility reproduces — fact + GO decision (P3.4)
+Baseline over the full 3×3 at N=200 (Qwen2.5-3B, greedy, seed 7; 1800 instances,
+`parse_ok` 0.99–1.00). **Premise confirmed → GO for P4.** Per-cell accuracy:
+
+| task | adjacency | incident | friendship | spread (max−min) |
+|---|---|---|---|---|
+| edge_existence | 0.70 | 0.68 | 0.68 | **0.02** (insensitive) |
+| node_degree | 0.37 | **0.75** | 0.46 | **0.38** |
+| connected_nodes | 0.28 | **0.345** | 0.21 | **0.135** |
+
+Reproduces Fatemi directionally: **incident is best for both node_degree and
+connected_nodes**, and **edge_existence is encoding-insensitive**. Spreads are well
+outside noise (N=200 → per-cell 95% CI ≈ ±0.07): node_degree's 0.38 gap is many σ;
+edge_existence's 0.02 is noise, as expected. No floor/ceiling (all in 0.21–0.75).
+- **Encoding-fragile targets for P4/P5** (worst cells to lift): `node_degree ×
+  adjacency` (0.37 vs incident 0.75) and `connected_nodes × friendship` (0.21). The
+  debate question is whether verification lifts the *worst* encoding specifically,
+  not everything uniformly.
+- ~4/1800 parse misses (connected_nodes) — negligible; can inspect with
+  `--raw --wrong-only` if ever needed.
+
 ### P2 pilot result — fact (P2.5)
 First real-GPU run (Qwen2.5-3B-Instruct, RTX 2080 Ti 11GB, greedy). Validates the
 harness end-to-end; **not** a measurement (N=8–20, noisy). Key facts for the writeup:

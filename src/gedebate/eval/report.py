@@ -71,6 +71,28 @@ def fragility(summary: dict[tuple[str, str], dict]) -> dict[str, dict]:
     return out
 
 
+def summary_to_csv(summary: dict[tuple[str, str], dict]) -> str:
+    """Per-cell summary as CSV text (for a committed analysis/ artifact)."""
+    lines = ["task,encoding,n,accuracy,parse_ok_rate,total_gen_tokens"]
+    for (task, encoding), s in summary.items():
+        lines.append(
+            f"{task},{encoding},{s['n']},{s['accuracy']:.4f},"
+            f"{s['parse_ok_rate']:.4f},{s['total_gen_tokens']}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def fragility_to_csv(frag: dict[str, dict]) -> str:
+    """Per-task fragility as CSV text (mean/std/max-min + best/worst encoding)."""
+    lines = ["task,mean,std,max_min,best,worst"]
+    for task, f in frag.items():
+        lines.append(
+            f"{task},{f['mean']:.4f},{f['std']:.4f},{f['max_min']:.4f},"
+            f"{f['best']},{f['worst']}"
+        )
+    return "\n".join(lines) + "\n"
+
+
 def format_fragility(frag: dict[str, dict]) -> str:
     """Fixed-width per-task fragility table: mean, std, max-min gap, best/worst."""
     header = f"{'task':<16}{'mean':>7}{'std':>7}{'max-min':>9}  {'best':>10} {'worst':>10}"

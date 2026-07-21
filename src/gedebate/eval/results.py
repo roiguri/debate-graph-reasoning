@@ -88,13 +88,19 @@ def make_row(
 # --- file layout --------------------------------------------------------------
 
 def shard_file(run_dir: str | Path, condition: str, shard: int = 0) -> Path:
-    """Path of the JSONL a given shard writes. One writer per file (no contention)."""
-    return Path(run_dir) / f"{condition}-shard{shard:03d}.jsonl"
+    """Path a shard writes: <run_dir>/<condition>/shard<i>.jsonl.
+
+    A run dir is one *dataset* (model + seed + N, pinned by its manifest); the
+    conditions (baseline / majority_vote / debate) live in sibling subfolders so
+    they share the dataset and can be joined for the matched-compute comparison.
+    One writer per file → no append contention.
+    """
+    return Path(run_dir) / condition / f"shard{shard:03d}.jsonl"
 
 
 def result_files(run_dir: str | Path) -> list[Path]:
-    """All result JSONL files in a run dir (any condition, any shard)."""
-    return sorted(Path(run_dir).glob("*.jsonl"))
+    """All result JSONL under a run dir, across every condition subfolder."""
+    return sorted(Path(run_dir).glob("**/*.jsonl"))
 
 
 # --- writing ------------------------------------------------------------------

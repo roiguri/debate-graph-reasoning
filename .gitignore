@@ -8,6 +8,9 @@ docs/articles/
 results/*
 !results/.gitkeep
 
+# Derived analysis tables/figures (kept local for now; may be committed later, e.g. P6)
+analysis/
+
 # HuggingFace cache, if ever created locally
 .hf_cache/
 hf_cache/

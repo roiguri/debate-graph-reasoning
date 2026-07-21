@@ -75,4 +75,4 @@ def test_repo_p3_matrix_config():
     assert set(cfg.tasks) == {"edge_existence", "node_degree", "connected_nodes"}
     assert set(cfg.encodings) == {"adjacency", "incident", "friendship"}
     assert cfg.n_graphs == 200 and cfg.dataset_seed == 7
-    assert cfg.out_dir == "results/p3-matrix"
+    assert cfg.out_dir == "results/main"  # shared experiment dir; condition in a subfolder
