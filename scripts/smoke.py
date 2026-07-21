@@ -1,4 +1,4 @@
-"""P0 de-risk entrypoint: load a small model, generate once, write JSON.
+"""De-risk entrypoint: load a small model, generate once, write JSON.
 
 Run on the cluster via slurm/smoke.slurm, or directly:
     python scripts/smoke.py --out results/smoke.json
@@ -18,7 +18,7 @@ from pathlib import Path
 from gedebate.model import load_model
 
 # A tiny instruct model that fits the 11GB RTX 2080 comfortably. The full
-# experiment model (larger) is chosen later in P2/P3.
+# experiment model (larger) is chosen by the run config.
 DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
 
 # A hand-written graph question -- just enough to exercise a real prompt.

@@ -1,5 +1,5 @@
 """Fidelity check: our parser must score GraphQA's own gold answers as correct
-for every task x encoding. This is what makes the P3 3x3 matrix a config-only
+for every task x encoding. This is what makes the 3x3 matrix a config-only
 change -- if the parser round-trips the gold across all nine combos, no new parsing
 code is needed to widen the run.
 """

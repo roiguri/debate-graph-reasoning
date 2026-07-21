@@ -65,7 +65,7 @@ def manifest_record(cfg: RunConfig, config_path: str) -> dict:
     return {
         "dataset": cfg.dataset,
         "dataset_sha256": dataset_identity(cfg.dataset),
-        "decoding": "greedy",  # majority-vote (P4) will set temperature here
+        "decoding": "greedy",  # majority-vote will set temperature here
         "max_new_tokens": cfg.max_new_tokens,
         "gedebate_version": gedebate.__version__,
         "git_commit": _git_commit(),
@@ -105,14 +105,18 @@ def summarize_run(cfg: RunConfig) -> dict:
 # --- reproducibility spot check (re-run a sample, compare parsed answers) ------
 
 def verify_sample(model, instances_by_id: dict, rows: list, k: int, *, max_new_tokens: int = 64) -> dict:
-    """Re-run the first K persisted rows and check the parsed answer still matches.
+    """Re-run an even-spaced sample of K persisted rows and check the parsed answer
+    still matches. Spacing spreads the sample across shards/cells rather than
+    concentrating on the first rows.
 
     Greedy fp16 on GPU is not guaranteed byte-identical across hardware, so this
     compares parsed answers, not raw text.
     """
+    step = max(1, len(rows) // k) if k else 1
+    sample = rows[::step][:k]
     checked = matches = 0
     mismatches = []
-    for row in rows[:k]:
+    for row in sample:
         inst = instances_by_id.get(row["instance_id"])
         if inst is None:
             continue

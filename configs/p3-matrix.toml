@@ -1,5 +1,5 @@
-# P3 full-matrix baseline run over the frozen dataset artifact.
-# P4/P5 reuse the same dataset (data/main.jsonl) at matched compute; keep this stable.
+# Full-matrix baseline run over the frozen dataset artifact. The vote and debate
+# conditions reuse the same dataset (data/main.jsonl) at matched compute; keep it stable.
 
 model = "Qwen/Qwen2.5-3B-Instruct"
 condition = "baseline"
@@ -12,5 +12,5 @@ encodings = ["adjacency", "incident", "friendship"]
 max_new_tokens = 128
 
 # One shared experiment dir; conditions live in subfolders (baseline/, then
-# majority_vote/ in P4, debate/ in P5) so matched-compute can join them.
+# majority_vote/, debate/) so matched-compute can join them.
 out_dir = "results/main"

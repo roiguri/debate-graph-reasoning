@@ -1,4 +1,4 @@
-"""Conditions: baseline (P2), majority_vote (P4), debate (P5).
+"""Conditions: baseline, majority_vote, debate.
 
 Each condition exposes a `run_instance(model, instance, ...) -> dict` that produces
 one attempt-level record under the shared persistence schema. Added one at a time,

@@ -6,9 +6,8 @@ is exact-match rather than brittle string compare. `parse` always returns
 `(value, parse_ok)` -- a failed parse yields `(None, False)` so it is *measurable*
 and never silently counted as a wrong answer.
 
-P2.1 implements the bool (edge_existence) path. The int (node_degree) and set
-(connected_nodes) shapes are added in P2.4; the `task`-keyed dispatch is already
-in place so that is purely additive.
+The three answer shapes -- bool (edge_existence), int (node_degree), and sorted
+list (connected_nodes) -- are dispatched by task.
 """
 
 from __future__ import annotations

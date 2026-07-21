@@ -3,7 +3,7 @@
 Independent of the data layer and the model: parse/score are exercised on literal
 inputs only. Covers the bool (edge_existence) parser path and the exact-match
 scorer; the int (node_degree) and set (connected_nodes) parser paths and their
-tests arrive with P2.4.
+tests live alongside.
 """
 
 from __future__ import annotations

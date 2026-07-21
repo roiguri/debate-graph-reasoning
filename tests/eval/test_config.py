@@ -54,7 +54,7 @@ def test_load_config_from_file(tmp_path):
 
 
 def test_repo_p3_matrix_config():
-    # The P3 run config: full matrix over the frozen dataset artifact.
+    # The run config: full matrix over the frozen dataset artifact.
     cfg = load_config("configs/p3-matrix.toml")
     assert set(cfg.tasks) == {"edge_existence", "node_degree", "connected_nodes"}
     assert set(cfg.encodings) == {"adjacency", "incident", "friendship"}

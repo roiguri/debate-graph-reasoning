@@ -1,5 +1,5 @@
 #!/bin/bash
-# Clear accumulated SLURM job logs + P0/P2 smoke artifacts from results/, KEEPING
+# Clear accumulated SLURM job logs + smoke artifacts from results/, KEEPING
 # every run data dir and manifest.json. Run on the cluster from the project root:
 #   bash slurm/clean_logs.sh          # list what would be removed (dry run)
 #   bash slurm/clean_logs.sh --force  # actually remove
@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 
 mkdir -p results/logs   # where future array jobs write (see slurm/p3-matrix.slurm)
 
-# Loose top-level clutter only: job logs and the P0 smoke outputs.
+# Loose top-level clutter only: job logs and the smoke outputs.
 mapfile -t victims < <(find results -maxdepth 1 -type f \
   \( -name '*.out' -o -name '*.err' -o -name 'smoke.json' \) | sort)
 

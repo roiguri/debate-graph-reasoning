@@ -1,6 +1,6 @@
 """Persistence contract: attempt-level JSONL rows, resume, and a run manifest.
 
-The keystone the whole harness (and P4/P5) inherit. Design and rationale are in
+The keystone the whole harness (all conditions) inherits. Design and rationale are in
 docs/notes.md -> "Persistence contract". In short:
 
 - **One row per completed attempt**, written atomically at attempt end. Baseline
@@ -14,8 +14,9 @@ docs/notes.md -> "Persistence contract". In short:
   `*.jsonl` in the run dir, so changing shard count never redoes work.
 - **Kill tolerance**: append + flush + fsync per row; the reader drops an
   unparseable *trailing* line (a torn write) but raises on mid-file corruption.
-- **Manifest guard**: a per-run `manifest.json` pins the model; resuming with a
-  different model is an error (prevents mixing two models into one accuracy).
+- **Manifest guard**: a per-run `manifest.json` doubles as a reproduction record and
+  pins the model + dataset hash; resuming against a different model or dataset is an
+  error (prevents mixing two models or datasets into one accuracy).
 """
 
 from __future__ import annotations

@@ -2,7 +2,7 @@
 
 Independent of the data layer: `build_prompt` reads only `.task` and `.question`,
 so a lightweight stand-in stands in for an Instance. Verifies the terse instruction
-is prefixed and GraphQA's question block is kept verbatim (P2.1 = edge_existence).
+is prefixed and GraphQA's question block is kept verbatim (edge_existence).
 """
 
 from __future__ import annotations

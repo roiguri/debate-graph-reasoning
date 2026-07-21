@@ -10,7 +10,7 @@
 #SBATCH --mem=16000
 #SBATCH --gpus=1
 #SBATCH --constraint=geforce_rtx_2080
-# P3: full 3x3 baseline at N=200, sharded across a SLURM job array. Each array task
+# Full 3x3 baseline at N=200, sharded across a SLURM job array. Each array task
 # runs one shard (--shard i/n derived from the array env), resumably. Submit as:
 #   mkdir -p results/logs                     # log dir must exist before submit
 #   sbatch --array=0-7 slurm/p3-matrix.slurm

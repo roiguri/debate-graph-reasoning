@@ -2,8 +2,8 @@
 
 `run_instance` is the atomic unit the whole harness is built around: build the
 prompt, generate once (greedy), parse, score, and return one attempt-level record.
-In P2.1 that record is printed; P2.2 persists it under the shared schema, and P4/P5
-produce the *same* record shape (N samples / a debate) so nothing is reopened.
+The record is persisted under the shared schema; the other conditions (majority-vote,
+debate) produce the *same* record shape (N samples / a debate) so nothing is reopened.
 
 Deliberately does not import `gedebate.model` at runtime (it pulls torch, a
 cluster-only extra) -- `run_instance` only needs a duck-typed object with a

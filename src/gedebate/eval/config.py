@@ -1,8 +1,8 @@
 """Run configuration, loaded from TOML (stdlib `tomllib`, no new dep).
 
 The config is the **single source of truth for the model id** and the run matrix
-(tasks x encodings x N graphs). P3 fans the full matrix out purely by editing
-these files + `--shard`; no code changes.
+(tasks x encodings x N graphs). The full matrix is run by editing these files +
+`--shard`; no code changes.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 from gedebate.data.dataset import ENCODINGS as ALL_ENCODINGS
 from gedebate.data.dataset import TASKS as ALL_TASKS
 
-KNOWN_CONDITIONS = ("baseline",)  # majority_vote (P4), debate (P5) added later
+KNOWN_CONDITIONS = ("baseline",)  # majority_vote, debate added later
 
 
 @dataclass(frozen=True)

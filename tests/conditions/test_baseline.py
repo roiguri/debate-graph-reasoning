@@ -1,6 +1,6 @@
 """Tests for the baseline pipe -- `conditions.baseline.run_instance` end-to-end.
 
-Integration of the P2.1 slice: a real edge_existence x adjacency instance flows
+Integration: a real edge_existence x adjacency instance flows
 through prompt -> generate -> parse -> score, with a stub model standing in for the
 (torch-only) HF model. Scoring and prompt building are unit-tested separately in
 test_scoring.py / test_prompts.py.

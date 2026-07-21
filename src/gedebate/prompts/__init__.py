@@ -6,8 +6,7 @@ instruct-*chat* model to emit the same short answer a raw-completion model produ
 after "A: ". Templates live here (data, not logic) per the workplan. See
 docs/notes.md -> "Baseline prompt" decision.
 
-P2.1 ships the edge_existence template; node_degree / connected_nodes are added in
-P2.4 (that's all it takes to widen to the full matrix).
+Templates cover all three tasks: edge_existence, node_degree, connected_nodes.
 """
 
 from __future__ import annotations
@@ -34,6 +33,6 @@ def build_prompt(instance: "Instance") -> str:
         instruction = TASK_INSTRUCTION[instance.task]
     except KeyError:
         raise NotImplementedError(
-            f"no prompt template for task '{instance.task}' yet (added in P2.4)"
+            f"no prompt template for task '{instance.task}'"
         )
     return f"{instruction}\n\n{instance.question}"

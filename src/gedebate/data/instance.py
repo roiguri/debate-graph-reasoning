@@ -2,7 +2,7 @@
 
 An Instance packages one GraphQA example (graph + encoding + question + answer)
 into a JSON-serializable record, and adds a *normalized* ground truth (bool / int
-/ sorted list) so P2's scorer can compare structurally rather than string-match
+/ sorted list) so the scorer can compare structurally rather than string-match
 GraphQA's formatted answer.
 """
 

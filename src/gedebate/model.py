@@ -1,9 +1,9 @@
 """Minimal in-process HuggingFace model wrapper.
 
-Deliberately small for P0: load an instruct model, generate on a single prompt,
+Deliberately small: load an instruct model, generate on a single prompt,
 and report the number of generated tokens. Token counting is the one thing that
 must be exact here -- the matched-compute comparison across conditions (baseline
-/ majority-vote / debate) is measured in total generated tokens. Grows in P2.
+/ majority-vote / debate) is measured in total generated tokens.
 """
 
 from __future__ import annotations
