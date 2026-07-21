@@ -10,26 +10,48 @@ section.
 
 ## Data generation
 
-### GraphQA generation parameters — reproduce in P1.4
-Source: Fatemi et al. 2024, Appendix A.4.
-- `n` (node count) ~ uniform over **{5..20}** per graph.
+### GraphQA generation parameters — fact
+We use the vendored `generate_graphs`, so these come for free:
+- `n` (node count) ~ uniform over **{5..19}** per graph (the code's size buckets
+  are 5–9 / 10–14 / 15–19; the paper's prose says "5 to 20").
 - `p` (ER edge probability) ~ uniform over **[0, 1]** per graph — deliberately
   spans empty→complete so the set isn't tuned to one density.
-- **~500** ER graphs sampled this way.
-- NetworkX used for both graph generation **and** ground-truth answers (same as
-  us). Their eval used decoding **temperature 0** (greedy).
+- Graph **count is our knob** (`n_graphs`); the paper used ~500 per generator.
+- NetworkX used for both graph generation **and** ground-truth answers. Their eval
+  used decoding **temperature 0** (greedy).
 
 ### ER only (structure held constant) — decision
 GraphQA studies graph *structure* as a variable (ER, BA, SFN, SBM, star, path,
 complete). We hold it fixed at **ER** because our question varies *encoding ×
-debate*, not structure — so structure is a control. The generator registry keeps
-other generators available if we later want structure as a variable.
+debate*, not structure — so structure is a control. Other generators remain
+available via the vendored `generate_graphs(algorithm=...)` if we later want
+structure as a variable; our adapter just gates to `er`.
 
-### Reimplement, don't vendor — decision
-We reimplement generators/encoders/tasks on NetworkX rather than vendoring the
-`google-research/talk-like-a-graph` code. Each encoder is ~10 lines and each
-ground truth is a NetworkX one-liner; vendoring would pull TF/JAX-era research
-deps for a handful of string functions. GraphQA is cited as the design source.
+### Use official GraphQA code — decision (revised)
+**Supersedes the earlier "reimplement, don't vendor" decision.** That call
+assumed vendoring meant pulling heavy TF/JAX deps. On inspecting the actual repo
+(`google-research/google-research/tree/master/graphqa`, Apache-2.0), that was
+wrong: the modules we need are **pure `networkx`/`numpy`**. TensorFlow appears
+only in the dataset-writing CLI layer, which we don't use.
+
+So we **vendor** the 4 pure files (`graph_generator_utils.py`,
+`name_dictionaries.py`, `graph_text_encoder.py`, `graph_task.py`) and build a
+thin adapter on top. This gives **byte-exact fidelity** to the paper — encoder
+wording, question phrasing, and generation sampling (n∈{5..19}, p∈U[0,1]) — which
+removes every "is this what the paper used?" caveat below. The earlier
+reimplementation (our `generators.py`/`encoders.py`/`naming.py`) is discarded
+(kept in git history). See [plan/p1-data.md](plan/p1-data.md).
+
+**Licensing:** Apache-2.0 permits vendoring with attribution. We keep each file's
+license header, add a NOTICE (source repo + pinned commit + our import-path
+change), and include the Apache-2.0 LICENSE text. Cite Fatemi et al. 2024.
+
+**Fidelity notes now moot:** the encoder-phrasing and name-list caveats recorded
+under "Tasks & encodings" are resolved by using the source directly (e.g.
+adjacency *does* carry the "(i,j) means…" preamble; `_POPULAR_NAMES` interleaves
+male/female from index 5; friendship says "among nodes …"; incident *skips*
+isolated nodes). The HF dataset `baharef/GraphQA` is not used — it ships single-
+encoding pre-baked prompts, which can't give same-graph-across-encodings control.
 
 ---
 
@@ -52,6 +74,23 @@ From Fatemi 2024 Table 1 (PaLM 62B, zero-shot), our three tasks span the range:
 - **edge existence** — barely sensitive to encoding (spread δ≈9)
 - **node degree** — moderately sensitive (incident 25 vs friendship 11)
 - **connected nodes** — highly sensitive (adjacency 19.8 vs incident 53.8)
+
+### Encoding wording is exact (we run the source) — fact
+Because encoders are the vendored `graph_text_encoder.py`, wording is byte-exact
+to GraphQA — no approximation to track. Non-obvious specifics worth knowing:
+- **adjacency** carries the preamble *"In an undirected graph, (i,j) means that
+  node i and node j are connected with an undirected edge. "* (the paper's Figure
+  2 hides it in a two-column layout; the code has it).
+- **incident** handles singular/plural ("node" vs "nodes") and **omits isolated
+  nodes entirely** (no line for a 0-degree node).
+- **friendship** literally says *"…friendship graph among **nodes** James, …"*
+  and uses `_POPULAR_NAMES`, which interleaves male/female from index 5
+  (0→James … 5→Mary … 10→William …).
+
+### Encoder assumptions (held by the vendored code) — note
+- Node labels are contiguous `0..n-1` (name dicts map id → name positionally).
+  Our `generate_graphs` always yields `0..n-1`, so this holds.
+- No self-loops (encoders don't special-case `(i, i)`); ER never produces them.
 
 ### Edge existence is both a task and the Critic's atomic check — note
 The Critic verifies edge-presence claims, and edge existence is also the *least*

@@ -41,7 +41,8 @@ graph-encodings-with-debate/
   scripts/                  # one-off entrypoints (smoke.py); run as python scripts/x.py
   src/gedebate/             # the library
     model.py                # in-process HF wrapper + token accounting
-    data/                   # generators, encoders, tasks, instance     (planned, P1)
+    graphqa/                # vendored GraphQA (Apache-2.0): generator, encoders, tasks
+    data/                   # thin adapter: dataset.py (build_dataset) + instance.py
     conditions/             # baseline / majority_vote / debate          (planned, P2/P4/P5)
     prompts/                # prompt templates, kept out of code         (planned, P2)
     eval/                   # run-the-matrix harness, scoring, resume     (planned, P2)
@@ -56,8 +57,9 @@ graph-encodings-with-debate/
 - **Inference:** in-process HuggingFace Transformers (not vLLM). Model loaded
   directly in the run process. Generated-token counts come from tokenizer output
   length.
-- **Cluster:** TAU CS Slurm, `studentkillable` partition, RTX 2080 (11GB) nodes.
-  Small open-weight instruct models (Qwen / Llama 7-8B, or smaller for smoke).
+- **Cluster:** TAU CS Slurm, `studentkillable` partition, RTX 2080 Ti (11GB)
+  nodes. Model must fit 11GB → ≤3B or 4-bit-quantized 7B (see notes.md VRAM
+  note); the P0 smoke used Qwen2.5-1.5B.
 - **Paths:** conda env + HF cache live on a course netapp path, not home. Driven
   by a `NETAPP` variable via `slurm/_activate.sh` + `slurm/setup_env.sh`. The
   real netapp path (contains a username) stays out of git — placeholder/env only.
@@ -68,7 +70,7 @@ graph-encodings-with-debate/
 | Phase | Slice | Delivers | GPU? | Status |
 |---|---|---|---|---|
 | [P0](p0-env.md) | Cluster env + minimal repo | Slurm setup for this course's netapp; a "model loads" smoke job passes | yes | ✅ |
-| [P1](p1-data.md) | Data generation helpers | Graph generators + 3 encoders + NetworkX ground truth, unit-tested | no | ☐ |
+| [P1](p1-data.md) | Data layer (vendor GraphQA + adapter) | Vendored GraphQA + thin builder; instances with normalized ground truth, tested | no | ✅ |
 | P2 | Baseline, one task × one encoding, end-to-end | Model wrapper + prompt + answer parser + scorer + JSON results + slurm run | yes | ☐ |
 | P3 | Baseline across full 3×3 matrix + analysis | Reproduce encoding-fragility (checkpoint on the premise) | yes | ☐ |
 | P4 | Majority-vote condition | N-sample + vote + token accounting; compare to baseline at matched compute | yes | ☐ |
