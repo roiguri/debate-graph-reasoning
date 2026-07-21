@@ -65,7 +65,7 @@ graph-encodings-with-debate/
 
 | Phase | Slice | Delivers | GPU? | Status |
 |---|---|---|---|---|
-| [P0](p0-env.md) | Cluster env + minimal repo | Slurm setup for this course's netapp; a "model loads" smoke job passes | yes | ☐ |
+| [P0](p0-env.md) | Cluster env + minimal repo | Slurm setup for this course's netapp; a "model loads" smoke job passes | yes | ✅ |
 | [P1](p1-data.md) | Data generation helpers | Graph generators + 3 encoders + NetworkX ground truth, unit-tested | no | ☐ |
 | P2 | Baseline, one task × one encoding, end-to-end | Model wrapper + prompt + answer parser + scorer + JSON results + slurm run | yes | ☐ |
 | P3 | Baseline across full 3×3 matrix + analysis | Reproduce encoding-fragility (checkpoint on the premise) | yes | ☐ |
