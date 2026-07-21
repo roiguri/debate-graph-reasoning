@@ -51,9 +51,21 @@ and a generated-token count.
 - `.gitignore`: `results/`, `.env`, HF cache, `__pycache__/`, `*.egg-info/`.
 - Short `README.md` stub: one-time setup + how to run smoke.
 
+## Cluster facts (confirmed)
+- **Netapp base:** `/home/yandex/MLWG2026/‹user›` (course = Machine Learning
+  with Graphs 2026). The `‹user›` segment is a username — it stays OUT of git.
+  `NETAPP` is read from the gitignored `.env`; `.env.example` ships a placeholder.
+  Rediscover the real value on the cluster with `echo $HOME` / `ls /home/yandex/MLWG2026`.
+- **Resource limits:** each student has limited memory and a limited number of
+  concurrent jobs. Implications carried forward:
+  - Keep per-job memory modest (small models, no oversized batches).
+  - The eval harness (P2+) shards the task×encoding×condition matrix into
+    several right-sized jobs rather than one monolith, and is resumable — so the
+    job quota is used fully and a killed job loses little work.
+
 ## Open decisions
 - **Which model for smoke?** A tiny instruct model that fits 11GB comfortably
   (e.g. `Qwen2.5-1.5B-Instruct` or similar) to keep the de-risk fast. The full
   experiment model (7-8B) is chosen later in P2/P3.
-- Confirm this course's netapp base path and partition/constraint (the `nlp`
-  repo pinned `studentkillable` + `geforce_rtx_2080`; verify the same applies).
+- Confirm the partition/constraint (the `nlp` repo pinned `studentkillable` +
+  `geforce_rtx_2080`; verify the same applies for this course's allocation).

@@ -15,6 +15,8 @@ See [project_proposal.md](../project_proposal.md) for the research question and
   restart.
 - **Matched compute is the core claim.** Track total generated tokens
   (including the Critic's) everywhere, so conditions compare at equal budget.
+- **Share cluster resources.** Limited memory and limited concurrent jobs per
+  student — keep jobs modest and shard the run matrix so the quota is used fully.
 
 ## Environment (from the sibling `nlp` repo's setup)
 
