@@ -190,22 +190,31 @@ def read_manifest(run_dir: str | Path) -> dict | None:
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
-def ensure_manifest(run_dir: str | Path, model: str, **extra) -> dict:
-    """Create the run manifest once, or verify the model matches on resume.
+# Fields that define the instance set + comparison; a resume must not change them.
+# `n_graphs` matters because the generator is NOT N-extensible (see docs/notes.md):
+# instance_id omits N, so resuming with a different N would skip-by-id onto
+# *different* graphs. Guarding it turns that silent corruption into a clear error.
+_GUARDED_KEYS = ("model", "dataset_seed", "n_graphs")
 
-    Guards against silently mixing two models' rows into one accuracy -- resuming a
-    run dir with a different model raises. `extra` snapshots config/commit/host/gpu.
+
+def ensure_manifest(run_dir: str | Path, model: str, **extra) -> dict:
+    """Create the run manifest once, or verify the guarded fields match on resume.
+
+    Guards `model`, `dataset_seed`, and `n_graphs` (whichever are supplied) so a
+    resume can never mix two models -- or two datasets -- into one accuracy. `extra`
+    also snapshots config/commit/host/gpu for provenance.
     """
+    fields = {"schema_version": SCHEMA_VERSION, "model": model, **extra}
     existing = read_manifest(run_dir)
     if existing is not None:
-        if existing.get("model") != model:
-            raise ValueError(
-                f"run dir {run_dir!s} was built with model {existing.get('model')!r}, "
-                f"not {model!r} -- use a fresh out_dir"
-            )
+        for k in _GUARDED_KEYS:
+            if k in fields and existing.get(k) != fields[k]:
+                raise ValueError(
+                    f"run dir {run_dir!s} was built with {k}={existing.get(k)!r}, "
+                    f"not {fields[k]!r} -- use a fresh out_dir"
+                )
         return existing
-    manifest = {"schema_version": SCHEMA_VERSION, "model": model, **extra}
     p = manifest_path(run_dir)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    return manifest
+    p.write_text(json.dumps(fields, indent=2), encoding="utf-8")
+    return fields

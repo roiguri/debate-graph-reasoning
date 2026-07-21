@@ -67,3 +67,12 @@ def test_repo_pilot_matrix_config_covers_full_matrix():
     cfg = load_config("configs/pilot-matrix.toml")
     assert set(cfg.tasks) == {"edge_existence", "node_degree", "connected_nodes"}
     assert set(cfg.encodings) == {"adjacency", "incident", "friendship"}
+
+
+def test_repo_p3_matrix_config():
+    # The P3 run config: full matrix, N/seed fixed (generator not N-extensible).
+    cfg = load_config("configs/p3-matrix.toml")
+    assert set(cfg.tasks) == {"edge_existence", "node_degree", "connected_nodes"}
+    assert set(cfg.encodings) == {"adjacency", "incident", "friendship"}
+    assert cfg.n_graphs == 200 and cfg.dataset_seed == 7
+    assert cfg.out_dir == "results/p3-matrix"

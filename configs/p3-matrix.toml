@@ -1,0 +1,15 @@
+# P3 full-matrix baseline run. N=200 / seed=7 are FIXED: the generator is not
+# N-extensible (see docs/notes.md), so changing N means a fresh out_dir + rerun.
+# P4/P5 reuse these exact instances at matched compute -- keep this config stable.
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "baseline"
+
+tasks = ["edge_existence", "node_degree", "connected_nodes"]
+encodings = ["adjacency", "incident", "friendship"]
+
+n_graphs = 200
+dataset_seed = 7
+max_new_tokens = 128   # connected_nodes lists can be long; edge/degree stay terse
+
+out_dir = "results/p3-matrix"
