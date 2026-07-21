@@ -34,11 +34,14 @@ combinator is a later option only if we explore beyond the three.
 
 ## Substeps
 
-### P1.1 — Graph generation
-- `src/gedebate/data/generators.py`: Erdős–Rényi generator (matches the paper),
-  `gnp_random_graph(n, p, seed)`. Parametrize `n` range and `p`.
-- Registry: `@register_generator("er")`. Keep the seam for BA/star/path later.
-- Return plain `nx.Graph` (undirected, matching the tasks chosen).
+### P1.1 — Graph generation  [done]
+- `src/gedebate/data/generators.py`: Erdős–Rényi generator, a pure function of
+  `(n, seed, p)` returning an undirected int-labeled `nx.Graph`. Registered as
+  `"er"` via the generic `registry.py`.
+- The generator does NOT sample `n`/`p` itself — it stays deterministic and
+  testable; the per-instance sampling lives in P1.4.
+- GraphQA's generation parameters (n/p sampling, count) and the ER-only scoping
+  decision are recorded in [../notes.md](../notes.md#data-generation).
 
 ### P1.2 — Encoders (the three chosen)
 - `src/gedebate/data/encoders.py`, each `nx.Graph -> str`:
@@ -71,7 +74,10 @@ combinator is a later option only if we explore beyond the three.
   `results/`). Store the graph as an edge list so instances are reproducible
   without re-running the generator.
 - A `build_dataset(config, seed)` that iterates generator × task × encoding and
-  yields instances.
+  yields instances. This is where GraphQA's sampling is reproduced (per-graph
+  `n`/`p` draw from one master seed — see
+  [../notes.md](../notes.md#graphqa-generation-parameters--reproduce-in-p14)).
+  The generator stays a pure function; the builder owns the randomness.
 
 ### P1.5 — Tests (`tests/`)
 - Encoders: hand-verify a tiny 3-node graph's string under each encoding.

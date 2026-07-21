@@ -4,6 +4,8 @@ Living tracker for _Does Debate Improve Encoding-Fragile LLM Graph Reasoning?_
 See [project_proposal.md](../project_proposal.md) for the research question and
 [grading_criteria.md](../grading_criteria.md) for what the final writeup is judged on.
 Cluster login/build/run steps live in [cluster-runbook.md](../cluster-runbook.md).
+Reference facts + design decisions (feeding the writeup) live in
+[notes.md](../notes.md).
 
 ## Working principles
 
