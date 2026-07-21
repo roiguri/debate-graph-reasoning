@@ -61,3 +61,9 @@ def test_repo_baseline_config_is_valid():
     assert cfg.condition == "baseline"
     assert cfg.tasks == ("edge_existence",) and cfg.encodings == ("adjacency",)
     assert "Qwen" in cfg.model
+
+
+def test_repo_pilot_matrix_config_covers_full_matrix():
+    cfg = load_config("configs/pilot-matrix.toml")
+    assert set(cfg.tasks) == {"edge_existence", "node_degree", "connected_nodes"}
+    assert set(cfg.encodings) == {"adjacency", "incident", "friendship"}
