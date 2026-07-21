@@ -111,3 +111,68 @@ The proposal's "7–8B" needs revisiting here. Smoke used Qwen2.5-1.5B (fits eas
 ### Inference stack — fact
 In-process HuggingFace Transformers (not vLLM), greedy by default. Generated-
 token count = tokenizer output length; this feeds the matched-compute comparison.
+
+### Baseline model: Qwen2.5-3B-Instruct, config-owned — decision (P2)
+Start with **Qwen2.5-3B-Instruct** (fp16, ~6 GB — fits 11 GB with KV headroom, no
+quantization confound perturbing the very fragility we study). Deviates from the
+proposal's "7–8B" purely for VRAM; state this in the writeup. The model id lives
+in **one place — the run's TOML config** — so swapping to a 4-bit 7B (if the
+P2/P3 pilot shows floor effects) is a one-line change. Proposer and Critic will
+be the same model in two roles (simplest, keeps matched-compute clean).
+
+---
+
+## Prompting & scoring
+
+### Baseline prompt = GraphQA zero-shot, direct answer — decision (P2)
+Faithful to Fatemi 2024's headline (Table 1 **ZERO-SHOT** row): a raw
+`…Q: ‹question›\nA: ` completion, terse answer, **no CoT, no few-shot**. That row
+is what produces the encoding-fragility spread (edge-existence µ/δ 44.5/9.4, node
+degree 14.0/16.0, connected nodes 14.7/11.0). We keep GraphQA's question verbatim
+(already our `Instance.question`) and add only a **minimal terse-format
+instruction** so an instruct-*chat* model (Qwen2.5-3B) emits the same short answer
+shape a raw-completion model (PaLM) did after `A: `. The chat-template-vs-raw-
+completion gap is the one deliberate adaptation; record it in the writeup.
+Rationale for not adding CoT to the baseline: the baseline is *meant* to be the
+weak reference — debate/vote are where accuracy should climb. Floor-effect risk
+on a 3B model is real; the P2 pilot sanity-checks we're not at rock-bottom-zero
+everywhere (which would threaten P3's "reproduce fragility" premise).
+
+### Scoring = exact match (incl. connected_nodes full set) — fact + decision (P2)
+The paper's accuracy (`scoref`) is **whole-answer exact match**; the 19.8/53.8
+connected-nodes numbers are the fraction of graphs where the model's neighbor set
+equals ground truth **exactly** (the 0.5% disconnected-nodes result confirms no
+partial credit). We mirror it: parsed value `==` normalized `ground_truth`, with
+**set-equality** for connected_nodes. **No Jaccard / partial credit** in the
+reported metric. We do track a separate **`parse_ok`** flag so parse failures are
+visible and measurable rather than silently scored as wrong (a high parse-failure
+rate is a confound to watch, not a result).
+
+---
+
+## Experiment harness
+
+### Persistence contract — decision (P2)
+The results format is a keystone P4/P5 inherit; two constraints shaped it — the
+`studentkillable` partition kills jobs mid-run, and matched-compute is defined as
+total generated tokens per instance per condition.
+- **Atomic unit = one completed *attempt*, written once at attempt end** (not one
+  generation). Baseline = 1 row/instance, majority-vote = N rows (one per sample),
+  debate = 1 row with tokens **summed** across all Proposer+Critic calls. Chosen
+  over generation-level rows because a debate killed mid-loop would otherwise leave
+  partial generations that double-count tokens on re-run; attempt-level rows are
+  all-or-nothing, so a kill leaves no row and re-running is clean. Trade-off
+  accepted: a killed debate redoes the whole (short, token-capped) loop.
+- **One uniform, lean row schema for all three conditions**, so baseline's row *is*
+  the final schema — nothing reopened. The verbose debate trace lives in a
+  **sidecar** (`traces/{instance_id}.json`), keeping the main JSONL uniform;
+  analysis never needs it for primary numbers.
+- **Resume** = "instance done under condition C when it has ≥ `expected_attempts(C)`
+  rows" (1 for baseline/debate, N for MV). One JSONL **file per shard**; done-ids
+  read from the **union of all `*.jsonl` in the run**, so re-sharding never redoes
+  work. Kill tolerance: flush per row (lose ≤1 in-flight attempt); reader drops a
+  torn trailing line. A per-run `manifest.json` snapshots config/model/commit and
+  guards against mixing two models' rows into one accuracy.
+- **Majority-vote stores one row per sample** (not an aggregated blob): resume tops
+  up missing sample indices, and it exposes individual-sample-vs-vote accuracy — a
+  number worth reporting (does the vote actually beat the average single draw?).
