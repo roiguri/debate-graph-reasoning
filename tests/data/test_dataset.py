@@ -71,3 +71,28 @@ def test_json_roundtrip():
     restored = json.loads(json.dumps(inst.to_dict()))
     assert restored["task"] in TASKS
     assert isinstance(restored["question"], str)
+    assert restored["instance_id"] == inst.instance_id  # convenience field present
+
+
+# --- instance_id (the resume key) ---------------------------------------------
+
+def test_instance_id_format_deterministic_and_unique():
+    insts = build_dataset(n_graphs=3, seed=7)
+
+    i0 = insts[0]
+    assert i0.instance_id == f"{i0.dataset_seed}/{i0.graph_index}/{i0.task}/{i0.encoding}"
+    assert i0.dataset_seed == 7
+
+    ids = [i.instance_id for i in insts]
+    assert len(ids) == len(set(ids))  # unique across the whole dataset
+
+    # deterministic: the same seed rebuilds the same ids.
+    assert set(ids) == {i.instance_id for i in build_dataset(n_graphs=3, seed=7)}
+
+
+def test_instance_id_shares_graph_index_across_encodings():
+    # One (graph, task) differs only by the encoding suffix -> same graph_index.
+    insts = [i for i in build_dataset(n_graphs=2, seed=7)
+             if i.task == "edge_existence" and i.graph_index == 0]
+    assert {i.encoding for i in insts} == set(ENCODINGS)
+    assert {i.instance_id.rsplit("/", 1)[0] for i in insts} == {"7/0/edge_existence"}

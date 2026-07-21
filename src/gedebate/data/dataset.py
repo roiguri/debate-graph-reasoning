@@ -86,6 +86,8 @@ def build_dataset(
                         nedges=int(ex["nedges"]),
                         graph_edgelist=_edgelist(graph),
                         query_seed=qseed,
+                        dataset_seed=seed,
+                        graph_index=gi,
                     )
                 )
     return instances

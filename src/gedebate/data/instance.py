@@ -29,9 +29,22 @@ class Instance:
     nedges: int
     graph_edgelist: list  # sorted [ [u, v], ... ] so the graph is reproducible
     query_seed: int  # per-(graph, task) seed that fixed the query across encodings
+    dataset_seed: int  # the master seed the whole dataset was built from
+    graph_index: int  # position of this graph within that dataset (0-based)
+
+    @property
+    def instance_id(self) -> str:
+        """Deterministic resume key: unique per (dataset, graph, task, encoding).
+
+        Stable across runs because the dataset is deterministic in `dataset_seed`.
+        This is the key the results layer counts attempts against.
+        """
+        return f"{self.dataset_seed}/{self.graph_index}/{self.task}/{self.encoding}"
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        d["instance_id"] = self.instance_id  # convenience; not a stored field
+        return d
 
 
 def normalized_ground_truth(task: str, graph: nx.Graph, node_ids: list) -> GroundTruth:
