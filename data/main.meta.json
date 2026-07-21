@@ -1,0 +1,23 @@
+{
+  "name": "main",
+  "spec": {
+    "algorithm": "er",
+    "dataset_seed": 7,
+    "n_graphs": 200,
+    "tasks": [
+      "edge_existence",
+      "node_degree",
+      "connected_nodes"
+    ],
+    "encodings": [
+      "adjacency",
+      "incident",
+      "friendship"
+    ]
+  },
+  "n_instances": 1800,
+  "sha256": "7030fa5d81589af4c56a9aa0b5e1fac3cb64e0aa8595850e770b058fe7785506",
+  "gedebate_version": "0.0.1",
+  "git_commit": "464c83feacb7df12544d32b1ddcc499f75dd6c66",
+  "created": "2026-07-21T12:29:14.687130+00:00"
+}
