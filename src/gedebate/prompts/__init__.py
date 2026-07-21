@@ -20,6 +20,11 @@ if TYPE_CHECKING:  # avoid importing the data layer at runtime just for a type h
 # One terse-format instruction per task, mirroring GraphQA's gold answer shape.
 TASK_INSTRUCTION = {
     "edge_existence": 'Answer with exactly "Yes" or "No" and nothing else.',
+    "node_degree": "Answer with a single integer (the degree) and nothing else.",
+    "connected_nodes": (
+        "Answer with the connected nodes as a comma-separated list "
+        '(or "none" if there are none) and nothing else.'
+    ),
 }
 
 

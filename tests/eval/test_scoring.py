@@ -40,10 +40,73 @@ def test_parse_edge_existence_failure_is_measurable(text):
     assert ok is False
 
 
-def test_parse_unimplemented_task_raises():
-    # Documents the P2.4 boundary rather than mis-parsing an unsupported task.
+def test_parse_unknown_task_raises():
     with pytest.raises(NotImplementedError):
-        parse("node_degree", "3")
+        parse("cycle_check", "yes")
+
+
+# --- parse: node_degree (int) -------------------------------------------------
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("3.", 3),
+        ("3", 3),
+        ("0", 0),
+        ("The degree is 3.", 3),
+        ("Node 5 has degree 3.", 3),   # last integer wins over the echoed node id
+    ],
+)
+def test_parse_node_degree_ok(text, expected):
+    value, ok = parse("node_degree", text)
+    assert ok is True
+    assert value == expected
+
+
+@pytest.mark.parametrize("text", ["", "many", "no idea"])
+def test_parse_node_degree_failure(text):
+    value, ok = parse("node_degree", text)
+    assert value is None and ok is False
+
+
+# --- parse: connected_nodes (set, encoding-aware) -----------------------------
+
+def test_parse_connected_nodes_integer_encoding():
+    # adjacency/incident: labels are integers.
+    value, ok = parse("connected_nodes", "1, 2.", encoding="adjacency", node_ids=[0])
+    assert ok is True and value == [1, 2]
+
+
+def test_parse_connected_nodes_drops_echoed_source():
+    # A model that echoes "connected to 0: 1, 2" must not count the source node.
+    value, ok = parse(
+        "connected_nodes", "Node 0 is connected to 1 and 2", encoding="adjacency", node_ids=[0]
+    )
+    assert ok is True and value == [1, 2]
+
+
+def test_parse_connected_nodes_named_encoding():
+    # friendship: labels are names (James=0, John=2). Source is Mary=5.
+    value, ok = parse(
+        "connected_nodes", "James, John.", encoding="friendship", node_ids=[5]
+    )
+    assert ok is True and value == [0, 2]
+
+
+@pytest.mark.parametrize("text", ["No nodes.", "none", "There are no other nodes."])
+def test_parse_connected_nodes_empty(text):
+    value, ok = parse("connected_nodes", text, encoding="adjacency", node_ids=[0])
+    assert ok is True and value == []
+
+
+def test_parse_connected_nodes_failure():
+    value, ok = parse("connected_nodes", "I am unsure", encoding="adjacency", node_ids=[0])
+    assert value is None and ok is False
+
+
+def test_parse_connected_nodes_requires_encoding():
+    with pytest.raises(ValueError):
+        parse("connected_nodes", "1, 2", node_ids=[0])
 
 
 # --- score: exact match -------------------------------------------------------

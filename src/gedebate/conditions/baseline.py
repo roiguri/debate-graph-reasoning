@@ -31,7 +31,9 @@ def run_instance(
     """Prompt -> greedy generate -> parse -> score -> one attempt record."""
     prompt = build_prompt(instance)
     gen = model.generate(prompt, max_new_tokens=max_new_tokens)  # greedy (temp=None)
-    parsed, parse_ok = parse(instance.task, gen.text)
+    parsed, parse_ok = parse(
+        instance.task, gen.text, encoding=instance.encoding, node_ids=instance.node_ids
+    )
     correct = score(parsed, instance.ground_truth)
     return {
         "condition": CONDITION,

@@ -28,7 +28,15 @@ def test_prefixes_instruction_and_keeps_question_verbatim():
     assert prompt.endswith(_QUESTION)  # GraphQA block unchanged, still ends in "A: "
 
 
-def test_unimplemented_task_raises():
-    inst = SimpleNamespace(task="node_degree", question=_QUESTION)
+@pytest.mark.parametrize("task", ["edge_existence", "node_degree", "connected_nodes"])
+def test_all_three_tasks_have_templates(task):
+    inst = SimpleNamespace(task=task, question=_QUESTION)
+    prompt = build_prompt(inst)
+    assert prompt.endswith(_QUESTION)
+    assert len(prompt) > len(_QUESTION)  # an instruction was prefixed
+
+
+def test_unknown_task_raises():
+    inst = SimpleNamespace(task="cycle_check", question=_QUESTION)
     with pytest.raises(NotImplementedError):
         build_prompt(inst)
