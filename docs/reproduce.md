@@ -31,22 +31,24 @@ in the script, and run `--init`. To grow the set, append a new seed's instances;
 existing `instance_id`s never move.
 
 ## 2. Results: reproduce
-A run evaluates one condition over the dataset and writes per-instance rows. This
-one command is the whole reproducible unit, anywhere:
+A run loads `data/main.jsonl` (never regenerates), evaluates one condition, and
+writes per-instance rows. This one command is the whole reproducible unit, anywhere:
 ```bash
 python -m gedebate.eval.runner --config configs/p3-matrix.toml
 # split across machines/GPUs with --shard i/n (e.g. --shard 0/8); resumable, so
 # re-running skips already-done instances. Writes results/main/baseline/.
 ```
-Lands with the dataset refactor (R2, see [plan/refactor-dataset.md](plan/refactor-dataset.md)),
-not built yet:
-- the run loads the frozen `data/main.jsonl` instead of regenerating graphs;
-- it writes `results/main/manifest.json` as a full reproduction record (model,
-  dataset path plus `sha256`, decoding, `max_new_tokens`, git commit, gedebate
-  version), the source of truth for what produced a `results/main/` dir;
-- `--verify-sample K` re-runs K stored instances and asserts the parsed answers
-  match (greedy fp16 on GPU is not byte-identical across hardware, so it checks
-  parsed answers, not raw text).
+The run writes `results/main/manifest.json`, the reproduction record: model, dataset
+path plus `sha256`, decoding, `max_new_tokens`, git commit, and gedebate version. It
+is the source of truth for what produced a `results/main/` dir, and a resume against
+a different model or dataset is refused.
+
+Verify a run reproduces (re-run a sample, check parsed answers match the stored rows):
+```bash
+python -m gedebate.eval.runner --config configs/p3-matrix.toml --verify-sample 20
+```
+Greedy fp16 on GPU is not byte-identical across hardware, so this checks parsed
+answers, not raw text.
 
 ## 3. Analysis: reproduce (available now)
 No GPU needed; point it at wherever the run wrote its results:

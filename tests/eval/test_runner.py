@@ -1,5 +1,6 @@
-"""Tests for the runner: single-instance persist/skip (P2.2) and the config-driven,
-shardable batch loop with resume (P2.3). A stub model keeps it torch-free.
+"""Tests for the runner: dataset load+filter, sharding, the config-driven batch
+loop with resume, the manifest reproduction-record guard, and verify_sample.
+Stub model + a tmp dataset artifact, so no torch is required.
 """
 
 from __future__ import annotations
@@ -8,17 +9,19 @@ from dataclasses import dataclass
 
 import pytest
 
+from gedebate.data.dataset import build_dataset
+from gedebate.data.store import dump_dataset
 from gedebate.eval import results
 from gedebate.eval.config import RunConfig
 from gedebate.eval.runner import (
     build_instances,
-    first_instance,
     parse_shard,
     run_instances,
-    run_one_persisted,
     select_shard,
-    summarize_run,
+    verify_sample,
 )
+
+MANIFEST = {"dataset_sha256": "testhash"}  # minimal reproduction record for the guard
 
 
 @dataclass
@@ -35,32 +38,32 @@ class _StubModel:
 
     def generate(self, prompt, *, max_new_tokens=64, **_):
         self.calls += 1
-        return _StubGen(self.reply, n_gen_tokens=7, n_prompt_tokens=11)
+        return _StubGen(self.reply, 7, 11)
 
 
-def _inst():
-    return first_instance(n_graphs=4, seed=7, task="edge_existence", encoding="adjacency")
+def _dataset(tmp_path, n=5):
+    p = tmp_path / "ds.jsonl"
+    dump_dataset(build_dataset(n_graphs=n, seed=7), p)
+    return str(p)
 
 
-def test_persist_then_skip_on_rerun(tmp_path):
-    inst = _inst()
-    model = _StubModel()
+def _cfg(tmp_path, **over):
+    base = dict(
+        model="stub-model", out_dir=str(tmp_path / "out"), dataset=_dataset(tmp_path),
+        condition="baseline", tasks=("edge_existence",), encodings=("adjacency",),
+        max_new_tokens=16,
+    )
+    base.update(over)
+    return RunConfig(**base)
 
-    row = run_one_persisted(model, inst, str(tmp_path), "stub-model")
-    assert row is not None
-    assert row["instance_id"] == inst.instance_id
-    assert model.calls == 1
 
-    # Manifest written; exactly one persisted row.
-    assert results.read_manifest(tmp_path)["model"] == "stub-model"
-    path = results.shard_file(tmp_path, "baseline")
-    assert len(results.read_rows(path)) == 1
+# --- load + filter ------------------------------------------------------------
 
-    # Re-run: instance already done -> skipped, model not called again, no new row.
-    skipped = run_one_persisted(model, inst, str(tmp_path), "stub-model")
-    assert skipped is None
-    assert model.calls == 1
-    assert len(results.read_rows(path)) == 1
+def test_build_instances_loads_and_filters(tmp_path):
+    cfg = _cfg(tmp_path)  # edge_existence x adjacency
+    insts = build_instances(cfg)
+    assert len(insts) == 5  # 5 graphs x 1 task x 1 encoding
+    assert {(i.task, i.encoding) for i in insts} == {("edge_existence", "adjacency")}
 
 
 # --- sharding -----------------------------------------------------------------
@@ -74,7 +77,6 @@ def test_select_shard_partitions_disjointly_and_completely():
     items = list(range(23))
     n = 4
     shards = [select_shard(items, s, n) for s in range(n)]
-    # union == all, and pairwise disjoint
     assert sorted(x for sh in shards for x in sh) == items
     seen = set()
     for sh in shards:
@@ -87,45 +89,50 @@ def test_select_shard_out_of_range():
         select_shard([1, 2, 3], 4, 4)
 
 
-# --- config-driven batch loop with resume -------------------------------------
-
-def _cfg(tmp_path, **over):
-    base = dict(
-        model="stub-model", out_dir=str(tmp_path), condition="baseline",
-        tasks=("edge_existence",), encodings=("adjacency",),
-        n_graphs=5, dataset_seed=7, max_new_tokens=16,
-    )
-    base.update(over)
-    return RunConfig(**base)
-
+# --- batch loop with resume ---------------------------------------------------
 
 def test_run_instances_persists_and_resumes(tmp_path):
     cfg = _cfg(tmp_path)
     instances = build_instances(cfg)
-    assert len(instances) == 5  # 5 graphs x 1 task x 1 encoding
+    assert len(instances) == 5
 
-    # First pass over the first 3 instances (simulating a kill after 3).
     model = _StubModel()
-    stats = run_instances(model, instances[:3], cfg)
-    assert stats == {"written": 3, "skipped": 0}
-    assert model.calls == 3
+    stats = run_instances(model, instances[:3], cfg, MANIFEST)
+    assert stats == {"written": 3, "skipped": 0} and model.calls == 3
 
-    # Resume over ALL 5: the first 3 are skipped, only 2 new generations happen.
     model2 = _StubModel()
-    stats2 = run_instances(model2, instances, cfg)
-    assert stats2 == {"written": 2, "skipped": 3}
-    assert model2.calls == 2
+    stats2 = run_instances(model2, instances, cfg, MANIFEST)
+    assert stats2 == {"written": 2, "skipped": 3} and model2.calls == 2
 
-    # One row per instance, and the summary covers all 5.
     path = results.shard_file(cfg.out_dir, "baseline")
     assert len(results.read_rows(path)) == 5
-    summary = summarize_run(cfg)
-    assert summary[("edge_existence", "adjacency")]["n"] == 5
 
 
 def test_run_instances_manifest_guards_model(tmp_path):
     cfg = _cfg(tmp_path)
-    run_instances(_StubModel(), build_instances(cfg), cfg)
-    # Same out_dir, different model -> refused.
+    run_instances(_StubModel(), build_instances(cfg), cfg, MANIFEST)
     with pytest.raises(ValueError):
-        run_instances(_StubModel(), build_instances(cfg), _cfg(tmp_path, model="other"))
+        run_instances(_StubModel(), build_instances(cfg), _cfg(tmp_path, model="other"), MANIFEST)
+
+
+def test_run_instances_manifest_guards_dataset(tmp_path):
+    cfg = _cfg(tmp_path)
+    run_instances(_StubModel(), build_instances(cfg), cfg, {"dataset_sha256": "h1"})
+    with pytest.raises(ValueError):
+        run_instances(_StubModel(), build_instances(cfg), cfg, {"dataset_sha256": "h2"})
+
+
+# --- verify_sample (reproducibility spot check) -------------------------------
+
+def test_verify_sample_matches_and_detects_mismatch(tmp_path):
+    cfg = _cfg(tmp_path)
+    insts = build_instances(cfg)
+    run_instances(_StubModel("Yes."), insts, cfg, MANIFEST)  # persist: all parse to True
+    rows = [r for f in results.result_files(cfg.out_dir) for r in results.read_rows(f)]
+    by_id = {i.instance_id: i for i in insts}
+
+    same = verify_sample(_StubModel("Yes."), by_id, rows, k=3)
+    assert same["checked"] == 3 and same["matches"] == 3 and not same["mismatches"]
+
+    diff = verify_sample(_StubModel("No."), by_id, rows, k=3)  # now parse to False
+    assert diff["checked"] == 3 and diff["matches"] == 0 and len(diff["mismatches"]) == 3

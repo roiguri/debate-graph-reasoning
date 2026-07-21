@@ -1,16 +1,15 @@
-# P3 full-matrix baseline run. N=200 / seed=7 are FIXED: the generator is not
-# N-extensible (see docs/notes.md), so changing N means a fresh out_dir + rerun.
-# P4/P5 reuse these exact instances at matched compute -- keep this config stable.
+# P3 full-matrix baseline run over the frozen dataset artifact.
+# P4/P5 reuse the same dataset (data/main.jsonl) at matched compute; keep this stable.
 
 model = "Qwen/Qwen2.5-3B-Instruct"
 condition = "baseline"
+dataset = "data/main.jsonl"
 
+# tasks/encodings default to the whole dataset; list a subset here to filter.
 tasks = ["edge_existence", "node_degree", "connected_nodes"]
 encodings = ["adjacency", "incident", "friendship"]
 
-n_graphs = 200
-dataset_seed = 7
-max_new_tokens = 128   # connected_nodes lists can be long; edge/degree stay terse
+max_new_tokens = 128
 
 # One shared experiment dir; conditions live in subfolders (baseline/, then
 # majority_vote/ in P4, debate/ in P5) so matched-compute can join them.

@@ -162,13 +162,10 @@ def test_ensure_manifest_rejects_model_mismatch(tmp_path):
         results.ensure_manifest(tmp_path, "model-B")
 
 
-def test_ensure_manifest_guards_dataset_seed_and_n_graphs(tmp_path):
-    results.ensure_manifest(tmp_path, "m", dataset_seed=7, n_graphs=200)
+def test_ensure_manifest_guards_dataset_sha256(tmp_path):
+    results.ensure_manifest(tmp_path, "m", dataset_sha256="abc", dataset="data/main.jsonl")
     # identical guarded fields -> ok (returns existing)
-    results.ensure_manifest(tmp_path, "m", dataset_seed=7, n_graphs=200)
-    # a different N would skip-by-id onto different graphs -> hard error
+    results.ensure_manifest(tmp_path, "m", dataset_sha256="abc")
+    # a different dataset (different hash) -> hard error, no silent mixing
     with pytest.raises(ValueError):
-        results.ensure_manifest(tmp_path, "m", dataset_seed=7, n_graphs=100)
-    # a different seed is a different dataset -> hard error
-    with pytest.raises(ValueError):
-        results.ensure_manifest(tmp_path, "m", dataset_seed=8, n_graphs=200)
+        results.ensure_manifest(tmp_path, "m", dataset_sha256="def")

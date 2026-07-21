@@ -42,3 +42,17 @@ def load_dataset(path: str | Path) -> list[Instance]:
         d.pop("instance_id", None)  # a derived property, not a constructor field
         out.append(Instance(**d))
     return out
+
+
+def meta_path_for(dataset_path: str | Path) -> Path:
+    """The provenance sidecar next to a dataset (data/main.jsonl -> data/main.meta.json)."""
+    return Path(dataset_path).with_suffix(".meta.json")
+
+
+def dataset_identity(dataset_path: str | Path) -> str:
+    """The dataset's content hash: read from the committed meta (source of truth),
+    or computed from the file if no meta sits alongside it."""
+    meta = meta_path_for(dataset_path)
+    if meta.exists():
+        return json.loads(meta.read_text(encoding="utf-8"))["sha256"]
+    return dataset_sha256(load_dataset(dataset_path))

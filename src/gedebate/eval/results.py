@@ -196,19 +196,19 @@ def read_manifest(run_dir: str | Path) -> dict | None:
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
-# Fields that define the instance set + comparison; a resume must not change them.
-# `n_graphs` matters because the generator is NOT N-extensible (see docs/notes.md):
-# instance_id omits N, so resuming with a different N would skip-by-id onto
-# *different* graphs. Guarding it turns that silent corruption into a clear error.
-_GUARDED_KEYS = ("model", "dataset_seed", "n_graphs")
+# Fields that pin the instance set + comparison; a resume must not change them.
+# `dataset_sha256` identifies the exact frozen dataset that produced the rows, so
+# resuming a run dir against a different model or dataset is a hard error rather
+# than silent corruption.
+_GUARDED_KEYS = ("model", "dataset_sha256")
 
 
 def ensure_manifest(run_dir: str | Path, model: str, **extra) -> dict:
     """Create the run manifest once, or verify the guarded fields match on resume.
 
-    Guards `model`, `dataset_seed`, and `n_graphs` (whichever are supplied) so a
-    resume can never mix two models -- or two datasets -- into one accuracy. `extra`
-    also snapshots config/commit/host/gpu for provenance.
+    The manifest doubles as a reproduction record (dataset + sha256, decoding,
+    git commit, ...). Guards `model` + `dataset_sha256` (whichever are supplied) so
+    a resume can never mix two models -- or two datasets -- into one accuracy.
     """
     fields = {"schema_version": SCHEMA_VERSION, "model": model, **extra}
     existing = read_manifest(run_dir)

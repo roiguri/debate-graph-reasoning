@@ -21,11 +21,11 @@ KNOWN_CONDITIONS = ("baseline",)  # majority_vote (P4), debate (P5) added later
 class RunConfig:
     model: str
     out_dir: str
+    dataset: str  # path to a frozen dataset artifact (data/main.jsonl)
     condition: str = "baseline"
+    # tasks/encodings act as FILTERS over the loaded dataset (default: all of it).
     tasks: tuple[str, ...] = tuple(ALL_TASKS)
     encodings: tuple[str, ...] = tuple(ALL_ENCODINGS)
-    n_graphs: int = 20
-    dataset_seed: int = 7
     max_new_tokens: int = 64
 
     @classmethod
@@ -34,8 +34,9 @@ class RunConfig:
         unknown = set(data) - allowed
         if unknown:
             raise ValueError(f"unknown config keys: {sorted(unknown)}")
-        if "model" not in data or "out_dir" not in data:
-            raise ValueError("config must set 'model' and 'out_dir'")
+        for req in ("model", "out_dir", "dataset"):
+            if req not in data:
+                raise ValueError(f"config must set '{req}'")
 
         tasks = tuple(data.get("tasks", ALL_TASKS))
         encodings = tuple(data.get("encodings", ALL_ENCODINGS))
@@ -48,11 +49,10 @@ class RunConfig:
         return cls(
             model=data["model"],
             out_dir=data["out_dir"],
+            dataset=data["dataset"],
             condition=condition,
             tasks=tasks,
             encodings=encodings,
-            n_graphs=int(data.get("n_graphs", 20)),
-            dataset_seed=int(data.get("dataset_seed", 7)),
             max_new_tokens=int(data.get("max_new_tokens", 64)),
         )
 

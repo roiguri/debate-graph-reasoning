@@ -23,14 +23,15 @@ We use the vendored `generate_graphs`, so these come for free:
 ### Graph generation is not N-extensible — fact (P3)
 `generate_graphs(number_of_graphs=N, seed)` draws all N size-choices in **one**
 up-front `random.choices(..., k=N)` batch, which offsets the per-graph RNG stream
-that follows. So changing N re-samples the **entire** graph sequence — the first
+that follows. So changing N re-samples the **entire** graph sequence: the first
 100 graphs of an N=200 build are NOT the first 100 of an N=100 build (verified).
-Consequences: (1) N is fixed per run — growing it means a fresh `out_dir` + a
-baseline rerun on new graphs; (2) since `instance_id` omits N, resuming an
-`out_dir` with a different N would skip-by-id onto different graphs — so the
-manifest guards `n_graphs` (+ `dataset_seed`) to make that a hard error, not silent
-corruption. For more samples later, add an independent **seed** and pool, rather
-than enlarging N in place.
+This is why the dataset is now a **frozen committed artifact** (`data/main.jsonl`,
+see [dataset refactor](plan/refactor-dataset.md)) that every run loads rather than
+regenerates: results are anchored to the artifact, not to implicit generator
+determinism. The run manifest guards `dataset_sha256` (the artifact's content hash),
+so a resume against a different dataset is a hard error. To get more samples, append
+an independent **seed**'s instances to the dataset; existing `instance_id`s never
+move.
 
 ### ER only (structure held constant) — decision
 GraphQA studies graph *structure* as a variable (ER, BA, SFN, SBM, star, path,
