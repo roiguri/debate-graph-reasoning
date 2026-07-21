@@ -1,1 +1,21 @@
+# Reference articles (downloaded PDFs)
 docs/articles/
+
+# Secrets & machine-specific config (holds HF_TOKEN and the real NETAPP path)
+.env
+
+# Run outputs (kept locally, not in git)
+results/*
+!results/.gitkeep
+
+# HuggingFace cache, if ever created locally
+.hf_cache/
+hf_cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
