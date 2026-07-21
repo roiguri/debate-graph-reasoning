@@ -1,5 +1,11 @@
 # P2 — Baseline, one task × one encoding, end-to-end
 
+**Status: complete (P2.1–P2.5 done).** The pilot validated the whole pipeline on
+the cluster (Qwen2.5-3B, RTX 2080 Ti): `parse_ok = 1.000` across all 9 task ×
+encoding cells with correct extraction on real model output, accuracy off the
+floor, token accounting populated, resume/manifest working. Pilot numbers and the
+first fragility signal are logged in [notes.md](../notes.md#p2-pilot-result--fact-p25).
+
 Goal: the first **runnable, scoreable** condition — take a data-layer `Instance`,
 prompt the model, parse the answer, score it against ground truth, and persist a
 result — proven end-to-end on a single (task, encoding) slice. **GPU** (a tiny

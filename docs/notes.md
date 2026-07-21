@@ -176,3 +176,23 @@ total generated tokens per instance per condition.
 - **Majority-vote stores one row per sample** (not an aggregated blob): resume tops
   up missing sample indices, and it exposes individual-sample-vs-vote accuracy — a
   number worth reporting (does the vote actually beat the average single draw?).
+
+### P2 pilot result — fact (P2.5)
+First real-GPU run (Qwen2.5-3B-Instruct, RTX 2080 Ti 11GB, greedy). Validates the
+harness end-to-end; **not** a measurement (N=8–20, noisy). Key facts for the writeup:
+- **The model fits and the parser is faithful to real output.** `parse_ok = 1.000`
+  in all 9 task × encoding cells; manual inspection confirms correct extraction
+  (terse integers, name→id mapping, source-node dropped, "none" → empty set). Every
+  scored error is a genuine model error, not a parse artifact. So P3 is a config
+  change (bump `n_graphs`), no parser work.
+- **No floor effect**; accuracy spans 0.25–0.90.
+- **Fragility is already visible even at N=8** (matches Fatemi's direction): edge
+  existence is easiest and encoding-insensitive (adjacency/friendship 0.875,
+  incident 0.75); connected_nodes is hardest and encoding-sensitive (adjacency
+  0.625 > incident 0.50 > **friendship 0.25**); node_degree middling (adjacency
+  0.375 vs incident/friendship 0.75). Real N in P3 will measure this properly.
+- **Prompt behaves:** the terse-format instruction lands — outputs are bare (`"3"`,
+  `"none"`, clean name lists), so baseline gen-token counts are small (16–80).
+- **Follow-up for P4:** Qwen ships `top_p=0.8/top_k=20` in its generation_config;
+  harmless under greedy (warned + ignored), but sampling params must be set
+  explicitly once majority-vote actually samples.
