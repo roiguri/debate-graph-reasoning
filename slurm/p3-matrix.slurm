@@ -13,11 +13,11 @@
 # P3: full 3x3 baseline at N=200, sharded across a SLURM job array. Each array task
 # runs one shard (--shard i/n derived from the array env), resumably. Submit as:
 #   mkdir -p results/logs                     # log dir must exist before submit
-#   sbatch --array=0-7%3 slurm/p3-matrix.slurm
-# %3 caps concurrency at 3 -- safe under an unknown per-student quota (extra shards
-# pend, they don't error); raise once `sacctmgr` confirms the real limit. Killed
-# shards rerun and skip already-done instances. Non-array `sbatch` runs shard 0/1
-# (the whole matrix in one job).
+#   sbatch --array=0-7 slurm/p3-matrix.slurm
+# The QOS (gpustudentkill) caps a student at 24 concurrent GPUs with no job-count
+# cap, so all 8 single-GPU shards run at once. Add a `%k` throttle (e.g. %6) only to
+# be a lighter cluster citizen. Killed shards rerun and skip already-done instances.
+# Non-array `sbatch` runs shard 0/1 (the whole matrix in one job).
 
 set -eo pipefail
 cd "$SLURM_SUBMIT_DIR"

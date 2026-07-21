@@ -1,8 +1,13 @@
-"""Tests for `gedebate.eval.report` -- per (task, encoding) summary."""
+"""Tests for `gedebate.eval.report` -- per (task, encoding) summary + fragility."""
 
 from __future__ import annotations
 
-from gedebate.eval.report import format_summary, summarize
+from gedebate.eval.report import (
+    format_fragility,
+    format_summary,
+    fragility,
+    summarize,
+)
 
 
 def _row(task, enc, correct, parse_ok=True, gen=5):
@@ -32,3 +37,45 @@ def test_format_summary_lists_each_group():
     out = format_summary(s)
     assert "edge_existence" in out and "adjacency" in out
     assert "acc" in out  # header present
+
+
+# --- fragility ----------------------------------------------------------------
+
+def _summary_from(acc_by_cell):
+    """Build a summarize()-shaped dict from {(task,enc): accuracy}."""
+    return {k: {"n": 10, "accuracy": a, "parse_ok_rate": 1.0, "total_gen_tokens": 0}
+            for k, a in acc_by_cell.items()}
+
+
+def test_fragility_spread_stats():
+    summary = _summary_from({
+        ("connected_nodes", "adjacency"): 0.2,
+        ("connected_nodes", "incident"): 0.5,
+        ("connected_nodes", "friendship"): 0.1,
+    })
+    f = fragility(summary)["connected_nodes"]
+    assert f["best"] == "incident" and f["worst"] == "friendship"
+    assert abs(f["max_min"] - 0.4) < 1e-9
+    assert abs(f["mean"] - (0.2 + 0.5 + 0.1) / 3) < 1e-9
+    assert f["std"] > 0.0
+    assert set(f["per_encoding"]) == {"adjacency", "incident", "friendship"}
+
+
+def test_fragility_no_spread_is_zero():
+    summary = _summary_from({
+        ("edge_existence", "adjacency"): 0.8,
+        ("edge_existence", "incident"): 0.8,
+        ("edge_existence", "friendship"): 0.8,
+    })
+    f = fragility(summary)["edge_existence"]
+    assert f["max_min"] == 0.0 and f["std"] == 0.0
+
+
+def test_format_fragility_table():
+    summary = _summary_from({
+        ("node_degree", "adjacency"): 0.375,
+        ("node_degree", "incident"): 0.75,
+        ("node_degree", "friendship"): 0.75,
+    })
+    out = format_fragility(fragility(summary))
+    assert "node_degree" in out and "max-min" in out

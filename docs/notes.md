@@ -124,6 +124,13 @@ The proposal's "7–8B" needs revisiting here. Smoke used Qwen2.5-1.5B (fits eas
 In-process HuggingFace Transformers (not vLLM), greedy by default. Generated-
 token count = tokenizer output length; this feeds the matched-compute comparison.
 
+### Cluster quota: 24 GPUs/user, no job cap — fact (P3)
+QOS `gpustudentkill`: `MaxTRESPU = gres/gpu=24` (up to 24 concurrent GPUs per
+student), **no** `MaxJobsPU`/`MaxSubmitPU` cap; partition `MaxTime = 24h`. So GPU
+phases can fan out wide — P3's 8-shard array runs fully concurrent; the expensive
+P4/P5 conditions can shard to ~24 single-GPU jobs. (Association-level limits are
+empty; the QOS holds the only real cap.)
+
 ### Baseline model: Qwen2.5-3B-Instruct, config-owned — decision (P2)
 Start with **Qwen2.5-3B-Instruct** (fp16, ~6 GB — fits 11 GB with KV headroom, no
 quantization confound perturbing the very fragility we study). Deviates from the

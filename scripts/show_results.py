@@ -19,6 +19,8 @@ from gedebate.eval import report, results
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir")
+    ap.add_argument("--fragility", action="store_true",
+                    help="also show per-task cross-encoding spread (mean/std/max-min)")
     ap.add_argument("--raw", action="store_true", help="print per-instance raw_output -> parsed")
     ap.add_argument("--wrong-only", action="store_true", help="with --raw, only incorrect rows")
     ap.add_argument("--task", default=None)
@@ -27,7 +29,12 @@ def main() -> None:
 
     rows = [r for f in results.result_files(args.run_dir) for r in results.read_rows(f)]
     print(f"{len(rows)} rows in {args.run_dir}\n")
-    print(report.format_summary(report.summarize(rows)))
+    summary = report.summarize(rows)
+    print(report.format_summary(summary))
+
+    if args.fragility:
+        print("\n-- fragility (accuracy spread across encodings, per task) --")
+        print(report.format_fragility(report.fragility(summary)))
 
     if not args.raw:
         return
