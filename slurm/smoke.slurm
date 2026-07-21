@@ -22,5 +22,5 @@ source slurm/_activate.sh
 echo "host=$(hostname)"
 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader || true
 
-python -u -m gedebate.smoke --out results/smoke.json
+python -u scripts/smoke.py --out results/smoke.json
 echo "Done. See results/smoke.json"

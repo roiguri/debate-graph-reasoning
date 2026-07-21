@@ -1,7 +1,7 @@
 """P0 de-risk entrypoint: load a small model, generate once, write JSON.
 
 Run on the cluster via slurm/smoke.slurm, or directly:
-    python -m gedebate.smoke --out results/smoke.json
+    python scripts/smoke.py --out results/smoke.json
 
 Confirms the env, GPU, model load, generation, and token accounting all work
 end-to-end before any real experiment code is built.

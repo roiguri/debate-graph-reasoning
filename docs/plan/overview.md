@@ -3,6 +3,7 @@
 Living tracker for _Does Debate Improve Encoding-Fragile LLM Graph Reasoning?_
 See [project_proposal.md](../project_proposal.md) for the research question and
 [grading_criteria.md](../grading_criteria.md) for what the final writeup is judged on.
+Cluster login/build/run steps live in [cluster-runbook.md](../cluster-runbook.md).
 
 ## Working principles
 
@@ -17,6 +18,36 @@ See [project_proposal.md](../project_proposal.md) for the research question and
   (including the Critic's) everywhere, so conditions compare at equal budget.
 - **Share cluster resources.** Limited memory and limited concurrent jobs per
   student — keep jobs modest and shard the run matrix so the quota is used fully.
+
+## Repository layout
+
+Intended shape. Per the vertical-slice principle, directories are created when
+their phase needs them, not upfront — `(planned, Pn)` marks what does not exist
+yet and which phase introduces it.
+
+```
+graph-encodings-with-debate/
+  pyproject.toml            # package + deps (core light; inference extra = GPU stack)
+  .env.example              # NETAPP + HF_TOKEN template (real .env is gitignored)
+  docs/
+    project_proposal.md
+    grading_criteria.md
+    cluster-runbook.md      # login / build / run reference
+    plan/                   # this tracker + per-phase substep docs
+    articles/               # reference PDFs (gitignored)
+  slurm/                    # _activate.sh, setup_env.sh, *.slurm job scripts
+  scripts/                  # one-off entrypoints (smoke.py); run as python scripts/x.py
+  src/gedebate/             # the library
+    model.py                # in-process HF wrapper + token accounting
+    data/                   # generators, encoders, tasks, instance     (planned, P1)
+    conditions/             # baseline / majority_vote / debate          (planned, P2/P4/P5)
+    prompts/                # prompt templates, kept out of code         (planned, P2)
+    eval/                   # run-the-matrix harness, scoring, resume     (planned, P2)
+  configs/                  # experiment configs (model, grid, N, caps)  (planned, P2)
+  tests/                    # unit tests (encoders, parsing, loop logic)
+  analysis/                 # tables + figures for the writeup           (planned, P6)
+  results/                  # run outputs, JSON/CSV (gitignored)
+```
 
 ## Environment (from the sibling `nlp` repo's setup)
 
