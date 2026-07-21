@@ -4,7 +4,7 @@
 #
 # Run from your LOCAL project root:
 #   NETAPP=/home/yandex/MLWG2026/<your-username> bash scripts/pull_results.sh
-#   NETAPP=... bash scripts/pull_results.sh p3-matrix   # just one run subdir
+#   NETAPP=... bash scripts/pull_results.sh main   # just one run subdir
 #
 # Requires the TAU VPN up and an ssh host alias `slurm-client` (see cluster-runbook.md).
 set -eo pipefail
@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 : "${NETAPP:?set NETAPP to your cluster netapp path, e.g. /home/yandex/MLWG2026/<user>}"
 HOST="${SLURM_HOST:-slurm-client}"
 REMOTE="$HOST:$NETAPP/graph-encodings-with-debate/results/"
-SUBDIR="${1:-}"   # optional: restrict to one run dir (e.g. p3-matrix)
+SUBDIR="${1:-}"   # optional: restrict to one run dir (e.g. main)
 
 mkdir -p results
 if [ -n "$SUBDIR" ]; then
@@ -26,4 +26,4 @@ else
   rsync -av --exclude 'logs/' --exclude '*.out' --exclude '*.err' "$REMOTE" "results/"
 fi
 echo "Done. Analyze locally, e.g.:"
-echo "  python scripts/show_results.py results/${SUBDIR:-p3-matrix} --fragility"
+echo "  python scripts/show_results.py results/${SUBDIR:-main} --fragility"

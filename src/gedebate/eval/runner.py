@@ -1,6 +1,6 @@
 """Baseline runner over the frozen dataset artifact.
 
-    python -m gedebate.eval.runner --config configs/p3-matrix.toml           # run a condition
+    python -m gedebate.eval.runner --config configs/matrix.toml           # run a condition
     python -m gedebate.eval.runner --config C --shard 0/8                     # one shard of it
     python -m gedebate.eval.runner --config C --verify-sample 20              # reproducibility spot check
 

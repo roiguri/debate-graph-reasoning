@@ -5,11 +5,11 @@
 #   bash slurm/clean_logs.sh --force  # actually remove
 #
 # Only touches loose log/smoke files at the top of results/ -- never the per-run
-# subdirectories (results/p2-baseline/, results/p3-matrix/, ...) or their manifests.
+# subdirectories (results/main/, ...) or their manifests.
 set -eo pipefail
 cd "$(dirname "$0")/.."
 
-mkdir -p results/logs   # where future array jobs write (see slurm/p3-matrix.slurm)
+mkdir -p results/logs   # where future array jobs write (see slurm/matrix.slurm)
 
 # Loose top-level clutter only: job logs and the smoke outputs.
 mapfile -t victims < <(find results -maxdepth 1 -type f \

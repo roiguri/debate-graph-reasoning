@@ -48,15 +48,15 @@ slices, not five.
 
 ### P3.1 — Run the full matrix (reuse P2 at scale)
 Launch the whole 3×3 at N=200 and let it complete, resumably, across the cluster.
-- `configs/p3-matrix.toml`: full 3×3, `n_graphs = 200`, `dataset_seed = 7`,
+- `configs/matrix.toml`: full 3×3, `n_graphs = 200`, `dataset_seed = 7`,
   `out_dir = results/main` (condition in a `baseline/` subfolder), `max_new_tokens = 128`.
 - **The one code change:** harden `results.ensure_manifest` to guard `dataset_seed`
   **and** `n_graphs` (it already records them). `instance_id` omits N, so resuming
   an `out_dir` with a different N would skip-by-id onto *different* graphs — the
   guard makes that a hard error, not silent corruption. Add a test.
-- `slurm/p3-matrix.slurm`: P2 node pins; shard from the array env
+- `slurm/matrix.slurm`: P2 node pins; shard from the array env
   (`--shard ${SLURM_ARRAY_TASK_ID}/${SLURM_ARRAY_TASK_COUNT}`); logs → `results/logs/`.
-  Submit `sbatch --array=0-7%3 slurm/p3-matrix.slurm` (8 shards, ≤3 concurrent —
+  Submit `sbatch --array=0-7%3 slurm/matrix.slurm` (8 shards, ≤3 concurrent —
   safe under unknown quota). Killed shards rerun and skip done work; the union of
   shard files is the full run.
 - Done: 1800 rows in `results/main/baseline/`, `parse_ok` ≈ 1.0 at real N.

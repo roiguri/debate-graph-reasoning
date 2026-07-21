@@ -34,7 +34,7 @@ existing `instance_id`s never move.
 A run loads `data/main.jsonl` (never regenerates), evaluates one condition, and
 writes per-instance rows. This one command is the whole reproducible unit, anywhere:
 ```bash
-python -m gedebate.eval.runner --config configs/p3-matrix.toml
+python -m gedebate.eval.runner --config configs/matrix.toml
 # split across machines/GPUs with --shard i/n (e.g. --shard 0/8); resumable, so
 # re-running skips already-done instances. Writes results/main/baseline/.
 ```
@@ -45,7 +45,7 @@ a different model or dataset is refused.
 
 Verify a run reproduces (re-run a sample, check parsed answers match the stored rows):
 ```bash
-python -m gedebate.eval.runner --config configs/p3-matrix.toml --verify-sample 20
+python -m gedebate.eval.runner --config configs/matrix.toml --verify-sample 20
 ```
 Greedy fp16 on GPU is not byte-identical across hardware, so this checks parsed
 answers, not raw text.

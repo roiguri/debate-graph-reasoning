@@ -27,5 +27,5 @@ K="${1:-100}"
 echo "host=$(hostname) verify-sample K=$K"
 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader || true
 
-python -u -m gedebate.eval.runner --config configs/p3-matrix.toml --verify-sample "$K"
+python -u -m gedebate.eval.runner --config configs/matrix.toml --verify-sample "$K"
 echo "Done. See the reproduce count above."

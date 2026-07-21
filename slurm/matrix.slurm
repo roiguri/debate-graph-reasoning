@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=ge-p3-matrix
+#SBATCH --job-name=ge-matrix
 #SBATCH --output=results/logs/%x.%A_%a.out
 #SBATCH --error=results/logs/%x.%A_%a.err
 #SBATCH --partition=studentkillable
@@ -13,7 +13,7 @@
 # Full 3x3 baseline at N=200, sharded across a SLURM job array. Each array task
 # runs one shard (--shard i/n derived from the array env), resumably. Submit as:
 #   mkdir -p results/logs                     # log dir must exist before submit
-#   sbatch --array=0-7 slurm/p3-matrix.slurm
+#   sbatch --array=0-7 slurm/matrix.slurm
 # The QOS (gpustudentkill) caps a student at 24 concurrent GPUs with no job-count
 # cap, so all 8 single-GPU shards run at once. Add a `%k` throttle (e.g. %6) only to
 # be a lighter cluster citizen. Killed shards rerun and skip already-done instances.
@@ -30,5 +30,5 @@ NSHARDS="${SLURM_ARRAY_TASK_COUNT:-1}"
 echo "host=$(hostname) array=${SLURM_ARRAY_JOB_ID:-NA} task=${SHARD}/${NSHARDS}"
 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader || true
 
-python -u -m gedebate.eval.runner --config configs/p3-matrix.toml --shard "${SHARD}/${NSHARDS}"
+python -u -m gedebate.eval.runner --config configs/matrix.toml --shard "${SHARD}/${NSHARDS}"
 echo "Done shard ${SHARD}/${NSHARDS}. Pull results locally with scripts/pull_results.sh"
