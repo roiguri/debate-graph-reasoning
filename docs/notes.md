@@ -20,6 +20,18 @@ We use the vendored `generate_graphs`, so these come for free:
 - NetworkX used for both graph generation **and** ground-truth answers. Their eval
   used decoding **temperature 0** (greedy).
 
+### Graph generation is not N-extensible — fact (P3)
+`generate_graphs(number_of_graphs=N, seed)` draws all N size-choices in **one**
+up-front `random.choices(..., k=N)` batch, which offsets the per-graph RNG stream
+that follows. So changing N re-samples the **entire** graph sequence — the first
+100 graphs of an N=200 build are NOT the first 100 of an N=100 build (verified).
+Consequences: (1) N is fixed per run — growing it means a fresh `out_dir` + a
+baseline rerun on new graphs; (2) since `instance_id` omits N, resuming an
+`out_dir` with a different N would skip-by-id onto different graphs — so the
+manifest guards `n_graphs` (+ `dataset_seed`) to make that a hard error, not silent
+corruption. For more samples later, add an independent **seed** and pool, rather
+than enlarging N in place.
+
 ### ER only (structure held constant) — decision
 GraphQA studies graph *structure* as a variable (ER, BA, SFN, SBM, star, path,
 complete). We hold it fixed at **ER** because our question varies *encoding ×
