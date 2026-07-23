@@ -1,0 +1,15 @@
+# Replication baseline on independent seed 13 (sibling of configs/matrix.toml).
+# Same model / tasks / encodings / N as main; only the dataset (and its seed) and
+# out_dir differ. Pool with results/main in analysis to check the fragility
+# pattern replicates on fresh graphs (scripts/show_results.py results/main results/seed13).
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "baseline"
+dataset = "data/seed13.jsonl"
+
+tasks = ["edge_existence", "node_degree", "connected_nodes"]
+encodings = ["adjacency", "incident", "friendship"]
+
+max_new_tokens = 128
+
+out_dir = "results/seed13"

@@ -102,6 +102,18 @@ def test_cochran_q_matches_closed_form():
 
 # --- task_significance (integration over rows) --------------------------------
 
+def test_pooling_two_seeds_does_not_collide_on_graph_index():
+    # Same graph_index 0..2 under two seeds are DIFFERENT graphs: pooled discordant
+    # counts must add up (6 b-pairs), not collapse to one seed's worth (3).
+    rows = []
+    for seed in (7, 11):
+        for g in range(3):
+            rows += [_row("t", "A", g, True, seed=seed),
+                     _row("t", "B", g, False, seed=seed)]
+    m = mcnemar(rows, "A", "B")
+    assert m["b"] == 6 and m["c"] == 0  # both seeds counted, not overwritten
+
+
 def test_task_significance_picks_best_worst_and_reports_both_tests():
     rows = []
     for g in range(20):

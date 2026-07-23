@@ -1,0 +1,23 @@
+{
+  "name": "seed13",
+  "spec": {
+    "algorithm": "er",
+    "dataset_seed": 13,
+    "n_graphs": 200,
+    "tasks": [
+      "edge_existence",
+      "node_degree",
+      "connected_nodes"
+    ],
+    "encodings": [
+      "adjacency",
+      "incident",
+      "friendship"
+    ]
+  },
+  "n_instances": 1800,
+  "sha256": "c462c051153a9bf76b2c2942b0b24c0677520ce77ed66290c059e2df70c1d460",
+  "gedebate_version": "0.0.1",
+  "git_commit": "1c5e788275a464dfd820da42785f4cd221b8acdd",
+  "created": "2026-07-23T12:48:27.703567+00:00"
+}

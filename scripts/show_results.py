@@ -1,4 +1,4 @@
-"""Inspect a run dir's results: summary + significance + optional raw->parsed rows.
+"""Inspect run dir(s): summary + significance + optional raw->parsed rows.
 
 Shell-agnostic (no heredoc needed -- the cluster login shell is tcsh):
 
@@ -7,21 +7,37 @@ Shell-agnostic (no heredoc needed -- the cluster login shell is tcsh):
     python scripts/show_results.py results/main --raw --wrong-only
     python scripts/show_results.py results/main --raw \
         --task connected_nodes --encoding friendship
+
+Pool independent seeds for a replication check by passing more than one run dir.
+The pooled tables answer "is the effect real"; `--by-seed` also prints each seed's
+own fragility table so you can see the *pattern* repeat on independent graphs:
+
+    python scripts/show_results.py results/main results/seed11 results/seed13 \
+        --fragility --by-seed
 """
 
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 from pathlib import Path
 
 from gedebate.eval import report, results, stats
 
 
+def _seed_of(row: dict) -> str:
+    """The dataset seed a row came from (first field of instance_id)."""
+    return row["instance_id"].split("/")[0]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("run_dir")
+    ap.add_argument("run_dir", nargs="+",
+                    help="one or more run dirs; multiple are pooled (replication)")
     ap.add_argument("--fragility", action="store_true",
                     help="also show per-task cross-encoding spread + paired significance")
+    ap.add_argument("--by-seed", action="store_true",
+                    help="with >1 seed present, also print each seed's own fragility table")
     ap.add_argument("--save", metavar="DIR", default=None,
                     help="write summary/fragility/significance CSVs here (e.g. analysis/baseline)")
     ap.add_argument("--raw", action="store_true", help="print per-instance raw_output -> parsed")
@@ -30,18 +46,28 @@ def main() -> None:
     ap.add_argument("--encoding", default=None)
     args = ap.parse_args()
 
-    rows = [r for f in results.result_files(args.run_dir) for r in results.read_rows(f)]
-    print(f"{len(rows)} rows in {args.run_dir}\n")
+    rows = [r for d in args.run_dir for f in results.result_files(d) for r in results.read_rows(f)]
+    seeds = sorted({_seed_of(r) for r in rows})
+    where = ", ".join(args.run_dir)
+    print(f"{len(rows)} rows in {where}  (seeds: {', '.join(seeds) or 'none'})\n")
     summary = report.summarize(rows)
     frag = report.fragility(summary)
     sig = stats.task_significance(rows)
     print(report.format_summary(summary))
 
     if args.fragility:
-        print("\n-- fragility (accuracy spread across encodings, per task) --")
+        pooled = "pooled, all seeds" if len(seeds) > 1 else "single seed"
+        print(f"\n-- fragility (accuracy spread across encodings, per task; {pooled}) --")
         print(report.format_fragility(frag))
         print("\n-- significance (paired: encodings share the same graphs) --")
         print(report.format_significance(sig))
+        if args.by_seed and len(seeds) > 1:
+            by_seed: dict[str, list[dict]] = defaultdict(list)
+            for r in rows:
+                by_seed[_seed_of(r)].append(r)
+            for seed in seeds:
+                print(f"\n-- seed {seed} only (replication view) --")
+                print(report.format_fragility(report.fragility(report.summarize(by_seed[seed]))))
 
     if args.save:
         out = Path(args.save)

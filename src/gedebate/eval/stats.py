@@ -30,9 +30,16 @@ def _norm_sf(x: float) -> float:
     return 0.5 * math.erfc(x / math.sqrt(2))
 
 
-def graph_index(instance_id: str) -> str:
-    """Graph key that pairs encodings/seeds: the graph_index field of instance_id."""
-    return instance_id.split("/")[1]
+def graph_key(instance_id: str) -> str:
+    """The graph a row belongs to, for pairing encodings: "<seed>/<graph_index>".
+
+    instance_id is "seed/graph_index/task/encoding". The pairing key is BOTH the
+    seed and the graph_index, not graph_index alone -- when seeds are pooled,
+    graph 0 of seed 7 and graph 0 of seed 11 are *different* graphs and must not
+    share a key (else one silently overwrites the other and half the pool is lost).
+    """
+    seed, gidx = instance_id.split("/")[:2]
+    return f"{seed}/{gidx}"
 
 
 def wilson_ci(k: int, n: int, z: float = Z_95) -> tuple[float, float]:
@@ -47,10 +54,10 @@ def wilson_ci(k: int, n: int, z: float = Z_95) -> tuple[float, float]:
 
 
 def _correct_by_graph(rows: list[dict]) -> dict[str, dict[str, bool]]:
-    """{graph_index: {encoding: correct}} for one task's rows."""
+    """{graph_key: {encoding: correct}} for one task's rows (keys are seed-scoped)."""
     out: dict[str, dict[str, bool]] = defaultdict(dict)
     for r in rows:
-        out[graph_index(r["instance_id"])][r["encoding"]] = bool(r["correct"])
+        out[graph_key(r["instance_id"])][r["encoding"]] = bool(r["correct"])
     return out
 
 
