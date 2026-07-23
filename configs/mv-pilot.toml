@@ -1,0 +1,17 @@
+# Majority-vote PILOT: one cell, isolated throwaway out_dir. A cheap real-GPU check
+# that sampling + N-row persistence + vote reporting work before the full array.
+# results/mv-pilot is disposable (delete after); the full run uses configs/mv.toml.
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "majority_vote"
+dataset = "data/main.jsonl"
+
+n_samples = 10
+temperature = 0.7
+
+# single cell -> ~200 instances x 10 draws; enough to confirm the pipeline end to end.
+tasks = ["node_degree"]
+encodings = ["incident"]
+max_new_tokens = 128
+
+out_dir = "results/mv-pilot"
