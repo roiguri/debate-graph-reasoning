@@ -132,7 +132,14 @@ def _run_vote_samples(model, inst, cfg: RunConfig, path, progress) -> int:
 
 
 def summarize_run(cfg: RunConfig) -> dict:
-    rows = [r for f in results.result_files(cfg.out_dir) for r in results.read_rows(f)]
+    """Per-cell summary for the config's condition only (a shared out_dir holds
+    baseline/ and majority_vote/ side by side; never pool them into one accuracy)."""
+    rows = [
+        r for f in results.result_files(cfg.out_dir) for r in results.read_rows(f)
+        if r["condition"] == cfg.condition
+    ]
+    if cfg.condition == "majority_vote":
+        return report.summarize_votes(rows)
     return report.summarize(rows)
 
 
@@ -191,7 +198,9 @@ def _run_config(config_path: str, shard_spec: str) -> None:
     print(f"Loaded on device={model.device}. Running ...", flush=True)
     stats = run_instances(model, instances, cfg, manifest, shard=shard)
     print(f"done: wrote {stats['written']}, skipped {stats['skipped']}\n", flush=True)
-    print(report.format_summary(summarize_run(cfg)), flush=True)
+    fmt = (report.format_vote_summary if cfg.condition == "majority_vote"
+           else report.format_summary)
+    print(fmt(summarize_run(cfg)), flush=True)
 
 
 def _verify_sample(config_path: str, k: int) -> None:

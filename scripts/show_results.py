@@ -50,12 +50,22 @@ def main() -> None:
     seeds = sorted({_seed_of(r) for r in rows})
     where = ", ".join(args.run_dir)
     print(f"{len(rows)} rows in {where}  (seeds: {', '.join(seeds) or 'none'})\n")
-    summary = report.summarize(rows)
-    frag = report.fragility(summary)
-    sig = stats.task_significance(rows)
-    print(report.format_summary(summary))
 
-    if args.fragility:
+    # A shared out_dir holds baseline/ and majority_vote/ side by side; summarize each
+    # separately (per-draw accuracy for baseline, voted-per-instance for majority-vote)
+    # rather than pooling them into one number.
+    base_rows = [r for r in rows if r["condition"] != "majority_vote"]
+    mv_rows = [r for r in rows if r["condition"] == "majority_vote"]
+
+    summary = report.summarize(base_rows) if base_rows else {}
+    frag = report.fragility(summary) if base_rows else {}
+    sig = stats.task_significance(base_rows) if base_rows else {}
+    if base_rows:
+        if mv_rows:
+            print("-- baseline (greedy, per instance) --")
+        print(report.format_summary(summary))
+
+    if base_rows and args.fragility:
         pooled = "pooled, all seeds" if len(seeds) > 1 else "single seed"
         print(f"\n-- fragility (accuracy spread across encodings, per task; {pooled}) --")
         print(report.format_fragility(frag))
@@ -63,19 +73,31 @@ def main() -> None:
         print(report.format_significance(sig))
         if args.by_seed and len(seeds) > 1:
             by_seed: dict[str, list[dict]] = defaultdict(list)
-            for r in rows:
+            for r in base_rows:
                 by_seed[_seed_of(r)].append(r)
             for seed in seeds:
                 print(f"\n-- seed {seed} only (replication view) --")
                 print(report.format_fragility(report.fragility(report.summarize(by_seed[seed]))))
 
+    vote_summary = report.summarize_votes(mv_rows) if mv_rows else {}
+    if mv_rows:
+        print("\n-- majority vote (voted per instance; 1samp = mean single-draw acc) --")
+        print(report.format_vote_summary(vote_summary))
+
     if args.save:
         out = Path(args.save)
         out.mkdir(parents=True, exist_ok=True)
-        (out / "summary.csv").write_text(report.summary_to_csv(summary), encoding="utf-8")
-        (out / "fragility.csv").write_text(report.fragility_to_csv(frag), encoding="utf-8")
-        (out / "significance.csv").write_text(report.significance_to_csv(sig), encoding="utf-8")
-        print(f"\nsaved summary.csv + fragility.csv + significance.csv -> {out}/")
+        wrote = []
+        if base_rows:
+            (out / "summary.csv").write_text(report.summary_to_csv(summary), encoding="utf-8")
+            (out / "fragility.csv").write_text(report.fragility_to_csv(frag), encoding="utf-8")
+            (out / "significance.csv").write_text(report.significance_to_csv(sig), encoding="utf-8")
+            wrote += ["summary.csv", "fragility.csv", "significance.csv"]
+        if mv_rows:
+            (out / "vote_summary.csv").write_text(
+                report.vote_summary_to_csv(vote_summary), encoding="utf-8")
+            wrote.append("vote_summary.csv")
+        print(f"\nsaved {' + '.join(wrote)} -> {out}/")
 
     if not args.raw:
         return

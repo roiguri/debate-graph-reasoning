@@ -1,0 +1,18 @@
+# Majority-vote (self-consistency) over the same frozen dataset the baseline scored.
+# N=10 sampled draws per instance at temperature 0.7; the vote is aggregated at
+# report time. Shares out_dir with the baseline (sibling majority_vote/ subfolder)
+# so the matched-compute comparison can join them on instance_id.
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "majority_vote"
+dataset = "data/main.jsonl"
+
+n_samples = 10
+temperature = 0.7
+
+# same tasks/encodings + token cap as the baseline, so a per-draw row is comparable.
+tasks = ["edge_existence", "node_degree", "connected_nodes"]
+encodings = ["adjacency", "incident", "friendship"]
+max_new_tokens = 128
+
+out_dir = "results/main"

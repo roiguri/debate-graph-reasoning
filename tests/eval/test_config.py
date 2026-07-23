@@ -64,6 +64,15 @@ def test_load_config_from_file(tmp_path):
     assert cfg.dataset == "data/main.jsonl" and cfg.tasks == ("edge_existence",)
 
 
+def test_repo_mv_config():
+    # The majority-vote run config: N=10 sampled draws over the frozen dataset.
+    cfg = load_config("configs/mv.toml")
+    assert cfg.condition == "majority_vote"
+    assert cfg.n_samples == 10 and cfg.temperature == 0.7
+    assert cfg.dataset == "data/main.jsonl" and cfg.out_dir == "results/main"
+    assert cfg.max_new_tokens == 128
+
+
 def test_repo_p3_matrix_config():
     # The run config: full matrix over the frozen dataset artifact.
     cfg = load_config("configs/matrix.toml")
