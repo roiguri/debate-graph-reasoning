@@ -17,7 +17,8 @@ import subprocess
 from datetime import datetime, timezone
 
 import gedebate
-from gedebate.conditions.baseline import CONDITION, run_instance
+from gedebate.conditions.baseline import run_instance
+from gedebate.conditions.majority_vote import run_sample
 from gedebate.data.dataset import build_dataset
 from gedebate.data.store import dataset_identity, load_dataset
 from gedebate.eval import report, results
@@ -62,16 +63,20 @@ def _git_commit() -> str:
 
 def manifest_record(cfg: RunConfig, config_path: str) -> dict:
     """The reproduction record stored in the run manifest (guards on dataset_sha256)."""
-    return {
+    rec = {
         "dataset": cfg.dataset,
         "dataset_sha256": dataset_identity(cfg.dataset),
-        "decoding": "greedy",  # majority-vote will set temperature here
+        "decoding": "greedy" if cfg.condition == "baseline"
+        else f"temperature={cfg.temperature}",
         "max_new_tokens": cfg.max_new_tokens,
         "gedebate_version": gedebate.__version__,
         "git_commit": _git_commit(),
         "config": config_path,
         "created": datetime.now(timezone.utc).isoformat(),
     }
+    if cfg.condition == "majority_vote":
+        rec["n_samples"] = cfg.n_samples
+    return rec
 
 
 # --- the run loop (torch-free: takes a model, so it is stub-testable) ----------
@@ -80,21 +85,50 @@ def run_instances(model, instances: list, cfg: RunConfig, manifest: dict, *, sha
     """Run the condition over `instances`, persisting and skipping done work.
 
     `manifest` is the reproduction record (must include `dataset_sha256`), written
-    once and guarded on resume. Returns {"written", "skipped"}.
+    once and guarded on resume. `written` counts rows appended, `skipped` counts
+    already-complete instances. Baseline writes one row per instance; majority-vote
+    writes `cfg.n_samples` (topping up only the missing sample indexes on resume).
     """
     results.ensure_manifest(cfg.out_dir, cfg.model, **manifest)
     progress = results.load_progress(cfg.out_dir)
     path = results.shard_file(cfg.out_dir, cfg.condition, shard)
     written = skipped = 0
     for inst in instances:
-        if results.is_instance_done(progress, cfg.condition, inst.instance_id):
-            skipped += 1
-            continue
-        attempt = run_instance(model, inst, max_new_tokens=cfg.max_new_tokens)
-        results.append_row(path, results.make_row(inst, cfg.model, attempt))
-        progress.setdefault((cfg.condition, inst.instance_id), set()).add(0)
-        written += 1
+        if cfg.condition == "majority_vote":
+            n = _run_vote_samples(model, inst, cfg, path, progress)
+            written += n
+            skipped += n == 0  # instance already had all N samples
+        else:
+            if results.is_instance_done(progress, cfg.condition, inst.instance_id):
+                skipped += 1
+                continue
+            attempt = run_instance(model, inst, max_new_tokens=cfg.max_new_tokens)
+            results.append_row(path, results.make_row(inst, cfg.model, attempt))
+            progress.setdefault((cfg.condition, inst.instance_id), set()).add(0)
+            written += 1
     return {"written": written, "skipped": skipped}
+
+
+def _run_vote_samples(model, inst, cfg: RunConfig, path, progress) -> int:
+    """Persist the missing sample rows for one majority-vote instance; return the count.
+
+    Resumes via `results.missing_samples`, so a killed shard tops up only the draws
+    it did not finish. Returns 0 when the instance was already complete.
+    """
+    missing = results.missing_samples(progress, cfg.condition, inst.instance_id, cfg.n_samples)
+    seen = progress.setdefault((cfg.condition, inst.instance_id), set())
+    for si in missing:
+        attempt = run_sample(
+            model, inst, sample_index=si,
+            temperature=cfg.temperature, max_new_tokens=cfg.max_new_tokens,
+        )
+        row = results.make_row(
+            inst, cfg.model, attempt,
+            sample_index=si, temperature=cfg.temperature, seed=attempt["seed"],
+        )
+        results.append_row(path, row)
+        seen.add(si)
+    return len(missing)
 
 
 def summarize_run(cfg: RunConfig) -> dict:
@@ -162,6 +196,10 @@ def _run_config(config_path: str, shard_spec: str) -> None:
 
 def _verify_sample(config_path: str, k: int) -> None:
     cfg = load_config(config_path)
+    if cfg.condition != "baseline":
+        # verify_sample re-runs greedily; that only reproduces baseline's rows, not
+        # majority-vote's sampled draws.
+        raise SystemExit("--verify-sample supports the baseline condition only")
     by_id = {i.instance_id: i for i in build_instances(cfg)}
     rows = [r for f in results.result_files(cfg.out_dir) for r in results.read_rows(f)]
     if not rows:

@@ -14,7 +14,7 @@ from pathlib import Path
 from gedebate.data.dataset import ENCODINGS as ALL_ENCODINGS
 from gedebate.data.dataset import TASKS as ALL_TASKS
 
-KNOWN_CONDITIONS = ("baseline",)  # majority_vote, debate added later
+KNOWN_CONDITIONS = ("baseline", "majority_vote")  # debate added later
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,9 @@ class RunConfig:
     tasks: tuple[str, ...] = tuple(ALL_TASKS)
     encodings: tuple[str, ...] = tuple(ALL_ENCODINGS)
     max_new_tokens: int = 64
+    # majority-vote decoding (ignored by baseline): draws per instance + temperature.
+    n_samples: int = 5
+    temperature: float = 0.7
 
     @classmethod
     def from_dict(cls, data: dict) -> "RunConfig":
@@ -46,6 +49,13 @@ class RunConfig:
         if condition not in KNOWN_CONDITIONS:
             raise ValueError(f"unknown condition {condition!r}; known: {KNOWN_CONDITIONS}")
 
+        n_samples = int(data.get("n_samples", 5))
+        temperature = float(data.get("temperature", 0.7))
+        if n_samples < 1:
+            raise ValueError(f"n_samples must be >= 1, got {n_samples}")
+        if temperature <= 0:
+            raise ValueError(f"temperature must be > 0 (sampling), got {temperature}")
+
         return cls(
             model=data["model"],
             out_dir=data["out_dir"],
@@ -54,6 +64,8 @@ class RunConfig:
             tasks=tasks,
             encodings=encodings,
             max_new_tokens=int(data.get("max_new_tokens", 64)),
+            n_samples=n_samples,
+            temperature=temperature,
         )
 
 

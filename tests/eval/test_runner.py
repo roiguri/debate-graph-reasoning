@@ -122,6 +122,48 @@ def test_run_instances_manifest_guards_dataset(tmp_path):
         run_instances(_StubModel(), build_instances(cfg), cfg, {"dataset_sha256": "h2"})
 
 
+# --- majority-vote path (N rows per instance, resume tops up missing draws) ---
+
+def test_majority_vote_persists_n_rows_per_instance(tmp_path):
+    cfg = _cfg(tmp_path, condition="majority_vote", n_samples=4, temperature=0.7)
+    instances = build_instances(cfg)
+
+    model = _StubModel()
+    stats = run_instances(model, instances, cfg, MANIFEST)
+    # 5 instances x 4 draws each
+    assert stats == {"written": 20, "skipped": 0} and model.calls == 20
+
+    rows = results.read_rows(results.shard_file(cfg.out_dir, "majority_vote"))
+    assert len(rows) == 20
+    first_id = instances[0].instance_id
+    got = {r["sample_index"] for r in rows if r["instance_id"] == first_id}
+    assert got == {0, 1, 2, 3}
+    # sampling metadata persisted per row
+    assert all(r["temperature"] == 0.7 and r["seed"] is not None for r in rows)
+
+
+def test_majority_vote_resume_tops_up_missing_draws(tmp_path):
+    # First pass runs only 2 of 4 draws (simulate a kill), then resume completes.
+    cfg2 = _cfg(tmp_path, condition="majority_vote", n_samples=2, temperature=0.7)
+    insts = build_instances(cfg2)
+    run_instances(_StubModel(), insts, cfg2, MANIFEST)  # writes samples 0,1
+
+    cfg4 = _cfg(tmp_path, condition="majority_vote", n_samples=4, temperature=0.7,
+                dataset=cfg2.dataset, out_dir=cfg2.out_dir)
+    model = _StubModel()
+    stats = run_instances(model, insts, cfg4, MANIFEST)  # tops up samples 2,3
+    assert stats == {"written": 10, "skipped": 0} and model.calls == 10  # 5 insts x 2
+
+    rows = results.read_rows(results.shard_file(cfg4.out_dir, "majority_vote"))
+    assert len(rows) == 20  # now 4 draws x 5 instances
+    first_id = insts[0].instance_id
+    assert {r["sample_index"] for r in rows if r["instance_id"] == first_id} == {0, 1, 2, 3}
+
+    # fully-done instances are skipped, not rerun
+    stats2 = run_instances(_StubModel(), insts, cfg4, MANIFEST)
+    assert stats2 == {"written": 0, "skipped": 5}
+
+
 # --- verify_sample (reproducibility spot check) -------------------------------
 
 def test_verify_sample_matches_and_detects_mismatch(tmp_path):

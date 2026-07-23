@@ -82,8 +82,8 @@ Reused **unchanged**: `data.store` (load), `select_shard`/`parse_shard`,
 
 ### P4.2 — Config + runner dispatch + resume
 - `config.py`: add `"majority_vote"` to `KNOWN_CONDITIONS`; add `n_samples: int`
-  (default 5) and `temperature: float` (default 0.7) fields; validate `n_samples`
-  odd/positive and `temperature > 0`.
+  (default 5) and `temperature: float` (default 0.7) fields; validate `n_samples >= 1`
+  and `temperature > 0` (even N is fine, the tie-break handles it).
 - `runner.py`: dispatch on `cfg.condition`. For majority-vote, per instance run
   `results.missing_samples(...)` and persist one row per sample_index with
   `sample_index`/`temperature`/`seed` set. `manifest_record` sets

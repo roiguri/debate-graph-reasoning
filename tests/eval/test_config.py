@@ -36,10 +36,21 @@ def test_from_dict_full():
     {"model": "m", "out_dir": "o", "dataset": "d", "tasks": ["nope"]},   # unknown task
     {"model": "m", "out_dir": "o", "dataset": "d", "encodings": ["z"]},  # unknown encoding
     {"model": "m", "out_dir": "o", "dataset": "d", "condition": "debate"},  # not yet known
+    {"model": "m", "out_dir": "o", "dataset": "d", "n_samples": 0},      # must be >= 1
+    {"model": "m", "out_dir": "o", "dataset": "d", "temperature": 0},    # must be > 0
 ])
 def test_from_dict_rejects_bad_config(data):
     with pytest.raises(ValueError):
         RunConfig.from_dict(data)
+
+
+def test_majority_vote_config_fields():
+    cfg = RunConfig.from_dict({
+        "model": "m", "out_dir": "o", "dataset": "data/main.jsonl",
+        "condition": "majority_vote", "n_samples": 10, "temperature": 0.7,
+    })
+    assert cfg.condition == "majority_vote"
+    assert cfg.n_samples == 10 and cfg.temperature == 0.7
 
 
 def test_load_config_from_file(tmp_path):
