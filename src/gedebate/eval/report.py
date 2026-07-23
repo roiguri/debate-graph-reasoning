@@ -11,6 +11,8 @@ from __future__ import annotations
 from collections import defaultdict
 from statistics import pstdev
 
+from gedebate.conditions.majority_vote import vote
+from gedebate.eval.scoring import score
 from gedebate.eval.stats import wilson_ci
 
 
@@ -49,6 +51,85 @@ def format_summary(summary: dict[tuple[str, str], dict]) -> str:
             f"{s['total_gen_tokens']:>10}"
         )
     return "\n".join(lines)
+
+
+def summarize_votes(rows: list[dict]) -> dict[tuple[str, str], dict]:
+    """Vote-aggregated per-cell summary for majority-vote rows.
+
+    Group the N sample rows by instance, take the vote of their parsed answers, and
+    score that voted answer -- so accuracy is per *instance*, not per draw. Reports
+    `voted_accuracy` (with Wilson CI) next to `per_sample_accuracy` (the mean
+    single-draw accuracy, i.e. what baseline-style `summarize` would show) and
+    `total_gen_tokens` (the N x cost that makes the matched-compute comparison
+    honest). Expects rows from a single (majority_vote) condition.
+    """
+    per_instance: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        per_instance[r["instance_id"]].append(r)
+
+    cells: dict[tuple[str, str], dict] = defaultdict(
+        lambda: {"n_instances": 0, "voted_correct": 0, "voted_parse_ok": 0,
+                 "sample_rows": 0, "sample_correct": 0, "total_gen_tokens": 0,
+                 "n_samples": set()}
+    )
+    for irows in per_instance.values():
+        irows = sorted(irows, key=lambda r: r.get("sample_index", 0))
+        head = irows[0]
+        voted, parse_ok, _support = vote([r["parsed_answer"] for r in irows])
+        c = cells[(head["task"], head["encoding"])]
+        c["n_instances"] += 1
+        c["voted_correct"] += bool(score(voted, head["ground_truth"]))
+        c["voted_parse_ok"] += bool(parse_ok)
+        c["sample_rows"] += len(irows)
+        c["sample_correct"] += sum(bool(r["correct"]) for r in irows)
+        c["total_gen_tokens"] += sum(int(r["n_gen_tokens"]) for r in irows)
+        c["n_samples"].add(len(irows))
+
+    out: dict[tuple[str, str], dict] = {}
+    for key in sorted(cells):
+        c = cells[key]
+        n = c["n_instances"]
+        out[key] = {
+            "n": n,
+            "voted_accuracy": c["voted_correct"] / n,
+            "voted_acc_ci": wilson_ci(c["voted_correct"], n),
+            "per_sample_accuracy": c["sample_correct"] / c["sample_rows"],
+            "parse_ok_rate": c["voted_parse_ok"] / n,
+            "total_gen_tokens": c["total_gen_tokens"],
+            "n_samples": sorted(c["n_samples"]),  # normally a single value [N]
+        }
+    return out
+
+
+def format_vote_summary(summary: dict[tuple[str, str], dict]) -> str:
+    """Fixed-width per-cell majority-vote table: voted vs per-sample accuracy + tokens."""
+    header = (f"{'task':<16}{'encoding':<12}{'n':>4}{'N':>4}{'vote_acc':>9}"
+              f"{'95% CI':>16}{'1samp':>8}{'parse_ok':>10}{'gen_tok':>10}")
+    lines = [header, "-" * len(header)]
+    for (task, encoding), s in summary.items():
+        lo, hi = s["voted_acc_ci"]
+        ci = f"[{lo:.3f},{hi:.3f}]"
+        ns = s["n_samples"][0] if len(s["n_samples"]) == 1 else "*"
+        lines.append(
+            f"{task:<16}{encoding:<12}{s['n']:>4}{str(ns):>4}"
+            f"{s['voted_accuracy']:>9.3f}{ci:>16}{s['per_sample_accuracy']:>8.3f}"
+            f"{s['parse_ok_rate']:>10.3f}{s['total_gen_tokens']:>10}"
+        )
+    return "\n".join(lines)
+
+
+def vote_summary_to_csv(summary: dict[tuple[str, str], dict]) -> str:
+    """Per-cell majority-vote summary as CSV text (for a committed analysis artifact)."""
+    lines = ["task,encoding,n,n_samples,voted_accuracy,ci_lo,ci_hi,"
+             "per_sample_accuracy,parse_ok_rate,total_gen_tokens"]
+    for (task, encoding), s in summary.items():
+        lo, hi = s["voted_acc_ci"]
+        ns = s["n_samples"][0] if len(s["n_samples"]) == 1 else "mixed"
+        lines.append(
+            f"{task},{encoding},{s['n']},{ns},{s['voted_accuracy']:.4f},{lo:.4f},{hi:.4f},"
+            f"{s['per_sample_accuracy']:.4f},{s['parse_ok_rate']:.4f},{s['total_gen_tokens']}"
+        )
+    return "\n".join(lines) + "\n"
 
 
 def fragility(summary: dict[tuple[str, str], dict]) -> dict[str, dict]:
