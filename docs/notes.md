@@ -29,9 +29,12 @@ This is why the dataset is now a **frozen committed artifact** (`data/main.jsonl
 see [dataset refactor](plan/refactor-dataset.md)) that every run loads rather than
 regenerates: results are anchored to the artifact, not to implicit generator
 determinism. The run manifest guards `dataset_sha256` (the artifact's content hash),
-so a resume against a different dataset is a hard error. To get more samples, append
-an independent **seed**'s instances to the dataset; existing `instance_id`s never
-move.
+so a resume against a different dataset is a hard error. To get more samples, add an
+independent **seed** as a **sibling artifact** (`build_dataset.py --init --name
+seedK --seed K`) rather than growing `main` in place: this keeps `main`'s hash and
+every existing manifest guard intact, and `instance_id`s (namespaced by
+`dataset_seed`) never collide when pooled. Realized: seeds 11 and 13 (see the
+replication result below).
 
 ### ER only (structure held constant) — decision
 GraphQA studies graph *structure* as a variable (ER, BA, SFN, SBM, star, path,
@@ -217,6 +220,42 @@ edge_existence's 0.02 is noise, as expected. No floor/ceiling (all in 0.21–0.7
   not everything uniformly.
 - ~4/1800 parse misses (connected_nodes) — negligible; can inspect with
   `--raw --wrong-only` if ever needed.
+
+### P3 result: fragility replicates across seeds + is significant — fact
+The seed-7 result above could be a quirk of those particular 200 graphs, so we
+ran the same baseline on two **independent** seeds (11, 13), each a fresh N=200
+draw from the identical generating process (built as sibling artifacts
+`data/seed11.jsonl`, `data/seed13.jsonl`; frozen `main` untouched). Pooled to 600
+graphs/cell:
+
+| task | adjacency | incident | friendship | spread | omnibus (Cochran Q) | best>worst (McNemar) |
+|---|---|---|---|---|---|---|
+| edge_existence | 0.703 | 0.690 | 0.695 | 0.013 | Q=0.5, p=0.77 (ns) | p=0.52 (ns) |
+| node_degree | 0.388 | **0.750** | 0.458 | 0.362 | Q=200, p=3e-44 | incident>adjacency 258/41, p=8e-36 |
+| connected_nodes | 0.280 | **0.373** | 0.263 | 0.110 | Q=50, p=2e-11 | incident>friendship 90/24, p=1e-9 |
+
+**Method (writeup point):** the three encodings are applied to the *same* graphs,
+so per-graph correctness is **paired**, not independent. Significance is therefore
+paired: Cochran's Q (omnibus, does any encoding differ) and McNemar (the headline
+best-vs-worst gap); an unpaired two-proportion test would be wrong here. Per-cell
+accuracy carries a 95% Wilson CI. All in `gedebate.eval.stats`, surfaced by
+`show_results.py --fragility` and pooled by passing multiple run dirs.
+
+**What replicates (per-seed `--by-seed` view):**
+- **node_degree: clean replication.** `incident` best and `adjacency` worst in all
+  three seeds independently. This is the strongest not-coincidental result.
+- **connected_nodes: core claim replicates.** `incident` best in all three seeds
+  (p=1e-9 pooled). The *worst* encoding wobbles (friendship in seeds 7/13,
+  adjacency in seed 11): adjacency and friendship are statistically
+  indistinguishable pooled, so report "incident helps", not "friendship is worst".
+- **edge_existence: null confirmed.** Gap ~0.01, ns in every seed, and the
+  best/worst labels differ across seeds (the signature of no real effect). Extra
+  data did not manufacture one.
+
+Pooling is by (seed, graph_index): different seeds' graph 0 are different graphs.
+(An earlier version keyed on graph_index alone, which silently collapsed the pool
+by half; fixed + regression-tested. The tripled discordant counts, e.g. node_degree
+89/13 at one seed to 258/41 at three, confirm all 600 graphs are counted.)
 
 ### P2 pilot result — fact (P2.5)
 First real-GPU run (Qwen2.5-3B-Instruct, RTX 2080 Ti 11GB, greedy). Validates the

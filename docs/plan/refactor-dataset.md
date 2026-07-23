@@ -78,5 +78,7 @@ are finalized with R2.
 `data/main.jsonl` + meta are committed and hash-verify; `load_dataset` proves
 equal to today's generation and consistent with the existing baseline; the runner
 loads the artifact; the run manifest reproduces a run and `--verify-sample` passes;
-then merge to main. The N-extensibility footgun is gone (grow the dataset by
-appending a new seed's instances; existing ones and their `instance_id`s never move).
+then merge to main. The N-extensibility footgun is gone: add more samples with an
+independent seed as a **sibling artifact** (`--name`/`--seed`, e.g. seed11/seed13),
+which leaves `main`'s bytes and hash untouched and pools cleanly in analysis because
+`instance_id`s are namespaced by `dataset_seed`.

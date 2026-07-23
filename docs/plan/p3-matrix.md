@@ -1,9 +1,12 @@
 # P3 — Baseline across the full 3×3 matrix + fragility analysis
 
-**Status: complete — premise confirmed, GO for P4.** N=200 baseline over the full
-3×3 (1800 instances, parse_ok≈1.0) reproduces encoding-fragility: incident best for
-node_degree (0.75) and connected_nodes (0.345), edge_existence encoding-insensitive
-(0.02 spread). Numbers + the go decision in
+**Status: complete — premise confirmed and replicated, GO for P4.** N=200 baseline
+over the full 3×3 (1800 instances, parse_ok≈1.0) reproduces encoding-fragility:
+incident best for node_degree (0.75) and connected_nodes (0.345), edge_existence
+encoding-insensitive (0.02 spread). Then **replicated on two independent seeds
+(11, 13)**: pooled to 600 graphs/cell the effect is paired-significant (node_degree
+p=3e-44, connected_nodes p=2e-11) and edge_existence stays a clean null (p=0.77).
+Numbers + the go decision + the replication result in
 [notes.md](../notes.md#p3-result-encoding-fragility-reproduces--fact--go-decision-p34).
 
 Goal: run the baseline over the **full task × encoding matrix at real N**, shard it
@@ -24,8 +27,9 @@ recorded in [notes.md](../notes.md).
   95% CI ≈ ±7%, enough to resolve the 10–30pt fragility spreads. **N is not
   extensible** (the generator re-samples the whole sequence when N changes — see
   [notes.md](../notes.md#graph-generation-is-not-n-extensible--fact-p3)), so a
-  different N means a fresh `out_dir` and a baseline rerun. Tighter CIs later come
-  from an additional **seed** (pooled), not a bigger N in place.
+  different N means a fresh `out_dir` and a baseline rerun. Tighter CIs come from
+  additional **seeds** (pooled), not a bigger N in place. **Done in P3.3:** seeds
+  11 and 13 pooled to 600 graphs/cell.
 - **Model:** Qwen2.5-3B-Instruct (validated in P2.5; parse_ok=1.0, off the floor).
 - **Sharding:** a **SLURM job array**, conservatively throttled (`%3`) so it is
   safe under an unknown per-student concurrent-job quota — extra shards pend, they
@@ -85,10 +89,28 @@ Get the results local, compute fragility, and decide go/no-go for P4/P5.
   - `results/` stays gitignored; only the **derived** table/figures get committed
     later under `analysis/` (P6).
 
+### P3.3 — Replication + significance (done)
+Confirm the fragility is not a seed-7 artifact and put numbers behind it.
+- **Sibling datasets.** `build_dataset.py` grew `--name`/`--seed` so independent
+  seeds build as **sibling artifacts** (frozen `main` untouched): `data/seed11.jsonl`,
+  `data/seed13.jsonl`, matched to `main` on N/tasks/encodings. Own `configs/seed*.toml`
+  and `results/seed*/` (own manifest each). `slurm/matrix.slurm` selects the config at
+  submit time via `CONFIG` (default `configs/matrix.toml`), so one array job drives
+  every seed.
+- **Paired significance.** New `gedebate.eval.stats`: Wilson CI per cell, McNemar
+  (best-vs-worst), Cochran's Q (omnibus). Paired because encodings share graphs.
+  `show_results.py` pools multiple run dirs and prints per-seed tables with `--by-seed`.
+- **Result.** node_degree replicates cleanly (incident best / adjacency worst in all
+  three seeds, pooled p=3e-44); connected_nodes' incident-advantage replicates
+  (p=2e-11) though the worst encoding wobbles; edge_existence is a confirmed null.
+  Full writeup in [notes.md](../notes.md).
+
 ## Notes for later phases
 - P4/P5 point at the **same instances** (`configs/*` sharing seed=7, N=200); the
-  persistence schema and resume are unchanged from P2.
+  persistence schema and resume are unchanged from P2. The replication seeds (11,
+  13) are available if a later phase wants them, but the matched-compute comparison
+  runs on seed 7 to keep budgets aligned.
 - The array-throttle pattern (`%k`) is how every later GPU phase respects the quota;
   raise `k` once the `sacctmgr` probe confirms the real limit.
-- If P6 needs tighter CIs, add seed=8/9 as independent replicates and pool — do not
-  grow N in place (non-extensible).
+- Tighter CIs come from pooling more **seeds** (done: 11, 13 as sibling artifacts),
+  never from growing N in place (non-extensible).
