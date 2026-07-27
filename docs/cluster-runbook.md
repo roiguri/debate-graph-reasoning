@@ -36,11 +36,14 @@ The env + model weights must live on netapp, NOT `$HOME` (home has a tiny quota)
 1. **Push the repo** (from a **local** terminal; excludes secrets/caches/git):
    ```bash
    cd <local repo>
-   rsync -av --exclude '.git' --exclude '.env' --exclude 'results/*' \
+   rsync -av --exclude '.git' --exclude '.env' --exclude '.venv' --exclude 'results/*' \
      --exclude '__pycache__' --exclude '*.egg-info' --exclude 'docs/articles' \
      ./ slurm-client:‹netapp›/graph-encodings-with-debate/
    ```
    `.env` is deliberately excluded so a re-sync never clobbers the cluster copy.
+   `.venv` is excluded too: the cluster runs jobs through the netapp conda env
+   (`slurm/_activate.sh`), never the local virtualenv, so syncing it just wastes
+   quota.
 
 2. **Create `.env`** (on the **cluster**, once — holds the netapp path + token):
    ```bash
