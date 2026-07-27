@@ -1,8 +1,14 @@
 # P4 — Majority-vote condition (self-consistency)
 
-**Status: planned.** Second condition after baseline: draw N sampled answers per
-instance, vote, and report accuracy + total generated tokens so it compares to
-baseline at a known compute cost. See [overview.md](overview.md); P2/P3 built the
+**Status: complete.** Full 3x3 at N=10, T=0.7, seed 7 (18,000 samples). **Result:
+voting reproduces the greedy baseline (all |Δ| ≤ 0.01) and does not close the
+fragility gap, at ~10x the token cost** -- the encoding errors are systematic, not
+sample-variance, so aggregation cannot repair them. GO for P5. Numbers + mechanism +
+decision in [notes.md](../notes.md). (P4.4 seed replication left optional.)
+
+Second condition after baseline: draw N sampled answers per instance, vote, and
+report accuracy + total generated tokens so it compares to baseline at a known
+compute cost. See [overview.md](overview.md); P2/P3 built the
 machinery this reuses, and the persistence schema already reserves the fields P4
 needs (`sample_index`, `temperature`, `seed`).
 

@@ -257,6 +257,50 @@ Pooling is by (seed, graph_index): different seeds' graph 0 are different graphs
 by half; fixed + regression-tested. The tripled discordant counts, e.g. node_degree
 89/13 at one seed to 258/41 at three, confirm all 600 graphs are counted.)
 
+### P4 result: majority vote does not beat greedy, does not close fragility — fact (P4.3)
+Majority vote (self-consistency) over the full 3x3 at N=10, temperature=0.7, seed 7
+(18,000 samples over the same frozen `data/main.jsonl` the baseline scored, parse_ok
+0.995-1.00). The voted answer per instance is the mode of the 10 parsed draws
+(parse-failures excluded, ties broken to the lowest-index supporter). **Voting
+reproduces the greedy baseline almost exactly and leaves the encoding-fragility gap
+intact, at ~10x the generated-token cost.** Per cell, greedy baseline vs voted
+accuracy (Δ = vote − baseline):
+
+| task | adjacency | incident | friendship |
+|---|---|---|---|
+| edge_existence | 0.700 → 0.700 (0.000) | 0.680 → 0.675 (−0.005) | 0.680 → 0.680 (0.000) |
+| node_degree | 0.370 → 0.360 (−0.010) | 0.750 → 0.755 (+0.005) | 0.455 → 0.455 (0.000) |
+| connected_nodes | 0.280 → 0.275 (−0.005) | 0.345 → 0.350 (+0.005) | 0.210 → 0.215 (+0.005) |
+
+Every |Δ| ≤ 0.01, far inside the per-cell 95% CI (≈±0.07); every voted CI overlaps
+its baseline CI. Fragility gap (max−min per task) is unchanged: node_degree
+0.38 → 0.395, connected_nodes 0.135 → 0.135, edge_existence 0.02 → 0.025. The worst
+encodings (node_degree × adjacency, connected_nodes × friendship) are not lifted.
+
+**Mechanism (writeup point).** The single sampled draw (`1samp` column) sits slightly
+*below* greedy in several cells, because sampling at T=0.7 adds noise (connected_nodes
+× incident 0.333 vs greedy 0.345; node_degree × incident 0.746 vs 0.750). Voting over
+10 draws recovers that loss back to approximately greedy, netting ~0 versus the greedy
+baseline. This is the signature of **systematic, not sample-variance, error**: the
+encoding-induced mistakes are consistent across draws, so the mode is the same wrong
+answer, and aggregation cannot repair them. Self-consistency helps when errors are
+independent noise; here they are not.
+
+**Compute.** MV spent ~83.5k generated tokens vs the baseline's ~8.5k (≈9.8x, i.e.
+~10x as designed since N=10), for zero accuracy return. Per-cell totals are in the
+`gen_tok` column; the connected_nodes cells dominate (~19-21k each) because listing
+neighbors is longer than a yes/no or a single degree.
+
+**Decision: GO for P5 (debate), with a sharpened hypothesis.** Spending compute on
+*more samples of the same reasoning* buys nothing here and does not touch fragility, so
+debate must earn its keep by changing the *reasoning* (Proposer-Critic verification),
+not by resampling. The matched-compute bar is now concrete: at ~10x baseline tokens
+MV = greedy, so debate has to beat greedy at a budget where the trivial compute
+baseline already fails. MV is therefore the "compute alone does nothing" control the
+writeup needs. (Optional P4.4: replicate the null on seeds 11/13 if we want the same
+paired-significance treatment P3 got; a near-zero effect this uniform is unlikely to
+change, so it is low priority.)
+
 ### P2 pilot result — fact (P2.5)
 First real-GPU run (Qwen2.5-3B-Instruct, RTX 2080 Ti 11GB, greedy). Validates the
 harness end-to-end; **not** a measurement (N=8–20, noisy). Key facts for the writeup:
