@@ -4,6 +4,8 @@ Shell-agnostic (no heredoc needed -- the cluster login shell is tcsh):
 
     python scripts/show_results.py results/main
     python scripts/show_results.py results/main --fragility
+    python scripts/show_results.py results/main --compare        # vote vs baseline delta
+    python scripts/show_results.py results/main --compare --save analysis/mv
     python scripts/show_results.py results/main --raw --wrong-only
     python scripts/show_results.py results/main --raw \
         --task connected_nodes --encoding friendship
@@ -38,6 +40,9 @@ def main() -> None:
                     help="also show per-task cross-encoding spread + paired significance")
     ap.add_argument("--by-seed", action="store_true",
                     help="with >1 seed present, also print each seed's own fragility table")
+    ap.add_argument("--compare", action="store_true",
+                    help="with both baseline + majority_vote present, print the "
+                         "vote-vs-baseline delta table (accuracy delta + token cost)")
     ap.add_argument("--save", metavar="DIR", default=None,
                     help="write summary/fragility/significance CSVs here (e.g. analysis/baseline)")
     ap.add_argument("--raw", action="store_true", help="print per-instance raw_output -> parsed")
@@ -84,6 +89,17 @@ def main() -> None:
         print("\n-- majority vote (voted per instance; 1samp = mean single-draw acc) --")
         print(report.format_vote_summary(vote_summary))
 
+    # vote-vs-baseline comparison (needs both conditions): printed on --compare,
+    # and always saved when --save is on, since it's the P4 headline artifact.
+    comparison = report.compare_baseline_vote(base_rows, mv_rows) if (base_rows and mv_rows) else {}
+    if args.compare:
+        if comparison:
+            print("\n-- majority vote vs baseline "
+                  "(delta = vote_acc - baseline_acc; x = token multiplier) --")
+            print(report.format_comparison(comparison))
+        else:
+            print("\n-- --compare needs both baseline and majority_vote rows in the run dir --")
+
     if args.save:
         out = Path(args.save)
         out.mkdir(parents=True, exist_ok=True)
@@ -97,6 +113,10 @@ def main() -> None:
             (out / "vote_summary.csv").write_text(
                 report.vote_summary_to_csv(vote_summary), encoding="utf-8")
             wrote.append("vote_summary.csv")
+        if comparison:
+            (out / "vote_vs_baseline.csv").write_text(
+                report.comparison_to_csv(comparison), encoding="utf-8")
+            wrote.append("vote_vs_baseline.csv")
         print(f"\nsaved {' + '.join(wrote)} -> {out}/")
 
     if not args.raw:

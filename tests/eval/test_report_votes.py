@@ -7,6 +7,8 @@ accuracy that baseline-style `summarize` reports.
 from __future__ import annotations
 
 from gedebate.eval.report import (
+    compare_baseline_vote,
+    comparison_to_csv,
     format_vote_summary,
     summarize_votes,
     vote_summary_to_csv,
@@ -68,6 +70,47 @@ def test_two_instances_aggregate_per_cell():
     ]
     cell = summarize_votes(rows)[("edge_existence", "adjacency")]
     assert cell["n"] == 2 and cell["voted_accuracy"] == 0.5  # one right, one wrong
+
+
+def _brow(task, enc, correct, gen):
+    """One baseline-shaped row (what report.summarize consumes)."""
+    return {"task": task, "encoding": enc, "correct": correct,
+            "parse_ok": True, "n_gen_tokens": gen}
+
+
+def test_compare_baseline_vote_delta_and_token_mult():
+    # baseline: 2 instances, both correct -> acc 1.0, 4 gen tokens total.
+    base = [
+        _brow("edge_existence", "adjacency", True, 2),
+        _brow("edge_existence", "adjacency", True, 2),
+    ]
+    # majority vote: instance A votes right, instance B votes wrong -> vote_acc 0.5.
+    # 4 rows x 3 tokens = 12 gen tokens -> token_mult 12/4 = 3.0.
+    mv = [
+        _row("7/0/edge_existence/adjacency", "edge_existence", "adjacency", True, True, 0, gen=3),
+        _row("7/0/edge_existence/adjacency", "edge_existence", "adjacency", True, True, 1, gen=3),
+        _row("7/1/edge_existence/adjacency", "edge_existence", "adjacency", True, False, 0, gen=3),
+        _row("7/1/edge_existence/adjacency", "edge_existence", "adjacency", True, False, 1, gen=3),
+    ]
+    cmp = compare_baseline_vote(base, mv)
+    c = cmp[("edge_existence", "adjacency")]
+    assert c["baseline_accuracy"] == 1.0
+    assert c["voted_accuracy"] == 0.5
+    assert abs(c["delta"] - (-0.5)) < 1e-9
+    assert c["baseline_gen_tokens"] == 4 and c["vote_gen_tokens"] == 12
+    assert abs(c["token_mult"] - 3.0) < 1e-9
+
+    csv = comparison_to_csv(cmp)
+    assert csv.startswith("task,encoding,baseline_acc,vote_acc,delta")
+    assert "edge_existence,adjacency,1.0000,0.5000,-0.5000,4,12,3.00" in csv
+
+
+def test_compare_only_cells_in_both_conditions():
+    base = [_brow("node_degree", "incident", True, 5)]
+    mv = [  # a different cell -> no overlap, empty comparison
+        _row("7/0/edge_existence/adjacency", "edge_existence", "adjacency", True, True, 0),
+    ]
+    assert compare_baseline_vote(base, mv) == {}
 
 
 def test_format_and_csv_render():

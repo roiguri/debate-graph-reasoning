@@ -132,6 +132,60 @@ def vote_summary_to_csv(summary: dict[tuple[str, str], dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def compare_baseline_vote(
+    base_rows: list[dict], mv_rows: list[dict]
+) -> dict[tuple[str, str], dict]:
+    """Per-cell majority-vote vs greedy-baseline comparison: accuracy delta + token cost.
+
+    Reuses `summarize` (per-draw/greedy) and `summarize_votes` (voted-per-instance) so
+    the numbers come from the same pipeline as every other table, not a one-off. Only
+    cells present in *both* conditions are compared. `delta` = voted − baseline
+    accuracy; `token_mult` = the vote's generated-token cost over the baseline's.
+    """
+    bs = summarize(base_rows)
+    vs = summarize_votes(mv_rows)
+    out: dict[tuple[str, str], dict] = {}
+    for key in sorted(set(bs) & set(vs)):
+        b, v = bs[key], vs[key]
+        bt, vt = b["total_gen_tokens"], v["total_gen_tokens"]
+        out[key] = {
+            "baseline_accuracy": b["accuracy"],
+            "voted_accuracy": v["voted_accuracy"],
+            "delta": v["voted_accuracy"] - b["accuracy"],
+            "baseline_gen_tokens": bt,
+            "vote_gen_tokens": vt,
+            "token_mult": (vt / bt) if bt else float("nan"),
+        }
+    return out
+
+
+def format_comparison(cmp: dict[tuple[str, str], dict]) -> str:
+    """Fixed-width vote-vs-baseline table: accuracy delta + token multiplier per cell."""
+    header = (f"{'task':<16}{'encoding':<12}{'base_acc':>9}{'vote_acc':>9}"
+              f"{'delta':>8}{'base_tok':>10}{'vote_tok':>10}{'x':>7}")
+    lines = [header, "-" * len(header)]
+    for (task, encoding), s in cmp.items():
+        lines.append(
+            f"{task:<16}{encoding:<12}{s['baseline_accuracy']:>9.3f}"
+            f"{s['voted_accuracy']:>9.3f}{s['delta']:>+8.3f}"
+            f"{s['baseline_gen_tokens']:>10}{s['vote_gen_tokens']:>10}{s['token_mult']:>7.2f}"
+        )
+    return "\n".join(lines)
+
+
+def comparison_to_csv(cmp: dict[tuple[str, str], dict]) -> str:
+    """Vote-vs-baseline comparison as CSV text (the P4 headline artifact)."""
+    lines = ["task,encoding,baseline_acc,vote_acc,delta,"
+             "baseline_gen_tok,vote_gen_tok,token_mult"]
+    for (task, encoding), s in cmp.items():
+        lines.append(
+            f"{task},{encoding},{s['baseline_accuracy']:.4f},{s['voted_accuracy']:.4f},"
+            f"{s['delta']:+.4f},{s['baseline_gen_tokens']},{s['vote_gen_tokens']},"
+            f"{s['token_mult']:.2f}"
+        )
+    return "\n".join(lines) + "\n"
+
+
 def fragility(summary: dict[tuple[str, str], dict]) -> dict[str, dict]:
     """Per-task cross-encoding spread -- the proposal's secondary metric.
 
