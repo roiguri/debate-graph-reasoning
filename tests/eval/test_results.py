@@ -47,6 +47,13 @@ def test_make_row_has_full_schema_and_drops_prompt():
     assert row["sample_index"] == 0 and row["temperature"] is None and row["seed"] is None
 
 
+def test_make_row_n_responses_default_and_override():
+    inst = _edge_instances()[0]
+    assert results.make_row(inst, "m", _attempt())["n_responses"] == 1  # baseline default
+    debate = results.make_row(inst, "m", _attempt("debate"), n_responses=5)
+    assert debate["n_responses"] == 5  # debate = # turns
+
+
 def test_make_row_carries_sample_metadata():
     inst = _edge_instances()[0]
     row = results.make_row(inst, "m", _attempt("majority_vote"), sample_index=3, temperature=0.7, seed=42)
@@ -82,6 +89,21 @@ def test_result_files_spans_condition_subfolders(tmp_path):
                        results.make_row(_edge_instances()[0], "m", _attempt("majority_vote")))
     files = results.result_files(tmp_path)
     assert {f.parent.name for f in files} == {"baseline", "majority_vote"}
+
+
+def test_trace_sidecar_roundtrip_and_excluded_from_result_files(tmp_path):
+    iid = _edge_instances()[0].instance_id
+    turns = [{"role": "proposer", "raw": "1. claim\nANSWER: 1", "parsed": 1},
+             {"role": "critic", "raw": "VERDICT: AGREE"}]
+    tpath = results.trace_file(tmp_path, "debate", 0)
+    assert tpath.name == "shard000.trace.jsonl"
+    results.append_trace(tpath, iid, turns)
+    got = results.read_traces(tpath)
+    assert got == [{"instance_id": iid, "turns": turns}]
+    # the trace sidecar must NOT be picked up as result rows (would corrupt progress/summary)
+    results.append_row(results.shard_file(tmp_path, "debate", 0),
+                       results.make_row(_edge_instances()[0], "m", _attempt("debate")))
+    assert all(not f.name.endswith(".trace.jsonl") for f in results.result_files(tmp_path))
 
 
 # --- torn / corrupt lines -----------------------------------------------------

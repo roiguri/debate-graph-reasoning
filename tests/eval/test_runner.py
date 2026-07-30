@@ -164,6 +164,40 @@ def test_majority_vote_resume_tops_up_missing_draws(tmp_path):
     assert stats2 == {"written": 0, "skipped": 5}
 
 
+# --- debate path (1 row + a trace sidecar per instance) -----------------------
+
+class _DebateStub:
+    """Prompt-aware stub: a Critic prompt (shows the VERDICT format) -> AGREE; otherwise
+    a Proposer answer. So every debate converges in 2 turns (proposer + critic)."""
+
+    def generate(self, prompt, *, max_new_tokens=64, **_):
+        if "VERDICT:" in prompt:
+            return _StubGen("VERDICT: AGREE", 2, 10)
+        return _StubGen("1. some claim\nANSWER: 1", 3, 20)
+
+
+def test_debate_dispatch_persists_row_and_trace(tmp_path):
+    cfg = _cfg(tmp_path, condition="debate", tasks=("node_degree",),
+               encodings=("adjacency",), n_samples=10)
+    insts = build_instances(cfg)
+    assert len(insts) == 5
+
+    stats = run_instances(_DebateStub(), insts, cfg, MANIFEST)
+    assert stats == {"written": 5, "skipped": 0}  # one row per instance
+
+    rows = results.read_rows(results.shard_file(cfg.out_dir, "debate"))
+    assert len(rows) == 5
+    assert rows[0]["condition"] == "debate" and rows[0]["n_responses"] == 2  # proposer + AGREE
+
+    # the verbose transcript lands in the trace sidecar, not the row
+    traces = results.read_traces(results.trace_file(cfg.out_dir, "debate"))
+    assert len(traces) == 5
+    assert [t["role"] for t in traces[0]["turns"]] == ["proposer", "critic"]
+
+    # resume: every instance already has its 1 row -> all skipped
+    assert run_instances(_DebateStub(), insts, cfg, MANIFEST) == {"written": 0, "skipped": 5}
+
+
 # --- verify_sample (reproducibility spot check) -------------------------------
 
 def test_verify_sample_matches_and_detects_mismatch(tmp_path):

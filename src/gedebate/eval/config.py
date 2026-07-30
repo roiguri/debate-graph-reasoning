@@ -14,7 +14,7 @@ from pathlib import Path
 from gedebate.data.dataset import ENCODINGS as ALL_ENCODINGS
 from gedebate.data.dataset import TASKS as ALL_TASKS
 
-KNOWN_CONDITIONS = ("baseline", "majority_vote")  # debate added later
+KNOWN_CONDITIONS = ("baseline", "majority_vote", "debate")
 
 
 @dataclass(frozen=True)

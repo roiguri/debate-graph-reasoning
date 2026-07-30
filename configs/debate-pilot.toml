@@ -1,0 +1,19 @@
+# Debate PILOT: one cell (node_degree x adjacency, the worst cell), isolated throwaway
+# out_dir. A real-GPU check that the Proposer-Critic loop + trace sidecar + compute
+# accounting work end to end before the full run. results/debate-pilot is disposable.
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "debate"
+dataset = "data/main.jsonl"
+
+# n_samples is the debate response BUDGET (max turns) -- matched to majority-vote's N,
+# so debate can never out-spend it. Greedy decoding (no temperature/top_p/top_k).
+n_samples = 10
+
+# debate turns emit a numbered-claim trace, so allow more room than a bare answer.
+max_new_tokens = 256
+
+tasks = ["node_degree"]
+encodings = ["adjacency"]
+
+out_dir = "results/debate-pilot"

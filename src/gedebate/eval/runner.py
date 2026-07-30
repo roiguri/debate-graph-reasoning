@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 
 import gedebate
 from gedebate.conditions.baseline import run_instance
+from gedebate.conditions.debate import run_debate
 from gedebate.conditions.majority_vote import run_sample
 from gedebate.data.dataset import build_dataset
 from gedebate.data.store import dataset_identity, load_dataset
@@ -63,11 +64,12 @@ def _git_commit() -> str:
 
 def manifest_record(cfg: RunConfig, config_path: str) -> dict:
     """The reproduction record stored in the run manifest (guards on dataset_sha256)."""
+    decoding = (f"temperature={cfg.temperature},top_p={cfg.top_p},top_k={cfg.top_k}"
+                if cfg.condition == "majority_vote" else "greedy")  # baseline + debate greedy
     rec = {
         "dataset": cfg.dataset,
         "dataset_sha256": dataset_identity(cfg.dataset),
-        "decoding": "greedy" if cfg.condition == "baseline"
-        else f"temperature={cfg.temperature}",
+        "decoding": decoding,
         "max_new_tokens": cfg.max_new_tokens,
         "gedebate_version": gedebate.__version__,
         "git_commit": _git_commit(),
@@ -76,7 +78,8 @@ def manifest_record(cfg: RunConfig, config_path: str) -> dict:
     }
     if cfg.condition == "majority_vote":
         rec["n_samples"] = cfg.n_samples
-        rec["decoding"] = f"temperature={cfg.temperature},top_p={cfg.top_p},top_k={cfg.top_k}"
+    if cfg.condition == "debate":
+        rec["max_responses"] = cfg.n_samples  # debate's response budget (= MV's N)
     return rec
 
 
@@ -93,16 +96,24 @@ def run_instances(model, instances: list, cfg: RunConfig, manifest: dict, *, sha
     results.ensure_manifest(cfg.out_dir, cfg.model, cfg.condition, **manifest)
     progress = results.load_progress(cfg.out_dir)
     path = results.shard_file(cfg.out_dir, cfg.condition, shard)
+    trace_path = results.trace_file(cfg.out_dir, cfg.condition, shard)
     written = skipped = 0
     for inst in instances:
         if cfg.condition == "majority_vote":
             n = _run_vote_samples(model, inst, cfg, path, progress)
             written += n
             skipped += n == 0  # instance already had all N samples
-        else:
-            if results.is_instance_done(progress, cfg.condition, inst.instance_id):
-                skipped += 1
-                continue
+        elif results.is_instance_done(progress, cfg.condition, inst.instance_id):
+            skipped += 1
+        elif cfg.condition == "debate":
+            record, turns = run_debate(
+                model, inst, max_new_tokens=cfg.max_new_tokens, max_responses=cfg.n_samples)
+            results.append_row(path, results.make_row(
+                inst, cfg.model, record, n_responses=record["n_responses"]))
+            results.append_trace(trace_path, inst.instance_id, turns)
+            progress.setdefault((cfg.condition, inst.instance_id), set()).add(0)
+            written += 1
+        else:  # baseline
             attempt = run_instance(model, inst, max_new_tokens=cfg.max_new_tokens)
             results.append_row(path, results.make_row(inst, cfg.model, attempt))
             progress.setdefault((cfg.condition, inst.instance_id), set()).add(0)

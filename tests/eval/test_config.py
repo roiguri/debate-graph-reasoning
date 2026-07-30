@@ -35,7 +35,7 @@ def test_from_dict_full():
     {"model": "m", "out_dir": "o", "dataset": "d", "bogus": 1},          # unknown key
     {"model": "m", "out_dir": "o", "dataset": "d", "tasks": ["nope"]},   # unknown task
     {"model": "m", "out_dir": "o", "dataset": "d", "encodings": ["z"]},  # unknown encoding
-    {"model": "m", "out_dir": "o", "dataset": "d", "condition": "debate"},  # not yet known
+    {"model": "m", "out_dir": "o", "dataset": "d", "condition": "quux"},  # unknown condition
     {"model": "m", "out_dir": "o", "dataset": "d", "n_samples": 0},      # must be >= 1
     {"model": "m", "out_dir": "o", "dataset": "d", "temperature": 0},    # must be > 0
     {"model": "m", "out_dir": "o", "dataset": "d", "top_p": 0},          # must be in (0,1]

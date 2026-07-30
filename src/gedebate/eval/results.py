@@ -49,6 +49,8 @@ ROW_FIELDS = (
     "ground_truth",
     "n_prompt_tokens",
     "n_gen_tokens",
+    "n_responses",   # model calls this row represents: 1 for baseline/majority-vote
+                     # (per sample), = # turns for debate. Sums to the compute metric.
 )
 
 
@@ -60,8 +62,9 @@ def make_row(
     sample_index: int = 0,
     temperature: float | None = None,
     seed: int | None = None,
+    n_responses: int = 1,
 ) -> dict:
-    """Assemble one persisted row from an instance + a `run_instance` attempt.
+    """Assemble one persisted row from an instance + a condition's attempt record.
 
     The prompt is intentionally *not* stored -- it is reproducible from the
     instance via `build_prompt`, and keeping rows lean matters at matrix scale.
@@ -83,6 +86,7 @@ def make_row(
         "ground_truth": attempt["ground_truth"],
         "n_prompt_tokens": attempt["n_prompt_tokens"],
         "n_gen_tokens": attempt["n_gen_tokens"],
+        "n_responses": n_responses,
     }
 
 
@@ -100,8 +104,31 @@ def shard_file(run_dir: str | Path, condition: str, shard: int = 0) -> Path:
 
 
 def result_files(run_dir: str | Path) -> list[Path]:
-    """All result JSONL under a run dir, across every condition subfolder."""
-    return sorted(Path(run_dir).glob("**/*.jsonl"))
+    """All result JSONL under a run dir, across every condition subfolder.
+
+    Excludes `*.trace.jsonl` sidecars (verbose debate transcripts, read separately)."""
+    return sorted(p for p in Path(run_dir).glob("**/*.jsonl")
+                  if not p.name.endswith(".trace.jsonl"))
+
+
+# --- debate trace sidecar (verbose transcripts, kept out of the lean rows) -----
+
+def trace_file(run_dir: str | Path, condition: str, shard: int = 0) -> Path:
+    """Path a shard's traces write: <run_dir>/<condition>/shard<i>.trace.jsonl.
+
+    One line per instance: {instance_id, turns}. Debate stores its full Proposer-Critic
+    transcript here; the result row stays lean (final answer + summed compute)."""
+    return Path(run_dir) / condition / f"shard{shard:03d}.trace.jsonl"
+
+
+def append_trace(path: str | Path, instance_id: str, turns: list[dict]) -> None:
+    """Append one instance's transcript (flush+fsync), mirroring append_row's kill safety."""
+    append_row(path, {"instance_id": instance_id, "turns": turns})
+
+
+def read_traces(path: str | Path) -> list[dict]:
+    """Parse a trace sidecar into [{instance_id, turns}, ...] (torn-trailing tolerant)."""
+    return read_rows(path)
 
 
 # --- writing ------------------------------------------------------------------
