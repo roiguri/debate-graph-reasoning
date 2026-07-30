@@ -34,9 +34,9 @@ so batching/scope are moot).
   final answer, in one call.
 - **Turn 2 — Critic:** reads the trace, **verifies its claims against the raw encoding**,
   and returns a critique (which claims are wrong or missing) or "no issues" -- one call.
-- Repeat Proposer↔Critic until **consensus** (Critic raises nothing), **max turns**, or a
-  **fixed point** (a revision that does not change the trace). Final = the Proposer's
-  latest answer.
+- Repeat Proposer↔Critic until **consensus** (Critic verdict `AGREE`), **no progress**
+  (Proposer repeats a previous answer), or the **response budget** (MV's N=10) is hit.
+  Final = the Proposer's latest answer. (Full rule in Decisions.)
 
 Every turn is **one full model response**, which is what makes the compute comparison
 clean (see Compute). The Critic is *holistic* (not per-edge), but is **prompted to verify
@@ -56,8 +56,19 @@ incident 0.75, the most room to lift the worst encoding).
 - **Critic:** holistic per-turn critique, prompted to verify the trace's claims against
   the raw encoding. **Greedy.** Same loaded model with a verification-role prompt (11GB
   VRAM allows one model).
-- **Stopping rule:** consensus / **max 2 revision rounds** (up to 5 turns: P, C, P, C, P)
-  / fixed point. Tunable via config.
+- **Stopping rule** (stop on whichever fires first, final = last Proposer answer):
+  - **consensus** -- the Critic emits a structured verdict `AGREE`. An *unparseable*
+    verdict is treated as AGREE **but counted** (a `critic_verdict_parsed` flag per Critic
+    turn; the per-cell rate is reported, so "fake consensus" from a muddled Critic is
+    visible, mirroring `parse_ok`).
+  - **no progress** -- the Proposer repeats any previous answer (catches no-change *and*
+    oscillation A->B->A).
+  - **budget** -- reaches **MV's N = 10 responses/instance** (the same budget MV gets, so
+    debate can never win by making more calls). The loop ends on a Proposer answer, never a
+    dangling Critic call. Config-tied to `n_samples`.
+  - Debate's *actual* per-instance response count (usually < 10) places it as a point on
+    MV's accuracy-vs-budget curve; the cap just bounds it to the curve's range. At matched
+    # responses, debate's total tokens still exceed MV's (transcript growth) -- reported.
 - **Compute (corrected).** **Primary: # model responses = # turns** (the literature
   standard: Huang 2024 "equivalent number of responses", Choi 2025 "number of agents",
   Du 2023 "3 responses"). **Secondary: total tokens (prompt + generated)** summed over
@@ -116,14 +127,15 @@ Get baseline + MV onto the correct metric before debate lands, from stored data
 ### P5.2 — Critic + turn loop + persistence (torch-free loop; PROMPT NEEDS APPROVAL)
 - **Critic prompt** (raise for approval): given the encoding + the Proposer's trace, verify
   the claims and return the critique (wrong/missing claims) or "no issues".
-- **Loop:** Proposer -> Critic -> revise, to consensus / max turns / fixed point; log each
-  turn's tokens.
+- **Loop:** Proposer -> Critic -> revise, to consensus / no-progress / response budget; log
+  each turn's tokens + `critic_verdict_parsed`.
 - `run_debate(model, instance, cfg) -> (record, trace)`: record is baseline's shape with
   `condition="debate"`, summed total tokens, and `n_responses`; trace is the transcript.
 - **Persistence:** 1 row via `make_row` (+ responses/tokens); trace to the sidecar. Runner
   dispatch on `condition=="debate"`; resume by the 1-row rule.
-- Tests: converges on a correct proposer; revises on a wrong claim; hits the max-turns cap;
-  fixed-point halt; token + response sums. Scripted stub model.
+- Tests: converges on a correct proposer (AGREE); revises on a wrong claim; stops on a
+  repeated answer (no-progress); hits the response budget; unparseable verdict counts +
+  stops; token + response sums. Scripted stub model.
 
 ### P5.3 — Debate viewer (self-contained static HTML)
 - `scripts/debate_viewer.py`: read debate rows + trace sidecar -> one standalone HTML
