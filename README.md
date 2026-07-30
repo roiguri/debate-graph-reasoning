@@ -49,11 +49,11 @@ python scripts/show_results.py results/main --fragility           # per-encoding
 src/gedebate/   the library: data adapter, model wrapper, prompts, scoring, eval harness
 data/           the frozen dataset artifact (+ provenance meta)
 configs/        run configs (TOML)
-scripts/        entry points (build_dataset, show_results, smoke)
+scripts/        entry points (build_dataset, show_results, debate_viewer, smoke)
 slurm/          batch-job scripts, specific to our compute setup
 results/        run outputs, JSON/CSV (gitignored)
 analysis/       derived tables and figures (gitignored)
-docs/           proposal, reproduce guide, cluster runbook, design notes
+docs/           proposal, reproduce guide, cluster runbook, debate viewer, design notes
 ```
 
 ## Data and attribution
