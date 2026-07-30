@@ -190,7 +190,7 @@ def _vote_vs_baseline_discordance(
             continue
         irows = sorted(irows, key=lambda r: r.get("sample_index", 0))
         head = irows[0]
-        voted, _ok, _n = vote([r["parsed_answer"] for r in irows])
+        voted, *_ = vote([r["parsed_answer"] for r in irows])
         vote_ok = bool(score(voted, head["ground_truth"]))
         base_ok = base_correct[iid]
         cell = disc[(head["task"], head["encoding"])]
