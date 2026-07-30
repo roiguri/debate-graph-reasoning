@@ -13,7 +13,7 @@ from statistics import pstdev
 
 from gedebate.conditions.majority_vote import vote
 from gedebate.eval.scoring import score
-from gedebate.eval.stats import wilson_ci
+from gedebate.eval.stats import mcnemar_from_bc, wilson_ci
 
 
 def summarize(rows: list[dict]) -> dict[tuple[str, str], dict]:
@@ -141,13 +141,21 @@ def compare_baseline_vote(
     the numbers come from the same pipeline as every other table, not a one-off. Only
     cells present in *both* conditions are compared. `delta` = voted − baseline
     accuracy; `token_mult` = the vote's generated-token cost over the baseline's.
+
+    Adds a **paired McNemar** of vote vs baseline (they run on the same instances):
+    `b` = baseline right / vote wrong, `c` = vote right / baseline wrong, over the
+    instances shared by both conditions. `mcnemar_p` turns "the CIs overlap" into a
+    real test -- a large p means voting is statistically indistinguishable from greedy.
     """
     bs = summarize(base_rows)
     vs = summarize_votes(mv_rows)
+    disc = _vote_vs_baseline_discordance(base_rows, mv_rows)
     out: dict[tuple[str, str], dict] = {}
     for key in sorted(set(bs) & set(vs)):
         b, v = bs[key], vs[key]
         bt, vt = b["total_gen_tokens"], v["total_gen_tokens"]
+        bc = disc.get(key, {"b": 0, "c": 0})
+        mc = mcnemar_from_bc(bc["b"], bc["c"])
         out[key] = {
             "baseline_accuracy": b["accuracy"],
             "voted_accuracy": v["voted_accuracy"],
@@ -155,33 +163,69 @@ def compare_baseline_vote(
             "baseline_gen_tokens": bt,
             "vote_gen_tokens": vt,
             "token_mult": (vt / bt) if bt else float("nan"),
+            "b": mc["b"],  # baseline right, vote wrong
+            "c": mc["c"],  # vote right, baseline wrong
+            "discordant": mc["b"] + mc["c"],
+            "mcnemar_p": mc["p"],
         }
     return out
 
 
+def _vote_vs_baseline_discordance(
+    base_rows: list[dict], mv_rows: list[dict]
+) -> dict[tuple[str, str], dict]:
+    """Per-cell McNemar b/c pairing baseline vs the voted answer on the same instance.
+
+    Vote-correctness is derived (vote the N draws, then score) -- it is not a stored
+    field -- so this pairs each instance's baseline `correct` against its voted result.
+    """
+    base_correct = {r["instance_id"]: bool(r["correct"]) for r in base_rows}
+    by_instance: dict[str, list[dict]] = defaultdict(list)
+    for r in mv_rows:
+        by_instance[r["instance_id"]].append(r)
+
+    disc: dict[tuple[str, str], dict] = defaultdict(lambda: {"b": 0, "c": 0})
+    for iid, irows in by_instance.items():
+        if iid not in base_correct:
+            continue
+        irows = sorted(irows, key=lambda r: r.get("sample_index", 0))
+        head = irows[0]
+        voted, _ok, _n = vote([r["parsed_answer"] for r in irows])
+        vote_ok = bool(score(voted, head["ground_truth"]))
+        base_ok = base_correct[iid]
+        cell = disc[(head["task"], head["encoding"])]
+        if base_ok and not vote_ok:
+            cell["b"] += 1
+        elif vote_ok and not base_ok:
+            cell["c"] += 1
+    return disc
+
+
 def format_comparison(cmp: dict[tuple[str, str], dict]) -> str:
-    """Fixed-width vote-vs-baseline table: accuracy delta + token multiplier per cell."""
+    """Fixed-width vote-vs-baseline table: accuracy delta, token multiplier, and the
+    paired McNemar (b/c discordance + p) per cell. `_stars` is defined above."""
     header = (f"{'task':<16}{'encoding':<12}{'base_acc':>9}{'vote_acc':>9}"
-              f"{'delta':>8}{'base_tok':>10}{'vote_tok':>10}{'x':>7}")
+              f"{'delta':>8}{'x':>6}{'b/c':>8}{'McNemar p':>11}")
     lines = [header, "-" * len(header)]
     for (task, encoding), s in cmp.items():
+        bc = f"{s['b']}/{s['c']}"
         lines.append(
             f"{task:<16}{encoding:<12}{s['baseline_accuracy']:>9.3f}"
-            f"{s['voted_accuracy']:>9.3f}{s['delta']:>+8.3f}"
-            f"{s['baseline_gen_tokens']:>10}{s['vote_gen_tokens']:>10}{s['token_mult']:>7.2f}"
+            f"{s['voted_accuracy']:>9.3f}{s['delta']:>+8.3f}{s['token_mult']:>6.1f}"
+            f"{bc:>8}{s['mcnemar_p']:>9.3f} {_stars(s['mcnemar_p']):<3}"
         )
     return "\n".join(lines)
 
 
 def comparison_to_csv(cmp: dict[tuple[str, str], dict]) -> str:
     """Vote-vs-baseline comparison as CSV text (the P4 headline artifact)."""
-    lines = ["task,encoding,baseline_acc,vote_acc,delta,"
-             "baseline_gen_tok,vote_gen_tok,token_mult"]
+    lines = ["task,encoding,baseline_acc,vote_acc,delta,baseline_gen_tok,vote_gen_tok,"
+             "token_mult,mcnemar_b,mcnemar_c,discordant,mcnemar_p"]
     for (task, encoding), s in cmp.items():
         lines.append(
             f"{task},{encoding},{s['baseline_accuracy']:.4f},{s['voted_accuracy']:.4f},"
             f"{s['delta']:+.4f},{s['baseline_gen_tokens']},{s['vote_gen_tokens']},"
-            f"{s['token_mult']:.2f}"
+            f"{s['token_mult']:.2f},{s['b']},{s['c']},{s['discordant']},{s['mcnemar_p']:.4g}"
         )
     return "\n".join(lines) + "\n"
 

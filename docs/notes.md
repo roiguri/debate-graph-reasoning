@@ -272,19 +272,28 @@ accuracy (Δ = vote − baseline):
 | node_degree | 0.370 → 0.360 (−0.010) | 0.750 → 0.755 (+0.005) | 0.455 → 0.455 (0.000) |
 | connected_nodes | 0.280 → 0.275 (−0.005) | 0.345 → 0.350 (+0.005) | 0.210 → 0.215 (+0.005) |
 
-Every |Δ| ≤ 0.01, far inside the per-cell 95% CI (≈±0.07); every voted CI overlaps
-its baseline CI. Fragility gap (max−min per task) is unchanged: node_degree
-0.38 → 0.395, connected_nodes 0.135 → 0.135, edge_existence 0.02 → 0.025. The worst
-encodings (node_degree × adjacency, connected_nodes × friendship) are not lifted.
+Every |Δ| ≤ 0.01, far inside the per-cell 95% CI (≈±0.07). A **paired McNemar** of vote
+vs greedy per cell (both run on the same instances) makes the null rigorous, not just
+overlapping CIs: the discordance is 1-9 instances out of 200 per cell and balanced
+(b≈c), so **every cell is non-significant** (p ≥ 0.69; eight of nine at p=1.0). Voting
+returns greedy's exact correctness on 96-99% of instances. Fragility gap (max−min per
+task) is unchanged: node_degree 0.38 → 0.395, connected_nodes 0.135 → 0.135,
+edge_existence 0.02 → 0.025. The worst encodings (node_degree × adjacency,
+connected_nodes × friendship) are not lifted. (Per-cell b/c + p in
+`analysis/main/mv_vs_baseline.csv`, from `show_results.py --compare`.)
 
-**Mechanism (writeup point).** The single sampled draw (`1samp` column) sits slightly
-*below* greedy in several cells, because sampling at T=0.7 adds noise (connected_nodes
-× incident 0.333 vs greedy 0.345; node_degree × incident 0.746 vs 0.750). Voting over
-10 draws recovers that loss back to approximately greedy, netting ~0 versus the greedy
-baseline. This is the signature of **systematic, not sample-variance, error**: the
-encoding-induced mistakes are consistent across draws, so the mode is the same wrong
-answer, and aggregation cannot repair them. Self-consistency helps when errors are
-independent noise; here they are not.
+**Why (writeup point).** The reason is structural, not incidental: our task answers are
+essentially single tokens (a yes/no, a degree; connected_nodes a short set), and
+**majority vote over samples of a single-token answer converges to the argmax, which is
+exactly greedy**. Self-consistency's leverage comes from marginalizing over *diverse
+reasoning paths* (Wang et al. 2023); with direct terse answers there are no diverse paths
+to marginalize, so the vote just re-estimates greedy's mode. Consistent with this, the
+single sampled draw (`1samp`) sits slightly below greedy where T=0.7 sampling adds noise
+(connected_nodes × incident 0.333 vs 0.345), and voting recovers it back to ~greedy,
+netting ~0. The encoding-induced errors are also systematic across draws, so aggregation
+cannot repair them. (Sampling used Qwen's recommended top_p=0.8/top_k=20, now set
+explicitly; a wider-diversity rerun was judged unnecessary because the single-token
+argument holds regardless of sampling diversity. See docs/plan/p4-review-followups.)
 
 **Compute.** MV spent ~83.5k generated tokens vs the baseline's ~8.5k (≈9.8x, i.e.
 ~10x as designed since N=10), for zero accuracy return. Per-cell totals are in the

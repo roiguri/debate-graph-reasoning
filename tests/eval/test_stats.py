@@ -11,9 +11,20 @@ import math
 from gedebate.eval.stats import (
     cochran_q,
     mcnemar,
+    mcnemar_from_bc,
     task_significance,
     wilson_ci,
 )
+
+
+def test_mcnemar_from_bc():
+    assert mcnemar_from_bc(0, 0)["p"] == 1.0            # no discordance -> no evidence
+    assert mcnemar_from_bc(2, 2)["p"] == 1.0            # balanced -> not significant
+    assert mcnemar_from_bc(1, 0)["p"] == 1.0            # a single flip -> p=1.0
+    assert mcnemar_from_bc(258, 41)["p"] < 1e-3         # lopsided -> highly significant
+    # small-n path is the exact binomial; large-n path the chi-square
+    assert mcnemar_from_bc(3, 5)["stat"] == 3.0         # exact: stat = min(b, c)
+    assert mcnemar_from_bc(200, 100)["stat"] > 1.0      # chi-square regime
 
 
 def _row(task, enc, gidx, correct, seed=7):

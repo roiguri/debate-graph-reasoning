@@ -61,12 +61,30 @@ def _correct_by_graph(rows: list[dict]) -> dict[str, dict[str, bool]]:
     return out
 
 
+def mcnemar_from_bc(b: int, c: int) -> dict:
+    """McNemar stat + p from the discordant counts alone: `b` = right on A / wrong on
+    B, `c` = the reverse. Concordant pairs carry no signal and are excluded upstream.
+
+    Continuity-corrected chi-square (df=1); for tiny discordance (b+c < 25) the exact
+    two-sided binomial (p=0.5) instead. Shared by the encoding test (mcnemar) and the
+    condition test (baseline vs majority-vote), so both use identical math.
+    """
+    n = b + c
+    if n == 0:
+        return {"b": b, "c": c, "stat": 0.0, "p": 1.0}
+    if n < 25:  # exact two-sided binomial (p=0.5), small-sample regime
+        k = min(b, c)
+        p = min(1.0, 2 * sum(math.comb(n, i) for i in range(k + 1)) / (2 ** n))
+        return {"b": b, "c": c, "stat": float(k), "p": p}
+    chi = (abs(b - c) - 1) ** 2 / n
+    return {"b": b, "c": c, "stat": chi, "p": 2 * _norm_sf(math.sqrt(chi))}
+
+
 def mcnemar(rows: list[dict], enc_a: str, enc_b: str) -> dict:
     """Paired McNemar test on two encodings' per-graph correctness (task rows).
 
     Only graphs scored under *both* encodings count. `b` = right on A, wrong on B;
-    `c` = wrong on A, right on B. Uses the continuity-corrected chi-square (df=1);
-    for tiny discordant counts (b+c < 25) reports the exact binomial p instead.
+    `c` = wrong on A, right on B.
     """
     by_graph = _correct_by_graph(rows)
     b = c = 0
@@ -78,17 +96,7 @@ def mcnemar(rows: list[dict], enc_a: str, enc_b: str) -> dict:
             b += 1
         elif b_ok and not a_ok:
             c += 1
-    n = b + c
-    if n == 0:
-        return {"enc_a": enc_a, "enc_b": enc_b, "b": b, "c": c, "stat": 0.0, "p": 1.0}
-    if n < 25:  # exact two-sided binomial (p=0.5), small-sample regime
-        k = min(b, c)
-        tail = sum(math.comb(n, i) for i in range(k + 1)) / (2 ** n)
-        p = min(1.0, 2 * tail)
-        return {"enc_a": enc_a, "enc_b": enc_b, "b": b, "c": c, "stat": float(k), "p": p}
-    chi = (abs(b - c) - 1) ** 2 / n
-    return {"enc_a": enc_a, "enc_b": enc_b, "b": b, "c": c,
-            "stat": chi, "p": 2 * _norm_sf(math.sqrt(chi))}
+    return {"enc_a": enc_a, "enc_b": enc_b, **mcnemar_from_bc(b, c)}
 
 
 def cochran_q(rows: list[dict], encodings: list[str]) -> dict:
