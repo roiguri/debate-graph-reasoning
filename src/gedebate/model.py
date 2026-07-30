@@ -36,13 +36,18 @@ class Model:
         *,
         max_new_tokens: int = 256,
         temperature: float | None = None,
+        top_p: float | None = None,
+        top_k: int | None = None,
         seed: int | None = None,
     ) -> GenResult:
         """Generate a completion for a single user prompt.
 
         `temperature=None` (default) is greedy/deterministic. A float enables
-        sampling -- used later by the majority-vote condition. `seed` makes a
-        sampled draw reproducible.
+        sampling -- used by the majority-vote condition. `seed` makes a sampled draw
+        reproducible. `top_p`/`top_k` are set explicitly when sampling so the
+        truncation is a deliberate, recorded choice rather than the model's shipped
+        generation_config defaults (Qwen ships top_p=0.8/top_k=20); pass top_p=1.0
+        and top_k=0 to disable nucleus/top-k filtering.
         """
         if seed is not None:
             torch.manual_seed(seed)
@@ -64,7 +69,14 @@ class Model:
             or self.tokenizer.eos_token_id,
         }
         if do_sample:
+            # Set truncation explicitly so we never inherit the model's shipped
+            # generation_config sampling defaults. Greedy ignores these (argmax),
+            # so they are only passed when sampling.
             gen_kwargs["temperature"] = temperature
+            if top_p is not None:
+                gen_kwargs["top_p"] = top_p
+            if top_k is not None:
+                gen_kwargs["top_k"] = top_k
 
         with torch.no_grad():
             output_ids = self.model.generate(

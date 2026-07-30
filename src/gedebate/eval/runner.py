@@ -76,6 +76,7 @@ def manifest_record(cfg: RunConfig, config_path: str) -> dict:
     }
     if cfg.condition == "majority_vote":
         rec["n_samples"] = cfg.n_samples
+        rec["decoding"] = f"temperature={cfg.temperature},top_p={cfg.top_p},top_k={cfg.top_k}"
     return rec
 
 
@@ -120,7 +121,8 @@ def _run_vote_samples(model, inst, cfg: RunConfig, path, progress) -> int:
     for si in missing:
         attempt = run_sample(
             model, inst, sample_index=si,
-            temperature=cfg.temperature, max_new_tokens=cfg.max_new_tokens,
+            temperature=cfg.temperature, top_p=cfg.top_p, top_k=cfg.top_k,
+            max_new_tokens=cfg.max_new_tokens,
         )
         row = results.make_row(
             inst, cfg.model, attempt,

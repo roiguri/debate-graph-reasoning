@@ -38,6 +38,9 @@ def test_from_dict_full():
     {"model": "m", "out_dir": "o", "dataset": "d", "condition": "debate"},  # not yet known
     {"model": "m", "out_dir": "o", "dataset": "d", "n_samples": 0},      # must be >= 1
     {"model": "m", "out_dir": "o", "dataset": "d", "temperature": 0},    # must be > 0
+    {"model": "m", "out_dir": "o", "dataset": "d", "top_p": 0},          # must be in (0,1]
+    {"model": "m", "out_dir": "o", "dataset": "d", "top_p": 1.5},        # must be <= 1
+    {"model": "m", "out_dir": "o", "dataset": "d", "top_k": -1},         # must be >= 0
 ])
 def test_from_dict_rejects_bad_config(data):
     with pytest.raises(ValueError):
@@ -48,9 +51,18 @@ def test_majority_vote_config_fields():
     cfg = RunConfig.from_dict({
         "model": "m", "out_dir": "o", "dataset": "data/main.jsonl",
         "condition": "majority_vote", "n_samples": 10, "temperature": 0.7,
+        "top_p": 1.0, "top_k": 0,
     })
     assert cfg.condition == "majority_vote"
     assert cfg.n_samples == 10 and cfg.temperature == 0.7
+    assert cfg.top_p == 1.0 and cfg.top_k == 0
+
+
+def test_sampling_defaults_are_explicit():
+    # Omitting top_p/top_k yields explicit defaults (not None), so the model never
+    # falls back to its shipped generation_config sampling params.
+    cfg = RunConfig.from_dict({"model": "m", "out_dir": "o", "dataset": "d"})
+    assert cfg.top_p == 0.8 and cfg.top_k == 20 and cfg.n_samples == 10
 
 
 def test_load_config_from_file(tmp_path):

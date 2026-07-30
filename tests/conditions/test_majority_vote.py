@@ -82,8 +82,10 @@ class _StubModel:
         self.reply = reply
         self.seen: list[dict] = []
 
-    def generate(self, prompt: str, *, max_new_tokens: int = 64, temperature=None, seed=None):
-        self.seen.append({"temperature": temperature, "seed": seed})
+    def generate(self, prompt: str, *, max_new_tokens: int = 64, temperature=None,
+                 top_p=None, top_k=None, seed=None):
+        self.seen.append({"temperature": temperature, "top_p": top_p,
+                          "top_k": top_k, "seed": seed})
         return _StubGen(self.reply, n_gen_tokens=9, n_prompt_tokens=13)
 
 
@@ -96,14 +98,15 @@ def test_run_sample_record_shape_and_passes_sampling_kwargs():
     gold = "Yes." if inst.ground_truth else "No."
     model = _StubModel(gold)
 
-    rec = run_sample(model, inst, sample_index=2, temperature=0.7)
+    rec = run_sample(model, inst, sample_index=2, temperature=0.7, top_p=1.0, top_k=0)
 
     assert rec["condition"] == "majority_vote"
     assert rec["sample_index"] == 2
     assert rec["correct"] is True
     assert rec["parse_ok"] is True
     assert rec["n_gen_tokens"] == 9 and rec["n_prompt_tokens"] == 13
-    # the draw was sampled (temperature set) with the derived per-draw seed
+    # the draw was sampled (temperature + explicit truncation) with the derived seed
     assert model.seen[0]["temperature"] == 0.7
+    assert model.seen[0]["top_p"] == 1.0 and model.seen[0]["top_k"] == 0
     assert rec["seed"] == sample_seed(inst.instance_id, 2)
     assert model.seen[0]["seed"] == rec["seed"]

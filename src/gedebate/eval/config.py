@@ -27,9 +27,14 @@ class RunConfig:
     tasks: tuple[str, ...] = tuple(ALL_TASKS)
     encodings: tuple[str, ...] = tuple(ALL_ENCODINGS)
     max_new_tokens: int = 64
-    # majority-vote decoding (ignored by baseline): draws per instance + temperature.
+    # majority-vote decoding (ignored by baseline): draws per instance + sampling.
+    # top_p/top_k are set explicitly (not inherited from the model's generation_config)
+    # so the sampling truncation is a deliberate, in-manifest choice. Defaults are
+    # Qwen2.5-Instruct's recommended values; top_p=1.0 + top_k=0 disables truncation.
     n_samples: int = 10  # the locked P4 budget; a config omitting it runs the full budget
     temperature: float = 0.7
+    top_p: float = 0.8
+    top_k: int = 20
 
     @classmethod
     def from_dict(cls, data: dict) -> "RunConfig":
@@ -51,10 +56,16 @@ class RunConfig:
 
         n_samples = int(data.get("n_samples", 10))
         temperature = float(data.get("temperature", 0.7))
+        top_p = float(data.get("top_p", 0.8))
+        top_k = int(data.get("top_k", 20))
         if n_samples < 1:
             raise ValueError(f"n_samples must be >= 1, got {n_samples}")
         if temperature <= 0:
             raise ValueError(f"temperature must be > 0 (sampling), got {temperature}")
+        if not 0 < top_p <= 1:
+            raise ValueError(f"top_p must be in (0, 1], got {top_p}")
+        if top_k < 0:
+            raise ValueError(f"top_k must be >= 0 (0 disables), got {top_k}")
 
         return cls(
             model=data["model"],
@@ -66,6 +77,8 @@ class RunConfig:
             max_new_tokens=int(data.get("max_new_tokens", 64)),
             n_samples=n_samples,
             temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
         )
 
 

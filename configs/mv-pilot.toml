@@ -8,6 +8,8 @@ dataset = "data/main.jsonl"
 
 n_samples = 10
 temperature = 0.7
+top_p = 0.8
+top_k = 20
 
 # single cell -> ~200 instances x 10 draws; enough to confirm the pipeline end to end.
 tasks = ["node_degree"]

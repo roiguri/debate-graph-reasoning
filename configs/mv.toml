@@ -9,6 +9,11 @@ dataset = "data/main.jsonl"
 
 n_samples = 10
 temperature = 0.7
+# Sampling truncation set explicitly (not inherited from Qwen's generation_config).
+# These are Qwen2.5-Instruct's recommended values and match the committed run; set
+# top_p = 1.0 and top_k = 0 to disable truncation (a wider-diversity rerun).
+top_p = 0.8
+top_k = 20
 
 # same tasks/encodings + token cap as the baseline, so a per-draw row is comparable.
 tasks = ["edge_existence", "node_degree", "connected_nodes"]

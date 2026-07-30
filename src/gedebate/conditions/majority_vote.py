@@ -44,17 +44,22 @@ def run_sample(
     *,
     sample_index: int,
     temperature: float,
+    top_p: float | None = None,
+    top_k: int | None = None,
     max_new_tokens: int = 128,
 ) -> dict:
     """One sampled draw -> parse -> score -> attempt record (baseline's shape + seed).
 
     The record carries the `seed` and `sample_index` used so the runner can persist
-    them via `results.make_row` without recomputing.
+    them via `results.make_row` without recomputing. `top_p`/`top_k` are passed
+    through to the model so the sampling truncation is explicit, not the model's
+    shipped default.
     """
     prompt = build_prompt(instance)
     seed = sample_seed(instance.instance_id, sample_index)
     gen = model.generate(
-        prompt, max_new_tokens=max_new_tokens, temperature=temperature, seed=seed
+        prompt, max_new_tokens=max_new_tokens, temperature=temperature,
+        top_p=top_p, top_k=top_k, seed=seed,
     )
     parsed, parse_ok = parse(
         instance.task, gen.text, encoding=instance.encoding, node_ids=instance.node_ids
