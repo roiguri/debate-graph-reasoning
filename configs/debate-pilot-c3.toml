@@ -1,0 +1,17 @@
+# Debate PILOT, Critic v3 (middle): same cell as debate-pilot (node_degree x adjacency).
+# v1 fabricated + over-revised (harmful); v2 was evidence-grounded but too shy (inert,
+# REVISE 9/200). v3 keeps the evidence grounding but drops the default-AGREE bias and
+# verifies actively (recompute the query node's edges from the list, check both misses
+# and fabrications). Isolated throwaway out_dir; only the Critic prompt changed vs v2.
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "debate"
+dataset = "data/main.jsonl"
+
+n_samples = 10
+max_new_tokens = 256
+
+tasks = ["node_degree"]
+encodings = ["adjacency"]
+
+out_dir = "results/debate-pilot-c3"
