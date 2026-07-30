@@ -1,0 +1,19 @@
+# Debate PILOT, Critic v2: same cell as debate-pilot (node_degree x adjacency, the worst
+# cell), re-run with the iterated Critic prompt (evidence-grounded, default-AGREE, no
+# invented edges -- see src/gedebate/prompts/debate.py). Isolated throwaway out_dir so the
+# original results/debate-pilot stays intact for a head-to-head comparison. Disposable.
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "debate"
+dataset = "data/main.jsonl"
+
+# n_samples is the debate response BUDGET (max turns), matched to majority-vote's N.
+# Greedy decoding (no temperature/top_p/top_k). Identical to debate-pilot: only the
+# Critic prompt changed, so any delta is the prompt.
+n_samples = 10
+max_new_tokens = 256
+
+tasks = ["node_degree"]
+encodings = ["adjacency"]
+
+out_dir = "results/debate-pilot-c2"

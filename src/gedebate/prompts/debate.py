@@ -71,19 +71,24 @@ _REVISION_FORMAT = {
 # Critic framing is task-generic (it verifies edge claims whatever the task).
 _CRITIC_TOP = (
     "Another model is answering the graph question below by writing numbered atomic claims\n"
-    "(each about one edge) and a final answer; you are the checker verifying its claims\n"
-    "against the graph. The debate so far is shown; verify the LATEST Proposer answer."
+    "(each about one edge) and a final answer. You are the checker. The graph text is the\n"
+    "ONLY source of truth: an edge exists only if the graph states it. Verify the LATEST\n"
+    "Proposer answer against the graph; the debate so far is shown."
 )
 _CRITIC_CUE = (
-    "Verify the latest Proposer answer against the graph, taking the earlier exchange into\n"
-    "account. Check each numbered claim against the edge list (is that edge present or\n"
-    "absent, as claimed?), check that no relevant edge was missed, and that the final\n"
-    "answer follows. Respond in exactly this format and nothing else:\n"
+    "Work only from the graph text. First find, from the graph, every edge that involves\n"
+    "the queried node -- an edge counts only if the graph explicitly states it; never\n"
+    "introduce an edge that is not written in the graph. Then compare the Proposer's claims\n"
+    "and final answer to what the graph shows.\n"
+    "Default to AGREE. Raise a problem ONLY when the Proposer's answer contradicts the graph\n"
+    "AND you can quote the exact graph text that proves it. If you cannot quote such text, do\n"
+    "not raise it. Do not repeat a problem the Proposer has already fixed. Respond in exactly\n"
+    "this format and nothing else:\n"
     "VERDICT: AGREE\n"
-    "(use this if every claim is correct and the answer follows)\n"
+    "(every claim matches the graph and the answer follows)\n"
     "or\n"
     "VERDICT: REVISE\n"
-    "- <one line per problem: which claim is wrong, or what was missed>"
+    "- <the problem, quoting the exact graph text that proves it>"
 )
 _REVISION_TOP = (
     "You are the Proposer in the debate below. A checker verified your latest claims against\n"
