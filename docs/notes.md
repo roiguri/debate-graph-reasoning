@@ -145,6 +145,22 @@ be the same model in two roles (simplest, keeps matched-compute clean).
 
 ---
 
+### Compute metric: # responses + total tokens, per instance — decision (P5.0)
+The matched-compute comparison across conditions uses **# model responses (calls)** as
+the primary metric (the debate-vs-self-consistency literature standard: Huang 2024
+"equivalent number of responses", Choi 2025 "number of agents", Du 2023), with **total
+tokens (prompt + generated)** as the secondary, faithful measure. **Generated-only was
+dropped**: for these tasks the prompt dominates hard -- a baseline instance averages
+~310-430 *total* tokens but only ~2 generated (the encoding is the whole cost), so
+generated-only measured under ~1% of the work. Reported **per instance** (mean cost of
+one question): baseline = 1 response / ~360 tokens; MV = 10 / ~3,600 (a clean 10x on both
+axes, since MV is N independent copies -- so the P4 "10x for nothing" holds in total
+tokens too). Debate will place as a point on MV's accuracy-vs-#responses curve; at matched
+responses its total tokens exceed MV's (the transcript grows each turn), which is why we
+report both. All recoverable from stored rows (`n_prompt_tokens` + `n_gen_tokens`), so no
+rerun. Surfaced by `report.summarize`/`summarize_votes`/`compare_baseline_vote` and
+`show_results.py`.
+
 ## Prompting & scoring
 
 ### Baseline prompt = GraphQA zero-shot, direct answer — decision (P2)

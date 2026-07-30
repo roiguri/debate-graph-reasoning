@@ -96,7 +96,10 @@ def test_compare_baseline_vote_delta_token_mult_and_mcnemar():
     c = cmp[("edge_existence", "adjacency")]
     assert c["baseline_accuracy"] == 1.0 and c["voted_accuracy"] == 0.5
     assert abs(c["delta"] - (-0.5)) < 1e-9
-    assert c["baseline_gen_tokens"] == 4 and c["vote_gen_tokens"] == 12
+    # compute per instance: baseline 1 response / 2 tok; vote 2 responses / 6 tok
+    assert c["baseline_responses"] == 1.0 and c["vote_responses"] == 2.0
+    assert abs(c["response_mult"] - 2.0) < 1e-9
+    assert c["baseline_tokens"] == 2.0 and c["vote_tokens"] == 6.0
     assert abs(c["token_mult"] - 3.0) < 1e-9
     # paired McNemar: instance 7/1 is baseline-right / vote-wrong -> b=1, c=0
     assert c["b"] == 1 and c["c"] == 0 and c["discordant"] == 1
@@ -104,8 +107,8 @@ def test_compare_baseline_vote_delta_token_mult_and_mcnemar():
 
     csv = comparison_to_csv(cmp)
     assert csv.startswith("task,encoding,baseline_acc,vote_acc,delta")
-    assert "mcnemar_b,mcnemar_c,discordant,mcnemar_p" in csv
-    assert "edge_existence,adjacency,1.0000,0.5000,-0.5000,4,12,3.00,1,0,1,1" in csv
+    assert "response_mult" in csv and "mcnemar_p" in csv
+    assert "edge_existence,adjacency,1.0000,0.5000,-0.5000,1,2,2.00,2.0,6.0,3.00,1,0,1,1" in csv
 
 
 def test_compare_only_cells_in_both_conditions():

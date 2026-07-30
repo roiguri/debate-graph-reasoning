@@ -18,7 +18,7 @@ the worst encodings?) is in [notes.md](../notes.md).
 
 ## Slice checklist
 
-- [ ] **P5.0** Baseline/MV compute measurement: total tokens + # responses (analysis-only, no rerun)
+- [x] **P5.0** Baseline/MV compute measurement: total tokens + # responses, per-instance (analysis-only, no rerun)
 - [ ] **P5.1** Proposer prompt + structured trace + parse (torch-free) — *prompt needs approval*
 - [ ] **P5.2** Critic (holistic trace verification) + turn loop + stopping rule + per-turn logging + persistence — *prompt needs approval*
 - [ ] **P5.3** Trace viewer (`scripts/debate_viewer.py`, self-contained HTML)

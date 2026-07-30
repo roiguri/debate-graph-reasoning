@@ -25,14 +25,19 @@ def summarize(rows: list[dict]) -> dict[tuple[str, str], dict]:
     out: dict[tuple[str, str], dict] = {}
     for key in sorted(groups):
         rs = groups[key]
-        n = len(rs)
+        n = len(rs)  # baseline: rows == instances (1 response each)
         n_correct = sum(bool(r["correct"]) for r in rs)
+        total_tokens = sum(int(r["n_gen_tokens"]) + int(r.get("n_prompt_tokens", 0)) for r in rs)
         out[key] = {
             "n": n,
             "accuracy": n_correct / n,
             "acc_ci": wilson_ci(n_correct, n),  # 95% Wilson interval (lo, hi)
             "parse_ok_rate": sum(bool(r["parse_ok"]) for r in rs) / n,
-            "total_gen_tokens": sum(int(r["n_gen_tokens"]) for r in rs),
+            "total_gen_tokens": sum(int(r["n_gen_tokens"]) for r in rs),  # kept for reference
+            "total_tokens": total_tokens,           # prompt + generated, cell total
+            "n_responses": n,                        # 1 model call per instance
+            "tokens_per_instance": total_tokens / n,  # the reporting unit (mean)
+            "responses_per_instance": 1.0,
         }
     return out
 
@@ -40,7 +45,7 @@ def summarize(rows: list[dict]) -> dict[tuple[str, str], dict]:
 def format_summary(summary: dict[tuple[str, str], dict]) -> str:
     """A compact fixed-width table for stdout / job logs."""
     header = (f"{'task':<16}{'encoding':<12}{'n':>4}{'acc':>8}"
-              f"{'95% CI':>16}{'parse_ok':>10}{'gen_tok':>10}")
+              f"{'95% CI':>16}{'parse_ok':>10}{'resp/i':>8}{'tok/i':>9}")
     lines = [header, "-" * len(header)]
     for (task, encoding), s in summary.items():
         lo, hi = s["acc_ci"]
@@ -48,7 +53,7 @@ def format_summary(summary: dict[tuple[str, str], dict]) -> str:
         lines.append(
             f"{task:<16}{encoding:<12}{s['n']:>4}"
             f"{s['accuracy']:>8.3f}{ci:>16}{s['parse_ok_rate']:>10.3f}"
-            f"{s['total_gen_tokens']:>10}"
+            f"{s['responses_per_instance']:>8.0f}{s['tokens_per_instance']:>9.0f}"
         )
     return "\n".join(lines)
 
@@ -70,7 +75,7 @@ def summarize_votes(rows: list[dict]) -> dict[tuple[str, str], dict]:
     cells: dict[tuple[str, str], dict] = defaultdict(
         lambda: {"n_instances": 0, "voted_correct": 0, "voted_parse_ok": 0,
                  "sample_rows": 0, "sample_correct": 0, "total_gen_tokens": 0,
-                 "n_samples": set()}
+                 "total_tokens": 0, "n_samples": set()}
     )
     for irows in per_instance.values():
         irows = sorted(irows, key=lambda r: r.get("sample_index", 0))
@@ -83,6 +88,7 @@ def summarize_votes(rows: list[dict]) -> dict[tuple[str, str], dict]:
         c["sample_rows"] += len(irows)
         c["sample_correct"] += sum(bool(r["correct"]) for r in irows)
         c["total_gen_tokens"] += sum(int(r["n_gen_tokens"]) for r in irows)
+        c["total_tokens"] += sum(int(r["n_gen_tokens"]) + int(r.get("n_prompt_tokens", 0)) for r in irows)
         c["n_samples"].add(len(irows))
 
     out: dict[tuple[str, str], dict] = {}
@@ -95,7 +101,11 @@ def summarize_votes(rows: list[dict]) -> dict[tuple[str, str], dict]:
             "voted_acc_ci": wilson_ci(c["voted_correct"], n),
             "per_sample_accuracy": c["sample_correct"] / c["sample_rows"],
             "parse_ok_rate": c["voted_parse_ok"] / n,
-            "total_gen_tokens": c["total_gen_tokens"],
+            "total_gen_tokens": c["total_gen_tokens"],  # kept for reference
+            "total_tokens": c["total_tokens"],           # prompt + generated, cell total
+            "n_responses": c["sample_rows"],             # N model calls per instance
+            "tokens_per_instance": c["total_tokens"] / n,      # reporting unit (mean)
+            "responses_per_instance": c["sample_rows"] / n,    # == N
             "n_samples": sorted(c["n_samples"]),  # normally a single value [N]
         }
     return out
@@ -104,7 +114,7 @@ def summarize_votes(rows: list[dict]) -> dict[tuple[str, str], dict]:
 def format_vote_summary(summary: dict[tuple[str, str], dict]) -> str:
     """Fixed-width per-cell majority-vote table: voted vs per-sample accuracy + tokens."""
     header = (f"{'task':<16}{'encoding':<12}{'n':>4}{'N':>4}{'vote_acc':>9}"
-              f"{'95% CI':>16}{'1samp':>8}{'parse_ok':>10}{'gen_tok':>10}")
+              f"{'95% CI':>16}{'1samp':>8}{'parse_ok':>10}{'tok/i':>9}")
     lines = [header, "-" * len(header)]
     for (task, encoding), s in summary.items():
         lo, hi = s["voted_acc_ci"]
@@ -113,7 +123,7 @@ def format_vote_summary(summary: dict[tuple[str, str], dict]) -> str:
         lines.append(
             f"{task:<16}{encoding:<12}{s['n']:>4}{str(ns):>4}"
             f"{s['voted_accuracy']:>9.3f}{ci:>16}{s['per_sample_accuracy']:>8.3f}"
-            f"{s['parse_ok_rate']:>10.3f}{s['total_gen_tokens']:>10}"
+            f"{s['parse_ok_rate']:>10.3f}{s['tokens_per_instance']:>9.0f}"
         )
     return "\n".join(lines)
 
@@ -121,13 +131,16 @@ def format_vote_summary(summary: dict[tuple[str, str], dict]) -> str:
 def vote_summary_to_csv(summary: dict[tuple[str, str], dict]) -> str:
     """Per-cell majority-vote summary as CSV text (for a committed analysis artifact)."""
     lines = ["task,encoding,n,n_samples,voted_accuracy,ci_lo,ci_hi,"
-             "per_sample_accuracy,parse_ok_rate,total_gen_tokens"]
+             "per_sample_accuracy,parse_ok_rate,"
+             "responses_per_instance,tokens_per_instance,total_tokens,total_gen_tokens"]
     for (task, encoding), s in summary.items():
         lo, hi = s["voted_acc_ci"]
         ns = s["n_samples"][0] if len(s["n_samples"]) == 1 else "mixed"
         lines.append(
             f"{task},{encoding},{s['n']},{ns},{s['voted_accuracy']:.4f},{lo:.4f},{hi:.4f},"
-            f"{s['per_sample_accuracy']:.4f},{s['parse_ok_rate']:.4f},{s['total_gen_tokens']}"
+            f"{s['per_sample_accuracy']:.4f},{s['parse_ok_rate']:.4f},"
+            f"{s['responses_per_instance']:.0f},{s['tokens_per_instance']:.1f},"
+            f"{s['total_tokens']},{s['total_gen_tokens']}"
         )
     return "\n".join(lines) + "\n"
 
@@ -154,15 +167,23 @@ def compare_baseline_vote(
     for key in sorted(set(bs) & set(vs)):
         b, v = bs[key], vs[key]
         bt, vt = b["total_gen_tokens"], v["total_gen_tokens"]
+        b_tpi, v_tpi = b["tokens_per_instance"], v["tokens_per_instance"]
+        b_rpi, v_rpi = b["responses_per_instance"], v["responses_per_instance"]
         bc = disc.get(key, {"b": 0, "c": 0})
         mc = mcnemar_from_bc(bc["b"], bc["c"])
         out[key] = {
             "baseline_accuracy": b["accuracy"],
             "voted_accuracy": v["voted_accuracy"],
             "delta": v["voted_accuracy"] - b["accuracy"],
-            "baseline_gen_tokens": bt,
+            # compute, per instance (the reporting unit) -- primary axis is responses
+            "baseline_responses": b_rpi,
+            "vote_responses": v_rpi,
+            "response_mult": (v_rpi / b_rpi) if b_rpi else float("nan"),
+            "baseline_tokens": b_tpi,
+            "vote_tokens": v_tpi,
+            "token_mult": (v_tpi / b_tpi) if b_tpi else float("nan"),
+            "baseline_gen_tokens": bt,  # cell totals, generated-only, kept for reference
             "vote_gen_tokens": vt,
-            "token_mult": (vt / bt) if bt else float("nan"),
             "b": mc["b"],  # baseline right, vote wrong
             "c": mc["c"],  # vote right, baseline wrong
             "discordant": mc["b"] + mc["c"],
@@ -205,13 +226,14 @@ def format_comparison(cmp: dict[tuple[str, str], dict]) -> str:
     """Fixed-width vote-vs-baseline table: accuracy delta, token multiplier, and the
     paired McNemar (b/c discordance + p) per cell. `_stars` is defined above."""
     header = (f"{'task':<16}{'encoding':<12}{'base_acc':>9}{'vote_acc':>9}"
-              f"{'delta':>8}{'x':>6}{'b/c':>8}{'McNemar p':>11}")
+              f"{'delta':>8}{'xresp':>6}{'xtok':>6}{'b/c':>8}{'McNemar p':>11}")
     lines = [header, "-" * len(header)]
     for (task, encoding), s in cmp.items():
         bc = f"{s['b']}/{s['c']}"
         lines.append(
             f"{task:<16}{encoding:<12}{s['baseline_accuracy']:>9.3f}"
-            f"{s['voted_accuracy']:>9.3f}{s['delta']:>+8.3f}{s['token_mult']:>6.1f}"
+            f"{s['voted_accuracy']:>9.3f}{s['delta']:>+8.3f}"
+            f"{s['response_mult']:>6.1f}{s['token_mult']:>6.1f}"
             f"{bc:>8}{s['mcnemar_p']:>9.3f} {_stars(s['mcnemar_p']):<3}"
         )
     return "\n".join(lines)
@@ -219,12 +241,15 @@ def format_comparison(cmp: dict[tuple[str, str], dict]) -> str:
 
 def comparison_to_csv(cmp: dict[tuple[str, str], dict]) -> str:
     """Vote-vs-baseline comparison as CSV text (the P4 headline artifact)."""
-    lines = ["task,encoding,baseline_acc,vote_acc,delta,baseline_gen_tok,vote_gen_tok,"
-             "token_mult,mcnemar_b,mcnemar_c,discordant,mcnemar_p"]
+    lines = ["task,encoding,baseline_acc,vote_acc,delta,"
+             "baseline_responses,vote_responses,response_mult,"
+             "baseline_tokens_per_inst,vote_tokens_per_inst,token_mult,"
+             "mcnemar_b,mcnemar_c,discordant,mcnemar_p"]
     for (task, encoding), s in cmp.items():
         lines.append(
             f"{task},{encoding},{s['baseline_accuracy']:.4f},{s['voted_accuracy']:.4f},"
-            f"{s['delta']:+.4f},{s['baseline_gen_tokens']},{s['vote_gen_tokens']},"
+            f"{s['delta']:+.4f},{s['baseline_responses']:.0f},{s['vote_responses']:.0f},"
+            f"{s['response_mult']:.2f},{s['baseline_tokens']:.1f},{s['vote_tokens']:.1f},"
             f"{s['token_mult']:.2f},{s['b']},{s['c']},{s['discordant']},{s['mcnemar_p']:.4g}"
         )
     return "\n".join(lines) + "\n"
@@ -260,12 +285,14 @@ def fragility(summary: dict[tuple[str, str], dict]) -> dict[str, dict]:
 
 def summary_to_csv(summary: dict[tuple[str, str], dict]) -> str:
     """Per-cell summary as CSV text (for a committed analysis/ artifact)."""
-    lines = ["task,encoding,n,accuracy,ci_lo,ci_hi,parse_ok_rate,total_gen_tokens"]
+    lines = ["task,encoding,n,accuracy,ci_lo,ci_hi,parse_ok_rate,"
+             "responses_per_instance,tokens_per_instance,total_tokens,total_gen_tokens"]
     for (task, encoding), s in summary.items():
         lo, hi = s["acc_ci"]
         lines.append(
             f"{task},{encoding},{s['n']},{s['accuracy']:.4f},{lo:.4f},{hi:.4f},"
-            f"{s['parse_ok_rate']:.4f},{s['total_gen_tokens']}"
+            f"{s['parse_ok_rate']:.4f},{s['responses_per_instance']:.0f},"
+            f"{s['tokens_per_instance']:.1f},{s['total_tokens']},{s['total_gen_tokens']}"
         )
     return "\n".join(lines) + "\n"
 

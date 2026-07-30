@@ -32,6 +32,21 @@ def test_summarize_accuracy_parse_and_tokens():
     assert nd["n"] == 1 and nd["accuracy"] == 0.0
 
 
+def test_summarize_total_tokens_and_per_instance():
+    # total_tokens = prompt + generated; tables report the per-instance mean.
+    rows = [
+        {"task": "edge_existence", "encoding": "adjacency", "correct": True,
+         "parse_ok": True, "n_gen_tokens": 2, "n_prompt_tokens": 100},
+        {"task": "edge_existence", "encoding": "adjacency", "correct": True,
+         "parse_ok": True, "n_gen_tokens": 4, "n_prompt_tokens": 100},
+    ]
+    s = summarize(rows)[("edge_existence", "adjacency")]
+    assert s["total_gen_tokens"] == 6           # generated only (reference)
+    assert s["total_tokens"] == 206             # (100+2) + (100+4)
+    assert s["n_responses"] == 2 and s["responses_per_instance"] == 1.0
+    assert s["tokens_per_instance"] == 103.0    # 206 / 2 instances
+
+
 def test_format_summary_lists_each_group():
     s = summarize([_row("edge_existence", "adjacency", True)])
     out = format_summary(s)
