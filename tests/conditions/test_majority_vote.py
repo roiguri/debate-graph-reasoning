@@ -44,6 +44,18 @@ def test_vote_tiebreak_lowest_first_index():
     assert vote([False, True, False, True]) == (False, True, 2)
 
 
+def test_vote_tiebreak_at_real_even_n10():
+    # N=10 is even, so ties are possible (~5% of real instances, mostly multi-class).
+    # Binary 5-5 split: first supporter of False is index 0, so False wins.
+    draws = [False, True, False, True, False, True, False, True, False, True]
+    assert vote(draws) == (False, True, 5)
+    # Multi-class 3-way tie an odd N would NOT prevent (node_degree-style): 4-3-3,
+    # here forced to a clean tie 3-3-4 -> the count-4 answer wins outright...
+    assert vote([1, 1, 1, 2, 2, 2, 3, 3, 3, 3]) == (3, True, 4)
+    # ...but a genuine top-tie (3-3, rest scattered) resolves to the lowest index.
+    assert vote([2, 2, 2, 3, 3, 3, 4, 5, 6, 7]) == (2, True, 3)
+
+
 # --- per-draw seed derivation -------------------------------------------------
 
 def test_sample_seed_deterministic_and_varies():

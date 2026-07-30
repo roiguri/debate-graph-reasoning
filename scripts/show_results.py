@@ -58,8 +58,10 @@ def main() -> None:
 
     # A shared out_dir holds baseline/ and majority_vote/ side by side; summarize each
     # separately (per-draw accuracy for baseline, voted-per-instance for majority-vote)
-    # rather than pooling them into one number.
-    base_rows = [r for r in rows if r["condition"] != "majority_vote"]
+    # rather than pooling them into one number. Select baseline by name, not by
+    # "not majority_vote": once P5's debate/ rows share the dir, an inequality would
+    # silently pool them into the baseline table.
+    base_rows = [r for r in rows if r["condition"] == "baseline"]
     mv_rows = [r for r in rows if r["condition"] == "majority_vote"]
 
     summary = report.summarize(base_rows) if base_rows else {}

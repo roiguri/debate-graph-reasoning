@@ -28,7 +28,7 @@ class RunConfig:
     encodings: tuple[str, ...] = tuple(ALL_ENCODINGS)
     max_new_tokens: int = 64
     # majority-vote decoding (ignored by baseline): draws per instance + temperature.
-    n_samples: int = 5
+    n_samples: int = 10  # the locked P4 budget; a config omitting it runs the full budget
     temperature: float = 0.7
 
     @classmethod
@@ -49,7 +49,7 @@ class RunConfig:
         if condition not in KNOWN_CONDITIONS:
             raise ValueError(f"unknown condition {condition!r}; known: {KNOWN_CONDITIONS}")
 
-        n_samples = int(data.get("n_samples", 5))
+        n_samples = int(data.get("n_samples", 10))
         temperature = float(data.get("temperature", 0.7))
         if n_samples < 1:
             raise ValueError(f"n_samples must be >= 1, got {n_samples}")
