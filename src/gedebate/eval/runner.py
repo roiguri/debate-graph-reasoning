@@ -90,7 +90,7 @@ def run_instances(model, instances: list, cfg: RunConfig, manifest: dict, *, sha
     already-complete instances. Baseline writes one row per instance; majority-vote
     writes `cfg.n_samples` (topping up only the missing sample indexes on resume).
     """
-    results.ensure_manifest(cfg.out_dir, cfg.model, **manifest)
+    results.ensure_manifest(cfg.out_dir, cfg.model, cfg.condition, **manifest)
     progress = results.load_progress(cfg.out_dir)
     path = results.shard_file(cfg.out_dir, cfg.condition, shard)
     written = skipped = 0

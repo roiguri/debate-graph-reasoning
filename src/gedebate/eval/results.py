@@ -197,31 +197,58 @@ def read_manifest(run_dir: str | Path) -> dict | None:
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
-# Fields that pin the instance set + comparison; a resume must not change them.
-# `dataset_sha256` identifies the exact frozen dataset that produced the rows, so
-# resuming a run dir against a different model or dataset is a hard error rather
-# than silent corruption.
+# The manifest is versioned separately from the row schema (SCHEMA_VERSION): v2
+# records per-condition provenance under `conditions`, where v1 was flat.
+MANIFEST_VERSION = 2
+
+# Top-level invariants a run dir shares across every condition. `dataset` +
+# `dataset_sha256` identify the exact frozen instance set; `model` is passed
+# explicitly. A resume must not change the guarded ones, else two models or datasets
+# would mix into one accuracy.
+_SHARED_KEYS = ("dataset", "dataset_sha256")
 _GUARDED_KEYS = ("model", "dataset_sha256")
 
 
-def ensure_manifest(run_dir: str | Path, model: str, **extra) -> dict:
-    """Create the run manifest once, or verify the guarded fields match on resume.
+def ensure_manifest(run_dir: str | Path, model: str, condition: str, **fields) -> dict:
+    """Create or update the run manifest, recording per-condition provenance.
 
-    The manifest doubles as a reproduction record (dataset + sha256, decoding,
-    git commit, ...). Guards `model` + `dataset_sha256` (whichever are supplied) so
-    a resume can never mix two models -- or two datasets -- into one accuracy.
+    A run dir holds one dataset + model (the shared, guarded invariants at top level)
+    and one or more conditions (baseline / majority_vote / debate) as siblings under
+    a shared `out_dir`. Each condition's provenance (decoding, config, tokens, ...) is
+    stored under `conditions[condition]` and written **once**: a later condition adds
+    its own entry without clobbering the others, and a resume of the same condition
+    preserves its original record. Guards `model` + `dataset_sha256` (whichever are
+    supplied) so a resume can never mix two models -- or two datasets -- into one
+    accuracy. Shared fields from earlier calls are preserved if not re-supplied.
     """
-    fields = {"schema_version": SCHEMA_VERSION, "model": model, **extra}
+    shared = {k: fields[k] for k in _SHARED_KEYS if k in fields}
+    provenance = {k: v for k, v in fields.items() if k not in _SHARED_KEYS}
+    guard_vals = {"model": model, "dataset_sha256": shared.get("dataset_sha256")}
+
     existing = read_manifest(run_dir)
+    conditions: dict = {}
     if existing is not None:
         for k in _GUARDED_KEYS:
-            if k in fields and existing.get(k) != fields[k]:
+            want = guard_vals.get(k)
+            if want is not None and existing.get(k) != want:
                 raise ValueError(
                     f"run dir {run_dir!s} was built with {k}={existing.get(k)!r}, "
-                    f"not {fields[k]!r} -- use a fresh out_dir"
+                    f"not {want!r} -- use a fresh out_dir"
                 )
-        return existing
+        conditions = dict(existing.get("conditions", {}))
+        # carry shared fields set by earlier calls that this one did not re-supply
+        shared = {**{k: existing[k] for k in _SHARED_KEYS if k in existing}, **shared}
+
+    if condition not in conditions:
+        conditions[condition] = provenance
+
+    manifest = {
+        "manifest_version": MANIFEST_VERSION,
+        "model": model,
+        **shared,
+        "conditions": conditions,
+    }
     p = manifest_path(run_dir)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(fields, indent=2), encoding="utf-8")
-    return fields
+    p.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest

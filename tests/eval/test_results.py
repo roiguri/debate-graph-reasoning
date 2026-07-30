@@ -149,23 +149,38 @@ def test_expected_attempts():
 # --- manifest guard -----------------------------------------------------------
 
 def test_ensure_manifest_creates_then_matches(tmp_path):
-    m = results.ensure_manifest(tmp_path, "model-A", note="first")
-    assert m["model"] == "model-A" and m["schema_version"] == results.SCHEMA_VERSION
-    # resuming with the same model returns the existing manifest (no overwrite).
-    again = results.ensure_manifest(tmp_path, "model-A")
-    assert again["note"] == "first"
+    m = results.ensure_manifest(tmp_path, "model-A", "baseline", decoding="greedy")
+    assert m["model"] == "model-A" and m["manifest_version"] == results.MANIFEST_VERSION
+    assert m["conditions"]["baseline"]["decoding"] == "greedy"
+    # resuming the same condition preserves its record (written once, not overwritten).
+    again = results.ensure_manifest(tmp_path, "model-A", "baseline", decoding="IGNORED")
+    assert again["conditions"]["baseline"]["decoding"] == "greedy"
+
+
+def test_ensure_manifest_records_multiple_conditions(tmp_path):
+    # baseline then majority_vote in one dir -> both provenances kept side by side.
+    results.ensure_manifest(tmp_path, "m", "baseline", dataset_sha256="h",
+                            dataset="data/main.jsonl", decoding="greedy")
+    m = results.ensure_manifest(tmp_path, "m", "majority_vote", dataset_sha256="h",
+                                decoding="temperature=0.7", n_samples=10)
+    assert set(m["conditions"]) == {"baseline", "majority_vote"}
+    assert m["conditions"]["baseline"]["decoding"] == "greedy"
+    assert m["conditions"]["majority_vote"]["n_samples"] == 10
+    # shared invariants stay at top level; dataset from the first call is preserved.
+    assert m["dataset_sha256"] == "h" and m["dataset"] == "data/main.jsonl"
 
 
 def test_ensure_manifest_rejects_model_mismatch(tmp_path):
-    results.ensure_manifest(tmp_path, "model-A")
+    results.ensure_manifest(tmp_path, "model-A", "baseline")
     with pytest.raises(ValueError):
-        results.ensure_manifest(tmp_path, "model-B")
+        results.ensure_manifest(tmp_path, "model-B", "baseline")
 
 
 def test_ensure_manifest_guards_dataset_sha256(tmp_path):
-    results.ensure_manifest(tmp_path, "m", dataset_sha256="abc", dataset="data/main.jsonl")
-    # identical guarded fields -> ok (returns existing)
-    results.ensure_manifest(tmp_path, "m", dataset_sha256="abc")
-    # a different dataset (different hash) -> hard error, no silent mixing
+    results.ensure_manifest(tmp_path, "m", "baseline", dataset_sha256="abc",
+                            dataset="data/main.jsonl")
+    # identical guarded field -> ok
+    results.ensure_manifest(tmp_path, "m", "baseline", dataset_sha256="abc")
+    # a different dataset (different hash), even under a new condition -> hard error
     with pytest.raises(ValueError):
-        results.ensure_manifest(tmp_path, "m", dataset_sha256="def")
+        results.ensure_manifest(tmp_path, "m", "majority_vote", dataset_sha256="def")
