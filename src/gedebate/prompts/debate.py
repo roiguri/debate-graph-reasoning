@@ -23,17 +23,43 @@ from gedebate.eval.scoring import parse as _parse_answer
 if TYPE_CHECKING:
     from gedebate.data.instance import GroundTruth, Instance
 
-# --- prompts (approved per task) ----------------------------------------------
+# --- prompts: shared scaffold + per-task variations (drift-guarded) ------------
+#
+# The scaffold (numbered atomic-claim trace + ANSWER line, the revision format, the Critic
+# framing) is written ONCE and shared across tasks. A task varies only where it must -- the
+# ANSWER line's tail (ANSWER_FORMAT) and what one claim asserts (_CLAIM_KIND). The Proposer
+# (turn 1) and the revision reuse the SAME format block, so their format cannot drift apart.
+# No encoding-specific wording is needed today (the encoding enters via instance.question);
+# an encoding variation would slot in the same dict-override way if one is ever required.
 
-# The `ANSWER:` line's task-specific tail (a human-facing format hint only; the value is
-# normalized by scoring.parse). Kept for all tasks; the instruction wording is what gates.
+# The `ANSWER:` line's task-specific tail (a human-facing format hint; the value is
+# normalized by scoring.parse).
 ANSWER_FORMAT = {
     "edge_existence": "Yes or No",
     "node_degree": "a single integer, the degree",
     "connected_nodes": "a comma-separated list of node ids, or none",
 }
 
-_SUPPORTED = ("node_degree",)  # tasks whose prompts are approved + implemented (pilot)
+# What one atomic claim asserts, per task. node_degree and connected_nodes both reason over
+# the queried node's incident edges, so they share ONE constant (they cannot drift);
+# edge_existence gets its own wording when its prompt is approved.
+_INCIDENT_CLAIM = (
+    "each claim one verifiable fact about a single edge (that it exists,\n"
+    "or that no further edge involves the node)"
+)
+_EDGE_CLAIM = (
+    "each claim one verifiable fact about the queried pair (whether that exact edge\n"
+    "appears in the graph's edge list)"
+)
+_CLAIM_KIND = {
+    "node_degree": _INCIDENT_CLAIM,
+    "connected_nodes": _INCIDENT_CLAIM,
+    "edge_existence": _EDGE_CLAIM,
+}
+
+# A task is supported iff it has both a claim kind and an answer format -- the two per-task
+# pieces the shared scaffold needs. Derived, so a task is added in exactly one place.
+_SUPPORTED = tuple(t for t in _CLAIM_KIND if t in ANSWER_FORMAT)
 
 
 def _require_supported(task: str) -> None:
@@ -43,32 +69,31 @@ def _require_supported(task: str) -> None:
         )
 
 
-# Per-task Proposer instruction (turn 1). Approved wording lives here verbatim.
-_PROPOSER_INSTRUCTION = {
-    "node_degree": (
-        "Answer the question below using the graph. Build the answer as a numbered list of\n"
-        "atomic claims -- each claim one verifiable fact about a single edge (that it exists,\n"
-        "or that no further edge involves the node) -- then give the final answer.\n"
-        "Use exactly this format and nothing else:\n"
-        "1. <one atomic claim>\n"
-        "2. <one atomic claim>\n"
-        "(as many as needed)\n"
-        "ANSWER: <a single integer, the degree>"
-    ),
-}
+# The shared numbered-claim + ANSWER block. `_format_block` is used by BOTH the Proposer
+# (turn 1) and the revision, so their format is identical by construction, not by copy.
+_FORMAT_BLOCK = (
+    "1. <one atomic claim>\n"
+    "2. <one atomic claim>\n"
+    "(as many as needed)\n"
+    "ANSWER: <{answer}>"
+)
+_PROPOSER_PREAMBLE = (
+    "Answer the question below using the graph. Build the answer as a numbered list of\n"
+    "atomic claims -- {claim} -- then give the final answer.\n"
+    "Use exactly this format and nothing else:\n"
+)
+_REVISION_PREAMBLE = "Give your corrected answer in exactly this format and nothing else:\n"
 
-# Per-task revision format block (the corrected-answer format the Proposer must re-emit).
-_REVISION_FORMAT = {
-    "node_degree": (
-        "Give your corrected answer in exactly this format and nothing else:\n"
-        "1. <one atomic claim>\n"
-        "2. <one atomic claim>\n"
-        "(as many as needed)\n"
-        "ANSWER: <a single integer, the degree>"
-    ),
-}
 
-# Critic framing is task-generic (it verifies edge claims whatever the task).
+def _format_block(task: str) -> str:
+    """The claim-list + ANSWER format for `task`, shared by the proposer and the revision."""
+    return _FORMAT_BLOCK.format(answer=ANSWER_FORMAT[task])
+
+
+# Critic framing. `_CRITIC_TOP` is shared. The cue varies by task where the verification
+# differs: node_degree + connected_nodes both check the queried node's incident edges, so
+# they share ONE cue (they cannot drift); edge_existence checks a single pair, so it gets
+# its own. `_CRITIC_CUE[task]` selects.
 _CRITIC_TOP = (
     "Another model is answering the graph question below by writing numbered atomic claims\n"
     "(each about one edge) and a final answer. You are the checker. The graph text is the\n"
@@ -76,7 +101,7 @@ _CRITIC_TOP = (
     "the answer out yourself from the graph, then verify the LATEST Proposer answer; the\n"
     "debate so far is shown."
 )
-_CRITIC_CUE = (
+_CRITIC_CUE_INCIDENT = (
     "Work only from the graph text. First, independently go through the graph's edge list and\n"
     "pick out every edge that involves the queried node, copying each exactly as written (an\n"
     "edge counts only if it is in the list; never introduce one that is not there). Those\n"
@@ -94,6 +119,25 @@ _CRITIC_CUE = (
     "VERDICT: REVISE\n"
     "- <an edge the Proposer missed or wrongly included, quoted from the graph's edge list>"
 )
+_CRITIC_CUE_EDGE = (
+    "Work only from the graph text. Look in the graph's edge list for the exact pair the\n"
+    "question asks about, in either order. If that pair appears, the answer is Yes; if it\n"
+    "does not, the answer is No -- decide this yourself from the list. Then check the\n"
+    "Proposer's answer.\n"
+    "AGREE if the Proposer's Yes/No matches the edge list. Otherwise REVISE and ground it:\n"
+    "quote the queried edge from the list if it is there, or state that no such edge appears.\n"
+    "Every problem you raise must be grounded in the edge list; never invent an edge. Respond\n"
+    "in exactly this format and nothing else:\n"
+    "VERDICT: AGREE\n"
+    "or\n"
+    "VERDICT: REVISE\n"
+    "- <the queried edge quoted from the list, or a note that it does not appear>"
+)
+_CRITIC_CUE = {
+    "node_degree": _CRITIC_CUE_INCIDENT,
+    "connected_nodes": _CRITIC_CUE_INCIDENT,
+    "edge_existence": _CRITIC_CUE_EDGE,
+}
 _REVISION_TOP = (
     "You are the Proposer in the debate below. A checker verified your latest claims against\n"
     "the graph and found problems. Produce a corrected answer that fixes them, using the\n"
@@ -124,19 +168,22 @@ def render_transcript(instance: "Instance", turns: list[dict]) -> str:
 def proposer_prompt(instance: "Instance") -> str:
     """Turn-1 Proposer prompt: numbered-claim trace + ANSWER, then the question verbatim."""
     _require_supported(instance.task)
-    return f"{_PROPOSER_INSTRUCTION[instance.task]}\n\n{instance.question}"
+    instruction = (_PROPOSER_PREAMBLE.format(claim=_CLAIM_KIND[instance.task])
+                   + _format_block(instance.task))
+    return f"{instruction}\n\n{instance.question}"
 
 
 def critic_prompt(instance: "Instance", turns: list[dict]) -> str:
     """Critic prompt: verify the latest Proposer answer given the full transcript."""
     _require_supported(instance.task)
-    return f"{_CRITIC_TOP}\n\n{render_transcript(instance, turns)}\n\n{_CRITIC_CUE}"
+    return f"{_CRITIC_TOP}\n\n{render_transcript(instance, turns)}\n\n{_CRITIC_CUE[instance.task]}"
 
 
 def revision_prompt(instance: "Instance", turns: list[dict]) -> str:
     """Proposer revision prompt: corrected answer given the full transcript."""
     _require_supported(instance.task)
-    return f"{_REVISION_TOP}\n\n{render_transcript(instance, turns)}\n\n{_REVISION_FORMAT[instance.task]}"
+    fmt = _REVISION_PREAMBLE + _format_block(instance.task)
+    return f"{_REVISION_TOP}\n\n{render_transcript(instance, turns)}\n\n{fmt}"
 
 
 # --- parsers (co-located with the prompts they parse) -------------------------
