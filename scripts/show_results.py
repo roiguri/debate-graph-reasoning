@@ -43,6 +43,9 @@ def main() -> None:
     ap.add_argument("--compare", action="store_true",
                     help="with both baseline + majority_vote present, print the "
                          "vote-vs-baseline delta table (accuracy delta + token cost)")
+    ap.add_argument("--condition", default=None,
+                    help="comma-separated conditions to include (default: all). "
+                         "e.g. --condition baseline for a baseline-only pooled view")
     ap.add_argument("--save", metavar="DIR", default=None,
                     help="write summary/fragility/significance CSVs here (e.g. analysis/baseline)")
     ap.add_argument("--raw", action="store_true", help="print per-instance raw_output -> parsed")
@@ -52,6 +55,9 @@ def main() -> None:
     args = ap.parse_args()
 
     rows = [r for d in args.run_dir for f in results.result_files(d) for r in results.read_rows(f)]
+    if args.condition:
+        keep = {c.strip() for c in args.condition.split(",")}
+        rows = [r for r in rows if r["condition"] in keep]
     seeds = sorted({_seed_of(r) for r in rows})
     where = ", ".join(args.run_dir)
     print(f"{len(rows)} rows in {where}  (seeds: {', '.join(seeds) or 'none'})\n")
@@ -105,20 +111,22 @@ def main() -> None:
     if args.save:
         out = Path(args.save)
         out.mkdir(parents=True, exist_ok=True)
+        # Condition-tagged filenames so a single --save into a scope dir is
+        # unambiguous (baseline views never collide with a generic name).
         wrote = []
         if base_rows:
-            (out / "summary.csv").write_text(report.summary_to_csv(summary), encoding="utf-8")
-            (out / "fragility.csv").write_text(report.fragility_to_csv(frag), encoding="utf-8")
-            (out / "significance.csv").write_text(report.significance_to_csv(sig), encoding="utf-8")
-            wrote += ["summary.csv", "fragility.csv", "significance.csv"]
+            (out / "baseline_summary.csv").write_text(report.summary_to_csv(summary), encoding="utf-8")
+            (out / "baseline_fragility.csv").write_text(report.fragility_to_csv(frag), encoding="utf-8")
+            (out / "baseline_significance.csv").write_text(report.significance_to_csv(sig), encoding="utf-8")
+            wrote += ["baseline_summary.csv", "baseline_fragility.csv", "baseline_significance.csv"]
         if mv_rows:
-            (out / "vote_summary.csv").write_text(
+            (out / "mv_vote_summary.csv").write_text(
                 report.vote_summary_to_csv(vote_summary), encoding="utf-8")
-            wrote.append("vote_summary.csv")
+            wrote.append("mv_vote_summary.csv")
         if comparison:
-            (out / "vote_vs_baseline.csv").write_text(
+            (out / "mv_vs_baseline.csv").write_text(
                 report.comparison_to_csv(comparison), encoding="utf-8")
-            wrote.append("vote_vs_baseline.csv")
+            wrote.append("mv_vs_baseline.csv")
         print(f"\nsaved {' + '.join(wrote)} -> {out}/")
 
     if not args.raw:

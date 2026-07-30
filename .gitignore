@@ -8,8 +8,12 @@ docs/articles/
 results/*
 !results/.gitkeep
 
-# Derived analysis tables/figures (kept local for now; may be committed later, e.g. P6)
-analysis/
+# Derived analysis tables/figures (kept local for now; may be committed later, e.g. P6).
+# The README (how to regenerate them) IS committed; the derived CSVs are not.
+# Ignore the *contents* (analysis/*) so the README re-include below can apply --
+# a whole-dir ignore (analysis/) can't be overridden for a file underneath it.
+analysis/*
+!analysis/README.md
 
 # HuggingFace cache, if ever created locally
 .hf_cache/
