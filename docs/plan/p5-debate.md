@@ -1,120 +1,142 @@
 # P5 — Debate condition (Proposer-Critic)
 
-**Status: planned.** The third and final condition, and the project's keystone: does
-*active verification* (not mere aggregation) lift encoding-fragile accuracy? P4 gives
+**Status: planned.** The third and final condition, and the project's keystone: does a
+*verifying Critic* lift encoding-fragile accuracy beyond what aggregation buys? P4 gives
 the control -- majority vote (pure extra compute) is statistically indistinguishable
 from greedy -- so any debate gain is the procedure, not the sampling.
 
-Goal: add the Proposer-Critic debate condition end-to-end (structured trace, per-claim
-verification reusing `edge_existence`, revision loop with a stopping rule, full token
-accounting), plus a **trace viewer** for inspecting individual debates, then compare to
-baseline and to MV **at matched generated-token compute**.
+Goal: add the Proposer-Critic debate condition end-to-end (structured trace, a Critic
+that verifies the trace, a revision loop with a stopping rule), on the **correct compute
+metric** (# model responses, with total tokens alongside), plus a **trace viewer**, then
+compare to baseline and MV **at matched compute**.
 
-**Done when:** `results/main/debate/` holds one summed-token row per instance for all 9
-cells with a trace sidecar; the viewer renders any debate round-by-round; debate's
-per-cell accuracy + token cost sit against baseline and MV's accuracy-vs-budget curve;
-and the matched-compute verdict (does verification beat aggregation, on the worst
-encodings?) is recorded in [notes.md](../notes.md).
+**Done when:** `results/main/debate/` holds one summed row per instance for all 9 cells
+with a trace sidecar; the viewer renders any debate turn-by-turn; debate's per-cell
+accuracy sits against baseline and MV's accuracy-vs-budget curve on **# responses** (and
+total tokens); and the matched-compute verdict (does verification beat aggregation, on
+the worst encodings?) is in [notes.md](../notes.md).
 
-## The idea (proposal §2.1-2.2)
+## Slice checklist
 
-The Proposer answers a task and emits its **atomic edge-existence claims**; the Critic
-verifies each claim *against the raw encoding* (a strictly narrower task than solving);
-refuted/missing claims go back to the Proposer, which revises; the loop runs to
-consensus or a cap. The bet: **`edge_existence` is the least encoding-fragile task**
-(P3: ~0.02 spread), so decomposing a fragile task into edge-checks should be more
-encoding-robust than solving it holistically. That is exactly the verification
-asymmetry the method assumes, and graphs make it directly measurable.
+- [ ] **P5.0** Baseline/MV compute measurement: total tokens + # responses (analysis-only, no rerun)
+- [ ] **P5.1** Proposer prompt + structured trace + parse (torch-free) — *prompt needs approval*
+- [ ] **P5.2** Critic (holistic trace verification) + turn loop + stopping rule + per-turn logging + persistence — *prompt needs approval*
+- [ ] **P5.3** Trace viewer (`scripts/debate_viewer.py`, self-contained HTML)
+- [ ] **P5.4** Pilot (node_degree) → full 3×3 → matched-compute checkpoint
 
-**Every task decomposes to edge claims:**
-- `edge_existence(u,v)` -> the answer *is* one edge claim (near-degenerate; a weak test).
-- `node_degree(n)` -> claims = the query node's incident edges `{(n,x)}`; degree = count of verified ones.
-- `connected_nodes(n)` -> the same incident edges, reported as a set.
+Resolved (see Decisions): **compute = # responses primary + total tokens secondary**
+(generated-only dropped); **Critic is holistic** (one call per turn, no per-edge checks,
+so batching/scope are moot).
 
-So node_degree and connected_nodes share one debate machine (verify node n's
-neighborhood); edge_existence is the trivial case. **Pilot: node_degree** (biggest
-fragility gap, 0.38; adjacency 0.37 vs incident 0.75, the most room to lift the worst).
+## The design
+
+- **Turn 1 — Proposer:** emits a **structured trace** (its supporting edge claims) + a
+  final answer, in one call.
+- **Turn 2 — Critic:** reads the trace, **verifies its claims against the raw encoding**,
+  and returns a critique (which claims are wrong or missing) or "no issues" -- one call.
+- Repeat Proposer↔Critic until **consensus** (Critic raises nothing), **max turns**, or a
+  **fixed point** (a revision that does not change the trace). Final = the Proposer's
+  latest answer.
+
+Every turn is **one full model response**, which is what makes the compute comparison
+clean (see Compute). The Critic is *holistic* (not per-edge), but is **prompted to verify
+the structured trace's claims against the encoding**, retaining the proposal's
+"verify, do not re-derive" essence -- a holistic pass over the encoding + claims can
+catch both wrong and missing edges in one call.
+
+**Every task's trace is edge claims:** `node_degree(n)`/`connected_nodes(n)` -> the query
+node's incident edges `{(n,x)}` (degree = count, neighbors = the set); `edge_existence` ->
+the single edge. **Pilot: node_degree** (biggest fragility gap, 0.38; adjacency 0.37 vs
+incident 0.75, the most room to lift the worst encoding).
 
 ## Decisions locked
 
-- **Critic = `edge_existence` reused.** Each edge-check is an `edge_existence` query
-  against the instance's encoding, reusing the existing prompt + parser. **Greedy.**
-- **One model, two role prompts.** The Critic is the same loaded model with a
-  verification prompt (11GB VRAM allows only one model).
-- **Stopping rule: consensus-primary + backstop.** Stop when the Critic refutes nothing
-  (consensus), OR after **R = 2** Critic->revise rounds, OR on a **fixed point** (a
-  revision that does not change the trace). **No live token-budget throttle** in P5 --
-  tokens are measured; matched compute is settled in P6 (below).
-- **Token accounting.** Sum *every* generation: Proposer + each Critic edge-check + each
-  revision. Persist **one lean row per instance** (final answer, summed tokens,
-  `sample_index=0`) via the existing schema; the verbose transcript goes to a **trace
-  sidecar** (the persistence contract already reserves this). Resume = 1 row done.
-- **Matched compute (P6, no rerun).** Compare debate's per-cell `(tokens, accuracy)`
-  point against **MV's accuracy-vs-budget curve** -- vote the first k of MV's 10 stored
-  draws (k=1..10) for accuracy at 1x..10x budget -- plus baseline (1x). Headline: is
-  debate above MV's curve at matched tokens on the worst encodings? Paired McNemar
-  (debate vs baseline, debate vs MV@budget) reuses `stats.mcnemar_from_bc`.
-
-## Decision to finalize in P5.1 (flagged)
-
-- **Critic scope for node_degree / connected_nodes:** does the Critic check only the
-  Proposer's *claimed* edges (cheap ~deg checks, catches over-claims only), or **sweep
-  all candidate incident edges** `(n,x)` (≤ n-1 checks, catches over- **and**
-  under-claims)? The full sweep is the method's essence -- it decomposes the fragile
-  task into edge-checks and is where the encoding-robustness (and most of the token
-  cost) comes from -- so we lean **full sweep**, but confirm on the pilot since it drives
-  debate's compute (potentially > MV's 10x).
+- **Structured trace:** the Proposer emits its answer + the supporting edge claims (the
+  neighbor set for node_degree/connected_nodes).
+- **Critic:** holistic per-turn critique, prompted to verify the trace's claims against
+  the raw encoding. **Greedy.** Same loaded model with a verification-role prompt (11GB
+  VRAM allows one model).
+- **Stopping rule:** consensus / **max 2 revision rounds** (up to 5 turns: P, C, P, C, P)
+  / fixed point. Tunable via config.
+- **Compute (corrected).** **Primary: # model responses = # turns** (the literature
+  standard: Huang 2024 "equivalent number of responses", Choi 2025 "number of agents",
+  Du 2023 "3 responses"). **Secondary: total tokens (prompt + generated)** summed over
+  turns. **Generated-only is dropped** -- for these tasks the prompt dominates (123 vs 2
+  generated), so it measured ~2% of the work. Debate's transcript grows each turn
+  (re-reads the encoding + history), so its total-tokens/response exceeds MV's; # responses
+  hides that, total tokens surfaces it -- report both.
+- **Matched compute (P6, no rerun):** MV's accuracy-vs-budget curve, indexed by **#
+  samples (= # responses)** and by total tokens (subsample the 10 stored draws). Debate is
+  a point on that curve at its # responses / total tokens. Paired McNemar via
+  `stats.mcnemar_from_bc`.
+- **Persistence:** one lean row per instance (final answer, summed total tokens,
+  `n_responses`, `sample_index=0`) + the verbose per-turn transcript in a **trace
+  sidecar**. Resume = 1 row.
+- **Prompts need approval.** The Proposer and Critic prompts are **raised for your
+  sign-off before finalizing** (in P5.1 / P5.2). They are the experiment's core.
 
 ## What's reused vs new
 
 Reused **unchanged:** results schema + resume (`expected_attempts("debate")==1`), runner
-shard/dispatch pattern, `model.generate`, `edge_existence` prompt + parser (as the
-Critic), `scoring`, `show_results` split-by-condition, `slurm/matrix.slurm` (CONFIG env),
-`stats.mcnemar_from_bc`.
+shard/dispatch, `model.generate`, `scoring`, `show_results` split-by-condition,
+`stats.mcnemar_from_bc`, `slurm/matrix.slurm` (CONFIG).
 
-New: the Proposer prompt + claim extraction, the Critic wrapper, the debate loop +
-stopping rule, the trace sidecar (schema + writer + reader), runner dispatch for debate,
-`scripts/debate_viewer.py`, and the matched-compute (MV-curve) analysis.
+New: total-token + response-count reporting (P5.0), the Proposer prompt + trace parse, the
+Critic prompt + holistic verification, the turn loop + stopping rule + per-turn logging,
+the trace sidecar, runner dispatch for debate, `scripts/debate_viewer.py`, and the
+matched-compute (MV-curve) analysis.
 
 ## Vertical slices
 
-### P5.1 — Proposer + claim extraction + trace schema (torch-free, tested)
-- **Proposer prompt:** answer node_degree AND list the incident edges counted (the
-  claims), in a parseable structured format.
-- **Claim extraction:** parse the Proposer output -> `(answer, [edge claims])`.
-- **Trace sidecar schema:** per instance a `rounds[]`; per round `{proposer_raw, claims,
-  critic_verdicts, revised, tokens}` + `dump`/`load`. Drives the viewer.
-- Tests: extraction on canned outputs, schema round-trip. Stub model.
+### P5.0 — Baseline/MV compute measurement (analysis-only, NO rerun)
+Get baseline + MV onto the correct metric before debate lands, from stored data
+(`n_prompt_tokens` is populated; total tokens + # responses are recoverable):
+- `report`: add `total_tokens` (prompt+gen) to `summarize` / `summarize_votes`; add
+  `n_responses` (baseline 1/instance, MV `n_samples`/instance). Keep generated for reference.
+- `--compare` + CSVs: surface total tokens + # responses.
+- `notes.md`: record that prompt dominates (123 vs 2), so generated-only measured ~2% of
+  compute; MV's ~10x multiplier holds in total tokens too (MV = N independent copies).
+- Tests; regenerate `analysis/`. No cluster time.
 
-### P5.2 — Critic + debate loop + persistence (torch-free loop, stub-tested)
-- **Critic:** per candidate edge, an `edge_existence` query -> present/absent; assemble
-  refuted + missing vs the Proposer's claims (scope per the P5.1 decision).
-- **Loop:** propose -> critic -> revise, to consensus / R / fixed-point; sum tokens.
+### P5.1 — Proposer + structured trace + parse (torch-free; PROMPT NEEDS APPROVAL)
+- **Proposer prompt** (raise for approval): answer node_degree + emit the structured trace
+  (the supporting neighbor/edge claims) in a parseable format.
+- **Parse:** proposer output -> `(answer, claims, raw)`.
+- **Trace sidecar schema:** per instance a `turns[]`; per turn `{role, raw, parsed,
+  n_prompt_tokens, n_gen_tokens}` + `dump`/`load`. Drives the viewer + the compute totals.
+- Tests: parse on canned outputs; schema round-trip. Stub model.
+
+### P5.2 — Critic + turn loop + persistence (torch-free loop; PROMPT NEEDS APPROVAL)
+- **Critic prompt** (raise for approval): given the encoding + the Proposer's trace, verify
+  the claims and return the critique (wrong/missing claims) or "no issues".
+- **Loop:** Proposer -> Critic -> revise, to consensus / max turns / fixed point; log each
+  turn's tokens.
 - `run_debate(model, instance, cfg) -> (record, trace)`: record is baseline's shape with
-  `condition="debate"` + summed tokens; trace is the transcript.
-- **Persistence:** 1 row via `make_row`; trace appended to the sidecar. Runner dispatch
-  on `condition=="debate"`; resume by the 1-row rule.
-- Tests: converges on a correct proposer; revises on a wrong claim; hits the R cap;
-  fixed-point halt; token sum. Scripted stub model.
+  `condition="debate"`, summed total tokens, and `n_responses`; trace is the transcript.
+- **Persistence:** 1 row via `make_row` (+ responses/tokens); trace to the sidecar. Runner
+  dispatch on `condition=="debate"`; resume by the 1-row rule.
+- Tests: converges on a correct proposer; revises on a wrong claim; hits the max-turns cap;
+  fixed-point halt; token + response sums. Scripted stub model.
 
 ### P5.3 — Debate viewer (self-contained static HTML)
 - `scripts/debate_viewer.py`: read debate rows + trace sidecar -> one standalone HTML
   (embedded JSON + inline CSS/JS), opened locally, offline, theme-aware:
-  - left: filter/search instances (task, encoding, correct/incorrect, #rounds, id);
-  - right: round-by-round -- question + gold + final (✓/✗), Proposer answer + claims,
-    Critic per-claim verdicts (refuted highlighted), the revision, per-turn + total tokens.
+  - left: filter/search instances (task, encoding, correct/incorrect, # turns, id);
+  - right: turn-by-turn -- question + gold + final (✓/✗), Proposer trace + answer, Critic
+    critique, revisions, per-turn + total tokens, # responses.
 - Tests: generator emits valid HTML with the embedded data for a synthetic trace.
 
 ### P5.4 — Pilot -> full run -> matched-compute checkpoint
 - **Pilot** node_degree × one encoding (few graphs) on GPU: confirm loop + trace + viewer
-  end to end; watch rounds + tokens (confirm the Critic-scope decision).
-- `configs/debate.toml`; reuse `slurm/matrix.slurm` via CONFIG. Full 3×3 (all tasks
-  decompose), resumable, throttled like P3.
-- **Analysis:** debate accuracy + tokens per cell; MV accuracy-vs-budget curve
-  (subsample); is debate above MV's curve at matched tokens on the worst encodings?
-  paired McNemar. Record in [notes.md](../notes.md) -- the project's headline result.
+  end to end; watch turns + tokens.
+- `configs/debate.toml`; reuse `slurm/matrix.slurm` via CONFIG. Full 3×3, resumable.
+- **Analysis:** debate accuracy + # responses + total tokens per cell; MV
+  accuracy-vs-budget curve; is debate above MV's curve at matched # responses (and total
+  tokens) on the worst encodings? paired McNemar. Record in [notes.md](../notes.md) -- the
+  project's headline result.
 
 ## Notes for later phases
-- P6 formalizes the matched-compute figures; the MV-curve trick means **no MV rerun**.
-- Debate's cost is variable per instance, which is why compute is measured in tokens
-  (not rounds) and summed including the Critic's -- the yardstick is P4's MV spend.
+- P6 formalizes the matched-compute figures on # responses and total tokens; the MV-curve
+  trick means no MV rerun.
+- The prompt-token dominance (123:2) is why total tokens matters and generated-only was
+  misleading; # responses is the literature-standard axis.
