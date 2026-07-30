@@ -65,6 +65,11 @@ incident 0.75, the most room to lift the worst encoding).
   generated), so it measured ~2% of the work. Debate's transcript grows each turn
   (re-reads the encoding + history), so its total-tokens/response exceeds MV's; # responses
   hides that, total tokens surfaces it -- report both.
+- **Reporting unit: per instance (mean).** Tables show the mean cost of *one* instance --
+  responses/instance (baseline 1, MV 10, debate ~T) and total-tokens/instance -- not the
+  cell grand total (which just scales with N=200). Cell totals stay in the CSV. The MV vs
+  baseline multiplier is identical either way. For debate, tokens/instance vary with the
+  number of turns, so the mean summarizes a spread (distribution shown later if useful).
 - **Matched compute (P6, no rerun):** MV's accuracy-vs-budget curve, indexed by **#
   samples (= # responses)** and by total tokens (subsample the 10 stored draws). Debate is
   a point on that curve at its # responses / total tokens. Paired McNemar via
@@ -91,9 +96,11 @@ matched-compute (MV-curve) analysis.
 ### P5.0 — Baseline/MV compute measurement (analysis-only, NO rerun)
 Get baseline + MV onto the correct metric before debate lands, from stored data
 (`n_prompt_tokens` is populated; total tokens + # responses are recoverable):
-- `report`: add `total_tokens` (prompt+gen) to `summarize` / `summarize_votes`; add
-  `n_responses` (baseline 1/instance, MV `n_samples`/instance). Keep generated for reference.
-- `--compare` + CSVs: surface total tokens + # responses.
+- `report`: add `total_tokens` (prompt+gen) + `n_responses` to `summarize` /
+  `summarize_votes`; derive the **per-instance means** (`tokens_per_instance`,
+  `responses_per_instance`) for the tables. Keep `total_gen_tokens` + cell totals for reference.
+- Console tables + `--compare` lead with **per-instance** total-tokens + responses (and
+  their MV/baseline multipliers); CSVs keep both per-instance and cell-total columns.
 - `notes.md`: record that prompt dominates (123 vs 2), so generated-only measured ~2% of
   compute; MV's ~10x multiplier holds in total tokens too (MV = N independent copies).
 - Tests; regenerate `analysis/`. No cluster time.
