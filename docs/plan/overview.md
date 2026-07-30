@@ -74,7 +74,7 @@ graph-encodings-with-debate/
 | [P2](p2-baseline.md) | Baseline, one task × one encoding, end-to-end | Model wrapper + prompt + answer parser + scorer + JSON results + slurm run | yes | ✅ |
 | [P3](p3-matrix.md) | Baseline across full 3×3 matrix + analysis | Reproduce encoding-fragility (checkpoint on the premise); replicated on seeds 11/13 with paired significance | yes | ✅ |
 | [P4](p4-majority-vote.md) | Majority-vote condition | N-sample + vote + token accounting; compare to baseline at matched compute | yes | ✅ |
-| P5 | Debate condition (Proposer–Critic) | Structured trace, claim extraction, per-claim verification, revision loop, stopping rule | yes | ☐ |
+| [P5](p5-debate.md) | Debate condition (Proposer–Critic) | Structured trace, claim extraction, per-claim verification, revision loop, stopping rule; trace viewer | yes | ☐ |
 | P6 | Matched-compute comparison + final analysis | Accuracy tables, cross-encoding variance (std, max-min), worst-encoding lift | no | ☐ |
 | P7 | Writeup | Paper against grading criteria | no | ☐ |
 
