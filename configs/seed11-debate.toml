@@ -1,0 +1,17 @@
+# Replication debate on independent seed 11 (sibling of configs/debate.toml).
+# Same model / tasks / encodings / budget as the main debate run; only the dataset
+# (and its seed) and out_dir differ. Pool with results/main to check the fragile-cell
+# lift replicates on fresh graphs
+# (scripts/show_results.py results/main results/seed11 results/seed13 --by-seed).
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "debate"
+dataset = "data/seed11.jsonl"
+
+n_samples = 10
+max_new_tokens = 256
+
+tasks = ["node_degree", "connected_nodes", "edge_existence"]
+encodings = ["adjacency", "incident", "friendship"]
+
+out_dir = "results/seed11"
