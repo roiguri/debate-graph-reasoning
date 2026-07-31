@@ -52,7 +52,7 @@ def test_graph_payload_has_nodes_edges_positions_query():
     g = mod._graph_payload(inst)
     assert g["nodes"] == list(range(inst.nnodes))
     assert g["edges"] == [list(e) for e in inst.graph_edgelist]
-    assert g["query"] == inst.node_ids[0]
+    assert g["query_nodes"] == list(inst.node_ids)
     assert set(g["positions"]) == {str(n) for n in range(inst.nnodes)}   # seeded layout, one per node
     assert g["encoding_text"] == inst.question
     assert mod._graph_payload(None) is None
@@ -69,6 +69,14 @@ def test_graph_payload_labels_nodes_the_way_the_encoding_does():
     assert set(labels) == {str(n) for n in range(fri.nnodes)}      # one per node
     assert all(name in fri.question for name in labels.values())   # names the run used
     assert labels["0"] == "James"
+
+
+def test_graph_payload_carries_every_queried_node():
+    """edge_existence asks about a pair; the header needs both endpoints."""
+    mod = _viewer()
+    inst = next(i for i in build_dataset(n_graphs=4, seed=7) if i.task == "edge_existence")
+    assert len(inst.node_ids) == 2
+    assert mod._graph_payload(inst)["query_nodes"] == list(inst.node_ids)
 
 
 def test_page_loads_via_api_and_draws_graph():

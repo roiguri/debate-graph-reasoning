@@ -113,7 +113,8 @@ def _graph_payload(inst) -> dict | None:
         "edges": [list(e) for e in inst.graph_edgelist],
         "positions": {str(n): {"x": round(float(x) * sx, 1), "y": round(float(y) * 130.0, 1)}
                       for n, (x, y) in pos.items()},
-        "query": inst.node_ids[0] if inst.node_ids else None,
+        # every queried node, not just the first: edge_existence asks about a pair
+        "query_nodes": list(inst.node_ids),
         "labels": labels,
         "named": named,
         "nnodes": inst.nnodes,
@@ -372,8 +373,12 @@ const AV_PROP=`<svg class="av" viewBox="0 0 40 40" aria-hidden="true"><circle cl
   +`<g class="em"><circle cx="20" cy="17" r="7"/><path d="M16.6 26.5h6.8M17.6 29.5h4.8"/><path d="M20 13.6v3.4M17.9 18.6h4.2"/></g></svg>`;
 const AV_CRIT=`<svg class="av" viewBox="0 0 40 40" aria-hidden="true"><circle class="disc" cx="20" cy="20" r="20"/>`
   +`<g class="em"><circle cx="18" cy="18" r="6.4"/><path d="M22.9 22.9 27.6 27.6"/></g></svg>`;
-const QLABEL={node_degree:q=>'degree of node '+q+'?', connected_nodes:q=>'neighbors of node '+q+'?',
-              edge_existence:q=>'edge on node '+q+'?'};
+// The header names the queried node(s) the way the encoding does ("degree of Robert?"),
+// so it reads like the question the model was actually asked. The verbatim `Q:` line
+// stays one glance away in the Raw encoding panel.
+const labOf=(g,n)=>(g&&g.labels&&g.labels[''+n])||''+n;
+const QLABEL={node_degree:n=>`degree of ${n[0]}?`, connected_nodes:n=>`neighbors of ${n[0]}?`,
+              edge_existence:n=>`${n[0]} and ${n[1]} connected?`};
 
 function opts(sel,vals){ const lab=sel.options[0]?.text||'all';
   sel.innerHTML=`<option value="all">${lab}</option>`+vals.map(v=>`<option value="${v}">${v}</option>`).join(''); }
@@ -392,7 +397,9 @@ async function openDebate(id){
   const d=await(await fetch('/api/trace?id='+encodeURIComponent(id))).json();
   document.body.classList.add('ready');
   const ok=d.correct, total=d.n_prompt_tokens+d.n_gen_tokens;
-  const q=d.graph&&d.graph.query, qt=(QLABEL[d.task]?QLABEL[d.task](q):d.task.replace(/_/g,' '));
+  const qn=((d.graph&&d.graph.query_nodes)||[]).map(n=>labOf(d.graph,n));
+  const qt=(QLABEL[d.task]&&qn.length>=(d.task==='edge_existence'?2:1))
+    ? QLABEL[d.task](qn) : d.task.replace(/_/g,' ');   // no graph data (no manifest): task name
   $('crumb').textContent='/ '+d.task+' · '+d.encoding;
   const okc=ok?'good-fg':'bad-fg';
   const svg=p=>`<svg class="ic" width="19" height="19" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
@@ -406,7 +413,7 @@ async function openDebate(id){
   $('head').innerHTML=`<div class="hrow"><div class="idparts">`
     +seg('seed',p[0]||'?')+seg('graph',p[1]||'?')+seg('task',d.task,'factor')+seg('encoding',d.encoding,'factor')
     +`</div><span class="stamp ${ok?'good':'bad'}">${ok?'correct':'wrong'}</span>`
-    +`<div class="qline">&ldquo;${qt}&rdquo;</div></div>`
+    +`<div class="qline">&ldquo;${esc(qt)}&rdquo;</div></div>`
     +`<div class="stats">`
     +stat(IC_A,'Answer',show(d.parsed_answer),okc)
     +stat(IC_T,'Truth',show(d.ground_truth))
@@ -444,18 +451,21 @@ function renderCost(turns,total){
 // on hover, so a payload id can still be matched to what is on screen.
 function renderGraph(g,task){
   LASTG={g,task};
-  const lab=n=>(g&&g.labels&&g.labels[''+n])||''+n;
+  const lab=n=>labOf(g,n);
+  // Only the first queried node is lit for now; edge_existence's second endpoint joins it
+  // when the per-task drawings land.
+  const q=(g&&g.query_nodes&&g.query_nodes.length)?g.query_nodes[0]:null;
   $('enc').textContent=g?g.encoding_text:'';
   $('gmeta').textContent=g?`${g.nnodes} nodes · ${g.edges.length} edges`:'';
-  $('legq').textContent=g&&g.query!=null?`query node ${lab(g.query)}`:'query node';
+  $('legq').textContent=q!=null?`query node ${lab(q)}`:'query node';
   if(cy){cy.destroy();cy=null;} if(!g||typeof cytoscape==='undefined'){ return; }
   const prop=cssv('--prop'),ink=cssv('--ink'),muted=cssv('--muted'),surf=cssv('--surface'),paper=cssv('--paper');
   // Named encodings get label-sized pills at 13px; numbered ones keep the original discs.
   const nodeSize=g.named?{'width':'label','height':'label','padding':'9px','font-size':13}
                         :{'width':27,'height':27,'font-size':12};
   const qSize=g.named?{'padding':'12px'}:{'width':32,'height':32};
-  const inc=new Set(); g.edges.forEach(([a,b])=>{ if(a===g.query||b===g.query) inc.add(a+'-'+b); });
-  const els=g.nodes.map(n=>({data:{id:''+n,label:lab(n)},position:g.positions[''+n],classes:n===g.query?'q':''}))
+  const inc=new Set(); g.edges.forEach(([a,b])=>{ if(a===q||b===q) inc.add(a+'-'+b); });
+  const els=g.nodes.map(n=>({data:{id:''+n,label:lab(n)},position:g.positions[''+n],classes:n===q?'q':''}))
     .concat(g.edges.map(([a,b])=>({data:{id:a+'-'+b,source:''+a,target:''+b},classes:inc.has(a+'-'+b)?'inc':''})));
   cy=cytoscape({container:$('cy'),elements:els,layout:{name:'preset'},
     style:[
