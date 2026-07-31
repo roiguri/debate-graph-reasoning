@@ -363,7 +363,7 @@ _PAGE = r"""<!doctype html>
 let INDEX=[], sel=null, cy=null, outcome='all', LASTG=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-const show=v=>esc(JSON.stringify(v));
+const show=v=>JSON.stringify(v);   // last-resort rendering; callers escape
 const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -379,6 +379,23 @@ const AV_CRIT=`<svg class="av" viewBox="0 0 40 40" aria-hidden="true"><circle cl
 const labOf=(g,n)=>(g&&g.labels&&g.labels[''+n])||''+n;
 const QLABEL={node_degree:n=>`degree of ${n[0]}?`, connected_nodes:n=>`neighbors of ${n[0]}?`,
               edge_existence:n=>`${n[0]} and ${n[1]} connected?`};
+
+// Answers are normalized by eval.scoring (bool / int / sorted id list), which is what the
+// scorer compares -- but not what the debate says. Render them the way the encoding talks,
+// so a tile reading "Michael, David" can be matched against the transcript. A node list is
+// shown in the order the question asked for (alphabetical for names, numeric for ids).
+// null means the answer never parsed; say so rather than print "null".
+function fmtAns(task,v,g){
+  if(v===null||v===undefined) return 'unparsed';
+  if(task==='edge_existence') return v===true?'Yes':v===false?'No':show(v);
+  if(task==='connected_nodes'){
+    if(!Array.isArray(v)) return show(v);
+    if(!v.length) return 'none';
+    const names=v.map(n=>labOf(g,n));
+    return (g&&g.named?names.sort((a,b)=>a.localeCompare(b)):names).join(', ');
+  }
+  return typeof v==='number'?String(v):show(v);   // node_degree
+}
 
 function opts(sel,vals){ const lab=sel.options[0]?.text||'all';
   sel.innerHTML=`<option value="all">${lab}</option>`+vals.map(v=>`<option value="${v}">${v}</option>`).join(''); }
@@ -415,8 +432,8 @@ async function openDebate(id){
     +`</div><span class="stamp ${ok?'good':'bad'}">${ok?'correct':'wrong'}</span>`
     +`<div class="qline">&ldquo;${esc(qt)}&rdquo;</div></div>`
     +`<div class="stats">`
-    +stat(IC_A,'Answer',show(d.parsed_answer),okc)
-    +stat(IC_T,'Truth',show(d.ground_truth))
+    +stat(IC_A,'Answer',esc(fmtAns(d.task,d.parsed_answer,d.graph)),okc)
+    +stat(IC_T,'Truth',esc(fmtAns(d.task,d.ground_truth,d.graph)))
     +stat(IC_R,'Turns',d.n_responses)
     +stat(IC_K,'Tokens',total.toLocaleString(),'',d.n_prompt_tokens.toLocaleString()+' read')
     +`</div>`;
@@ -426,7 +443,8 @@ async function openDebate(id){
     let foot='';
     if(!isC){ const same=prev!==undefined&&eq(t.parsed,prev);
       const note=same?' <span class="muted mono">(unchanged)</span>':(prev!==undefined?' <span class="chg mono">(changed)</span>':'');
-      foot=`<div class="ans">answer &rarr; <b class="mono">${show(t.parsed)}</b>${note}</div>`; prev=t.parsed; }
+      foot=`<div class="ans">answer &rarr; <b class="mono">${esc(fmtAns(d.task,t.parsed,d.graph))}</b>${note}</div>`;
+      prev=t.parsed; }
     let v=''; if(isC&&t.verdict){ v=`<span class="verdict ${t.verdict==='AGREE'?'agree':'revise'}">${t.verdict}</span>`
       +(t.critic_verdict_parsed===false?'<span class="unpar">unparsed → default</span>':''); }
     const name=isC?'Critic':'Proposer', role=i===0?'opens':(isC?'reviews':'revises');
