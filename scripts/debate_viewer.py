@@ -242,7 +242,7 @@ _PAGE = r"""<!doctype html>
   body.ready #empty{display:none}
   body.ready #head{display:block} body.ready #transcript{display:block}
   #head{padding:16px 30px 14px;border-bottom:1px solid var(--border);background:var(--surface)}
-  #head .hrow{display:flex;align-items:center;gap:14px;margin:0 0 12px;flex-wrap:wrap}
+  #head .hrow{display:flex;align-items:center;gap:14px;margin:0;flex-wrap:wrap}
   #head .idparts{display:flex;flex-wrap:wrap;gap:8px}
   #head .seg{display:inline-flex;align-items:baseline;gap:6px;padding:5px 12px;border:1px solid var(--border);
              border-radius:8px;background:var(--paper);font:14.5px var(--mono);color:var(--muted)}
@@ -252,14 +252,21 @@ _PAGE = r"""<!doctype html>
          border:1.5px solid currentColor;border-radius:4px;transform:rotate(-1.5deg)}
   .stamp.good{color:var(--good)} .stamp.bad{color:var(--bad)}
   #head .qline{margin-left:auto;text-align:right;font:italic 21px var(--serif);color:var(--ink)}
-  #head .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(124px,1fr));gap:10px;margin-top:13px}
-  #head .stat{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);
-              border-radius:10px;background:var(--paper)}
-  #head .stat .ic{color:var(--muted);flex:none}
-  #head .stat .lab{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
-  #head .stat .val{font:600 15px var(--mono);color:var(--ink);margin-top:1px}
-  #head .stat .val.good-fg{color:var(--good)} #head .stat .val.bad-fg{color:var(--bad)}
-  #head .stat .sub{font:400 11px var(--mono);color:var(--muted)}
+  /* outcome tiles: answer + truth, above the graph that draws that truth */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .stat{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);
+        border-radius:10px;background:var(--paper);min-width:0}
+  .stat .ic{color:var(--muted);flex:none}
+  .stat .lab{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+  .stat .val{font:600 15px var(--mono);color:var(--ink);margin-top:1px;overflow-wrap:anywhere}
+  .stat .val.good-fg{color:var(--good)} .stat .val.bad-fg{color:var(--bad)}
+  .stat .sub{font:400 11px var(--mono);color:var(--muted)}
+  #gstats{padding:13px 14px 1px}
+  /* turn count: a floating chip over the transcript it counts */
+  #turnbox{position:absolute;right:22px;bottom:20px;display:none;align-items:center;gap:8px;
+           padding:7px 13px;border:1px solid var(--border);border-radius:999px;background:var(--surface);
+           box-shadow:0 2px 12px rgb(0 0 0 / .10);font:12.5px var(--mono);color:var(--muted);z-index:5}
+  body.ready #turnbox{display:inline-flex}
   /* collapsible side panels (cost, raw encoding) */
   .disc{padding:14px 16px;border-top:1px solid var(--border)}
   .disc summary{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;list-style:none;
@@ -269,6 +276,9 @@ _PAGE = r"""<!doctype html>
   .disc .chev{margin-left:auto;color:var(--muted);display:block;transition:transform .18s ease}
   .disc[open] .chev{transform:rotate(90deg)}
   #cost{margin-top:12px}
+  /* the totals ride on the summary row, so they read without opening the panel */
+  #costsum{margin-left:auto;font-size:11.5px;color:var(--muted)}
+  #cost .chev{margin-left:8px}
   #rawenc pre{margin:10px 0 2px;padding:11px 12px;max-height:150px;overflow:auto;
               background:color-mix(in srgb, var(--ink) 8%, var(--surface));
               border:1px solid var(--border);border-radius:8px;
@@ -349,14 +359,16 @@ _PAGE = r"""<!doctype html>
     <div id="empty">Pick a debate to read.</div>
     <header id="head"></header>
     <section id="transcript"></section>
+    <div id="turnbox" title="model responses in this debate"></div>
   </main>
   <aside id="graphcol">
     <div class="gcolhead"><span class="sec">Graph</span><span id="gmeta" class="mono muted"></span></div>
     <div id="gempty">no debate open</div>
     <div id="gwrap">
+      <div id="gstats" class="stats"></div>
       <div id="cyframe"><div id="cy"></div></div>
       <div id="legend"><span><span class="sw q"></span><span id="legq">query node</span></span><span><span class="sw o"></span>other nodes</span><span id="legpair" hidden></span></div>
-      <details id="cost" class="disc"><summary><span class="sec">Cost</span><svg class="chev" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></summary><div id="bars"></div><div id="costlab"></div></details>
+      <details id="cost" class="disc"><summary><span class="sec">Cost</span><span id="costsum" class="mono"></span><svg class="chev" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></summary><div id="bars"></div><div id="costlab"></div></details>
       <details id="rawenc" class="disc"><summary><span class="sec">Raw encoding</span><svg class="chev" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></summary><pre id="enc"></pre></details>
     </div>
   </aside>
@@ -425,20 +437,18 @@ async function openDebate(id){
   const IC_A=svg('<rect x="2" y="3" width="12" height="8" rx="2"/><path d="M5.5 11.5v2.3l2.6-2.3"/>');    // answer — speech bubble
   const IC_T=svg('<path d="M4 2.4v11.2"/><path d="M4 3.1h7.2l-1.7 2.3 1.7 2.3H4"/>');                     // truth — flag
   const IC_R=svg('<path d="M3 6.2h9.6"/><path d="M10.6 4.2 12.8 6.2 10.6 8.2"/><path d="M13 10.2H3.4"/><path d="M5.4 8.2 3.2 10.2 5.4 12.2"/>'); // turns — exchange
-  const IC_K=svg('<path d="M8 2v12"/><path d="M10.6 5.1C10.6 3.9 9.4 3.2 8 3.2 6.5 3.2 5.3 4 5.3 5.4 5.3 8 10.7 7.2 10.7 10 10.7 11.5 9.4 12.4 8 12.4 6.6 12.4 5.4 11.7 5.4 10.4"/>'); // tokens — dollar
   const stat=(ic,lab,val,cls,sub)=>`<div class="stat">${ic}<div><div class="lab">${lab}</div>`
     +`<div class="val ${cls||''}">${val}${sub?` <span class="sub">${sub}</span>`:''}</div></div></div>`;
   const p=d.instance_id.split('/'), seg=(lab,val,cls)=>`<span class="seg ${cls||''}"><i>${lab}</i>${esc(val)}</span>`;
   $('head').innerHTML=`<div class="hrow"><div class="idparts">`
     +seg('seed',p[0]||'?')+seg('graph',p[1]||'?')+seg('task',d.task,'factor')+seg('encoding',d.encoding,'factor')
     +`</div><span class="stamp ${ok?'good':'bad'}">${ok?'correct':'wrong'}</span>`
-    +`<div class="qline">&ldquo;${esc(qt)}&rdquo;</div></div>`
-    +`<div class="stats">`
-    +stat(IC_A,'Answer',esc(fmtAns(d.task,d.parsed_answer,d.graph)),okc)
-    +stat(IC_T,'Truth',esc(fmtAns(d.task,d.ground_truth,d.graph)))
-    +stat(IC_R,'Turns',d.n_responses)
-    +stat(IC_K,'Tokens',total.toLocaleString(),'',d.n_prompt_tokens.toLocaleString()+' read')
-    +`</div>`;
+    +`<div class="qline">&ldquo;${esc(qt)}&rdquo;</div></div>`;
+  // Above the graph: what the debate answered, right next to the truth being drawn.
+  // Turns floats over the transcript it counts; tokens live in the Cost panel alone.
+  $('gstats').innerHTML=stat(IC_A,'Answer',esc(fmtAns(d.task,d.parsed_answer,d.graph)),okc)
+    +stat(IC_T,'Truth',esc(fmtAns(d.task,d.ground_truth,d.graph)));
+  $('turnbox').innerHTML=IC_R+`<span>${d.n_responses} turns</span>`;
   const turns=d.turns||[];
   const T=$('transcript'); T.scrollTop=0; let prev=undefined;
   T.innerHTML=turns.map((t,i)=>{ const isC=t.role==='critic';
@@ -456,15 +466,16 @@ async function openDebate(id){
       +`<span class="role">${role}</span>${v}<span class="tok tnum">${(t.n_prompt_tokens||0)+(t.n_gen_tokens||0)} tok</span></div>`
       +`<div class="say">${esc(t.raw||'')}</div>${foot}</div></div>`; }).join('');
   renderGraph(d.graph,d.task);
-  renderCost(turns,total);
+  renderCost(turns,total,d.n_prompt_tokens);
 }
 
-function renderCost(turns,total){
+function renderCost(turns,total,read){
   const tot=t=>(t.n_prompt_tokens||0)+(t.n_gen_tokens||0);
   const max=Math.max(1,...turns.map(tot));
   $('bars').innerHTML=turns.map(t=>`<div class="bar ${t.role}" style="height:${Math.max(8,Math.round(tot(t)/max*100))}%"`
     +` title="turn ${t.role}: ${tot(t)} tok"></div>`).join('');
-  $('costlab').textContent=`tokens per turn · ${total.toLocaleString()} total`;
+  $('costsum').textContent=`${total.toLocaleString()} tok · ${read.toLocaleString()} read`;
+  $('costlab').textContent='tokens per turn';
 }
 // Nodes are drawn with the names the model actually read (server-supplied `labels`):
 // integers for adjacency/incident, people for friendship. The integer id stays available
