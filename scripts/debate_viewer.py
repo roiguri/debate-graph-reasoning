@@ -469,9 +469,10 @@ function renderCost(turns,total){
 // on hover, so a payload id can still be matched to what is on screen.
 // The drawing shows the GROUND TRUTH of the open question, never the debate's answer.
 // edge_existence lights both endpoints and bolds the queried pair when the graph states
-// it; when it does not, there is simply nothing between the two lit nodes. Everything
-// outside the two neighbourhoods is dimmed away. The other tasks keep the single lit
-// query node until their own drawings land.
+// it; when it does not, there is simply nothing between the two lit nodes. node_degree
+// lights the query node and bolds the spokes being counted. Either way everything outside
+// the queried neighbourhood is dimmed away. The count itself is not drawn: it is already
+// the Answer / Truth tile, and repeating it on the node only adds clutter.
 function renderGraph(g,task){
   LASTG={g,task};
   const lab=n=>labOf(g,n);
@@ -490,14 +491,16 @@ function renderGraph(g,task){
                         :{'width':27,'height':27,'font-size':12};
   const qSize=g.named?{'padding':'12px'}:{'width':32,'height':32};
   const key=(a,b)=>a+'-'+b;
+  const deg=(task==='node_degree'&&q!=null);
+  const focus=!!pair||deg;   // dim everything outside the queried neighbourhood
   const queried=n=>pair?(n===pair[0]||n===pair[1]):n===q;
   const inc=new Set(), near=new Set(qs);   // edges touching a queried node, and their far ends
   g.edges.forEach(([a,b])=>{ if(queried(a)||queried(b)){ inc.add(key(a,b)); near.add(a); near.add(b); } });
   const pairKey=pair&&[key(pair[0],pair[1]),key(pair[1],pair[0])].find(k=>inc.has(k));
   const els=g.nodes.map(n=>({data:{id:''+n,label:lab(n)},position:g.positions[''+n],
-      classes:queried(n)?'q':(pair&&!near.has(n)?'far':'')}))
+      classes:queried(n)?'q':(focus&&!near.has(n)?'far':'')}))
     .concat(g.edges.map(([a,b])=>({data:{id:key(a,b),source:''+a,target:''+b},
-      classes:key(a,b)===pairKey?'pair':inc.has(key(a,b))?(pair?'ctx':'inc'):(pair?'far':'')})));
+      classes:key(a,b)===pairKey?'pair':inc.has(key(a,b))?(pair?'ctx':'inc'):(focus?'far':'')})));
   // Absence is drawn as absence: two lit nodes with nothing between them. (A dashed
   // "phantom" line was tried and read as a connection, which is the opposite of the truth.)
   if(pair){ $('legpair').hidden=false;
