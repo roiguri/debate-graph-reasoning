@@ -311,6 +311,7 @@ _PAGE = r"""<!doctype html>
   #legend span{display:flex;align-items:center;gap:6px}
   .sw{width:11px;height:11px;border-radius:50%;display:inline-block}
   .sw.q{background:var(--prop)} .sw.o{border:1.5px solid var(--muted)}
+  .sw.n{border:2.5px solid var(--prop)}
   .panel{padding:14px 16px;border-top:1px solid var(--border);margin-top:12px}
   #bars{display:flex;gap:4px;align-items:flex-end;height:46px;margin:8px 0 5px}
   .bar{flex:1;border-radius:3px 3px 0 0;min-height:4px}
@@ -470,9 +471,10 @@ function renderCost(turns,total){
 // The drawing shows the GROUND TRUTH of the open question, never the debate's answer.
 // edge_existence lights both endpoints and bolds the queried pair when the graph states
 // it; when it does not, there is simply nothing between the two lit nodes. node_degree
-// lights the query node and bolds the spokes being counted. Either way everything outside
-// the queried neighbourhood is dimmed away. The count itself is not drawn: it is already
-// the Answer / Truth tile, and repeating it on the node only adds clutter.
+// lights the query node and bolds the spokes being counted, and connected_nodes rings the
+// neighbours so the answer reads as a set of names. Either way everything outside the
+// queried neighbourhood is dimmed away. Values are not drawn on the graph: the degree and
+// the neighbour list are already the Answer / Truth tiles.
 function renderGraph(g,task){
   LASTG={g,task};
   const lab=n=>labOf(g,n);
@@ -492,19 +494,22 @@ function renderGraph(g,task){
   const qSize=g.named?{'padding':'12px'}:{'width':32,'height':32};
   const key=(a,b)=>a+'-'+b;
   const deg=(task==='node_degree'&&q!=null);
-  const focus=!!pair||deg;   // dim everything outside the queried neighbourhood
+  const set=(task==='connected_nodes'&&q!=null);   // the answer IS the neighbour set
+  const focus=!!pair||deg||set;   // dim everything outside the queried neighbourhood
   const queried=n=>pair?(n===pair[0]||n===pair[1]):n===q;
   const inc=new Set(), near=new Set(qs);   // edges touching a queried node, and their far ends
   g.edges.forEach(([a,b])=>{ if(queried(a)||queried(b)){ inc.add(key(a,b)); near.add(a); near.add(b); } });
   const pairKey=pair&&[key(pair[0],pair[1]),key(pair[1],pair[0])].find(k=>inc.has(k));
   const els=g.nodes.map(n=>({data:{id:''+n,label:lab(n)},position:g.positions[''+n],
-      classes:queried(n)?'q':(focus&&!near.has(n)?'far':'')}))
+      classes:queried(n)?'q':(near.has(n)?(set?'nbr':''):(focus?'far':''))}))
     .concat(g.edges.map(([a,b])=>({data:{id:key(a,b),source:''+a,target:''+b},
       classes:key(a,b)===pairKey?'pair':inc.has(key(a,b))?(pair?'ctx':'inc'):(focus?'far':'')})));
   // Absence is drawn as absence: two lit nodes with nothing between them. (A dashed
   // "phantom" line was tried and read as a connection, which is the opposite of the truth.)
   if(pair){ $('legpair').hidden=false;
     $('legpair').textContent=pairKey?'the pair is an edge':'no edge between them'; }
+  if(set){ $('legpair').hidden=false;
+    $('legpair').innerHTML='<span class="sw n"></span>neighbours (the answer)'; }
   cy=cytoscape({container:$('cy'),elements:els,layout:{name:'preset'},
     style:[
       {selector:'node',style:{'label':'data(label)','text-wrap':'none','background-color':surf,
@@ -512,6 +517,8 @@ function renderGraph(g,task){
         'text-valign':'center','text-halign':'center',...nodeSize}},
       {selector:'node.q',style:{'background-color':prop,'border-color':prop,'color':paper,
         'font-weight':'bold',...qSize}},
+      // the answer set: ringed, so it reads as a group without being confused with the query
+      {selector:'node.nbr',style:{'border-width':3.5,'border-color':prop,'color':ink}},
       {selector:'node.far',style:{'opacity':.3}},
       {selector:'edge',style:{'width':1.5,'line-color':muted,'opacity':.45,'curve-style':'straight'}},
       {selector:'edge.inc',style:{'line-color':prop,'opacity':1,'width':2.5}},
