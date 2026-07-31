@@ -58,6 +58,19 @@ def test_graph_payload_has_nodes_edges_positions_query():
     assert mod._graph_payload(None) is None
 
 
+def test_graph_payload_labels_nodes_the_way_the_encoding_does():
+    """The drawing must use the same node names the model read, per encoding."""
+    mod = _viewer()
+    ds = [i for i in build_dataset(n_graphs=4, seed=7) if i.task == "node_degree"]
+    adj = next(i for i in ds if i.encoding == "adjacency")
+    fri = next(i for i in ds if i.encoding == "friendship")
+    assert mod._graph_payload(adj)["labels"] == {str(n): str(n) for n in range(adj.nnodes)}
+    labels = mod._graph_payload(fri)["labels"]
+    assert set(labels) == {str(n) for n in range(fri.nnodes)}      # one per node
+    assert all(name in fri.question for name in labels.values())   # names the run used
+    assert labels["0"] == "James"
+
+
 def test_page_loads_via_api_and_draws_graph():
     mod = _viewer()
     assert "/api/index" in mod._PAGE and "/api/trace?id=" in mod._PAGE  # dynamic fetch

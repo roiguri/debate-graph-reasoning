@@ -22,6 +22,7 @@ from urllib.parse import parse_qs, urlparse
 
 from gedebate.data.store import load_dataset
 from gedebate.eval import results
+from gedebate.graphqa.graph_text_encoder import TEXT_ENCODER_DICT
 
 _ROW_KEYS = ("task", "encoding", "correct", "parse_ok", "parsed_answer",
              "ground_truth", "n_responses", "n_prompt_tokens", "n_gen_tokens")
@@ -73,6 +74,20 @@ def _component_layout(g):
     return pos
 
 
+def _node_labels(inst) -> dict[str, str]:
+    """Node id -> the name the model actually read, per encoding.
+
+    The encodings differ mainly in how they *name* nodes (integers for adjacency /
+    incident, people for friendship, ...), so the drawing must use the same words as the
+    transcript -- otherwise the graph says "1" while the debate argues about "Robert".
+    `random` regenerates its names per process (`random.randint` at dict creation), so a
+    stored run's names cannot be reproduced here: fall back to the integer id rather than
+    print names the run never used. Same fallback for any id past the dictionary's end.
+    """
+    names = {} if inst.encoding == "random" else TEXT_ENCODER_DICT.get(inst.encoding, {})
+    return {str(n): str(names.get(n, n)) for n in range(inst.nnodes)}
+
+
 def _graph_payload(inst) -> dict | None:
     """Nodes/edges + seeded force-directed positions for Cytoscape (stable per graph)."""
     if inst is None:
@@ -82,13 +97,25 @@ def _graph_payload(inst) -> dict | None:
     g.add_nodes_from(range(inst.nnodes))
     g.add_edges_from(tuple(e) for e in inst.graph_edgelist)
     pos = _component_layout(g)  # component-aware: keeps disconnected clusters compact
-    scale = 130
+    labels = _node_labels(inst)
+    # `named` encodings (friendship, ...) draw wide pills; numbered ones (adjacency,
+    # incident) keep the original discs and the original 130 spacing, untouched.
+    #
+    # For names, the layout is normalized, so the scale sets node spacing in the same units
+    # as node size. A name ("Christopher") is wide but no taller than an integer, so only
+    # the X axis needs the extra room; scaling both would inflate the drawing and, since
+    # cy.fit() zooms it into the panel, shrink the text right back.
+    named = any(k != v for k, v in labels.items())
+    label_w = 7.5 * max(len(v) for v in labels.values()) + 18   # ~13px monospace + padding
+    sx = max(130.0, 3.2 * label_w) if named else 130.0
     return {
         "nodes": list(range(inst.nnodes)),
         "edges": [list(e) for e in inst.graph_edgelist],
-        "positions": {str(n): {"x": round(float(x) * scale, 1), "y": round(float(y) * scale, 1)}
+        "positions": {str(n): {"x": round(float(x) * sx, 1), "y": round(float(y) * 130.0, 1)}
                       for n, (x, y) in pos.items()},
         "query": inst.node_ids[0] if inst.node_ids else None,
+        "labels": labels,
+        "named": named,
         "nnodes": inst.nnodes,
         "encoding_text": inst.question,
     }
@@ -180,8 +207,10 @@ _PAGE = r"""<!doctype html>
   .iconbtn:hover{background:var(--sunk)}
 
   /* three-column shell */
-  #shell{display:grid;grid-template-columns:288px minmax(0,1fr) 520px;min-height:0}
-  body.railhidden #shell{grid-template-columns:minmax(0,1fr) 520px}
+  /* graph column: one fixed width for every encoding (named pills need the wider of the
+     two, and a column that resized per encoding made the whole page jump) */
+  #shell{display:grid;grid-template-columns:288px minmax(0,1fr) 580px;min-height:0}
+  body.railhidden #shell{grid-template-columns:minmax(0,1fr) 580px}
   body.railhidden #rail{display:none}
 
   /* left rail — browse */
@@ -410,24 +439,35 @@ function renderCost(turns,total){
     +` title="turn ${t.role}: ${tot(t)} tok"></div>`).join('');
   $('costlab').textContent=`tokens per turn · ${total.toLocaleString()} total`;
 }
+// Nodes are drawn with the names the model actually read (server-supplied `labels`):
+// integers for adjacency/incident, people for friendship. The integer id stays available
+// on hover, so a payload id can still be matched to what is on screen.
 function renderGraph(g,task){
   LASTG={g,task};
+  const lab=n=>(g&&g.labels&&g.labels[''+n])||''+n;
   $('enc').textContent=g?g.encoding_text:'';
   $('gmeta').textContent=g?`${g.nnodes} nodes · ${g.edges.length} edges`:'';
-  $('legq').textContent=g&&g.query!=null?`query node ${g.query}`:'query node';
+  $('legq').textContent=g&&g.query!=null?`query node ${lab(g.query)}`:'query node';
   if(cy){cy.destroy();cy=null;} if(!g||typeof cytoscape==='undefined'){ return; }
   const prop=cssv('--prop'),ink=cssv('--ink'),muted=cssv('--muted'),surf=cssv('--surface'),paper=cssv('--paper');
+  // Named encodings get label-sized pills at 13px; numbered ones keep the original discs.
+  const nodeSize=g.named?{'width':'label','height':'label','padding':'9px','font-size':13}
+                        :{'width':27,'height':27,'font-size':12};
+  const qSize=g.named?{'padding':'12px'}:{'width':32,'height':32};
   const inc=new Set(); g.edges.forEach(([a,b])=>{ if(a===g.query||b===g.query) inc.add(a+'-'+b); });
-  const els=g.nodes.map(n=>({data:{id:''+n},position:g.positions[''+n],classes:n===g.query?'q':''}))
+  const els=g.nodes.map(n=>({data:{id:''+n,label:lab(n)},position:g.positions[''+n],classes:n===g.query?'q':''}))
     .concat(g.edges.map(([a,b])=>({data:{id:a+'-'+b,source:''+a,target:''+b},classes:inc.has(a+'-'+b)?'inc':''})));
   cy=cytoscape({container:$('cy'),elements:els,layout:{name:'preset'},
     style:[
-      {selector:'node',style:{'label':'data(id)','width':27,'height':27,'background-color':surf,
-        'border-width':1.5,'border-color':muted,'color':ink,'font-family':'monospace','font-size':12,
-        'text-valign':'center','text-halign':'center'}},
-      {selector:'node.q',style:{'background-color':prop,'border-color':prop,'color':paper,'font-weight':'bold','width':32,'height':32}},
+      {selector:'node',style:{'label':'data(label)','text-wrap':'none','background-color':surf,
+        'border-width':1.5,'border-color':muted,'color':ink,'font-family':'monospace',
+        'text-valign':'center','text-halign':'center',...nodeSize}},
+      {selector:'node.q',style:{'background-color':prop,'border-color':prop,'color':paper,
+        'font-weight':'bold',...qSize}},
       {selector:'edge',style:{'width':1.5,'line-color':muted,'opacity':.45,'curve-style':'straight'}},
       {selector:'edge.inc',style:{'line-color':prop,'opacity':1,'width':2.5}}]});
+  cy.on('mouseover','node',e=>{ $('cy').title='node '+e.target.id(); });
+  cy.on('mouseout','node',()=>{ $('cy').title=''; });
   cy.fit(undefined,26);
 }
 

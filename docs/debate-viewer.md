@@ -32,7 +32,9 @@ results freshly pulled), restart the viewer to pick up the new debates.
   transcript (Proposer left, Critic right, verdict pills, per-turn tokens).
 - **Right:** the graph (query node lit, its edges bolded, disconnected clusters tiled
   so each stays legible), a per-turn token cost chart, and the raw encoding the model
-  read (`r` toggles it).
+  read (`r` toggles it). Nodes carry the names that encoding used, so the drawing and
+  the transcript speak the same language: integers for `adjacency` / `incident`, people
+  for `friendship`. Hover a node for its integer id.
 
 The top bar has light/dark and rail-collapse toggles.
 
