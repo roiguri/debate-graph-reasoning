@@ -260,13 +260,15 @@ _PAGE = r"""<!doctype html>
   #head .stat .val{font:600 15px var(--mono);color:var(--ink);margin-top:1px}
   #head .stat .val.good-fg{color:var(--good)} #head .stat .val.bad-fg{color:var(--bad)}
   #head .stat .sub{font:400 11px var(--mono);color:var(--muted)}
-  #rawenc{padding:14px 16px;border-top:1px solid var(--border)}
-  #rawenc summary{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;list-style:none;
-                  padding:5px 7px;margin:-5px -7px;border-radius:7px;transition:background .12s ease}
-  #rawenc summary::-webkit-details-marker{display:none}
-  #rawenc summary:hover{background:var(--sunk)}
-  #rawenc .chev{margin-left:auto;color:var(--muted);display:block;transition:transform .18s ease}
-  #rawenc[open] .chev{transform:rotate(90deg)}
+  /* collapsible side panels (cost, raw encoding) */
+  .disc{padding:14px 16px;border-top:1px solid var(--border)}
+  .disc summary{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;list-style:none;
+                padding:5px 7px;margin:-5px -7px;border-radius:7px;transition:background .12s ease}
+  .disc summary::-webkit-details-marker{display:none}
+  .disc summary:hover{background:var(--sunk)}
+  .disc .chev{margin-left:auto;color:var(--muted);display:block;transition:transform .18s ease}
+  .disc[open] .chev{transform:rotate(90deg)}
+  #cost{margin-top:12px}
   #rawenc pre{margin:10px 0 2px;padding:11px 12px;max-height:150px;overflow:auto;
               background:color-mix(in srgb, var(--ink) 8%, var(--surface));
               border:1px solid var(--border);border-radius:8px;
@@ -312,7 +314,6 @@ _PAGE = r"""<!doctype html>
   .sw{width:11px;height:11px;border-radius:50%;display:inline-block}
   .sw.q{background:var(--prop)} .sw.o{border:1.5px solid var(--muted)}
   .sw.n{border:2.5px solid var(--prop)}
-  .panel{padding:14px 16px;border-top:1px solid var(--border);margin-top:12px}
   #bars{display:flex;gap:4px;align-items:flex-end;height:46px;margin:8px 0 5px}
   .bar{flex:1;border-radius:3px 3px 0 0;min-height:4px}
   .bar.proposer{background:var(--prop)} .bar.critic{background:var(--crit)}
@@ -355,8 +356,8 @@ _PAGE = r"""<!doctype html>
     <div id="gwrap">
       <div id="cyframe"><div id="cy"></div></div>
       <div id="legend"><span><span class="sw q"></span><span id="legq">query node</span></span><span><span class="sw o"></span>other nodes</span><span id="legpair" hidden></span></div>
-      <div class="panel"><span class="sec">Cost</span><div id="bars"></div><div id="costlab"></div></div>
-      <details id="rawenc" open><summary><span class="sec">Raw encoding</span><svg class="chev" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></summary><pre id="enc"></pre></details>
+      <details id="cost" class="disc"><summary><span class="sec">Cost</span><svg class="chev" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></summary><div id="bars"></div><div id="costlab"></div></details>
+      <details id="rawenc" class="disc"><summary><span class="sec">Raw encoding</span><svg class="chev" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></summary><pre id="enc"></pre></details>
     </div>
   </aside>
 </div>
@@ -543,7 +544,7 @@ document.documentElement.dataset.theme=theme;
 $('themebtn').onclick=()=>{ theme=theme==='dark'?'light':'dark'; document.documentElement.dataset.theme=theme;
   if(LASTG) renderGraph(LASTG.g,LASTG.task); };
 
-// keyboard: / search · j/k or n/p walk the queue · r toggles raw encoding
+// keyboard: / search · j/k or n/p walk the queue · r raw encoding · c cost
 function step(dir){ const it=filtered(); if(!it.length)return;
   let i=it.findIndex(d=>d.instance_id===sel);
   i=i<0?(dir>0?0:it.length-1):Math.min(it.length-1,Math.max(0,i+dir));
@@ -554,7 +555,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='/'&&!typing){ e.preventDefault(); $('q').focus(); return; }
   if(e.key==='Escape'&&typing){ e.target.blur(); return; }
   if(typing) return;
-  if(e.key==='r'){ const el=$('rawenc'); if(el) el.open=!el.open; return; }
+  if(e.key==='r'||e.key==='c'){ const el=$(e.key==='r'?'rawenc':'cost'); if(el) el.open=!el.open; return; }
   if(['j','n','ArrowDown'].includes(e.key)){ e.preventDefault(); step(1); }
   if(['k','p','ArrowUp'].includes(e.key)){ e.preventDefault(); step(-1); } });
 
