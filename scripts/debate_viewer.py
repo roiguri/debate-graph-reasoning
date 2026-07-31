@@ -353,7 +353,7 @@ _PAGE = r"""<!doctype html>
     <div id="gempty">no debate open</div>
     <div id="gwrap">
       <div id="cyframe"><div id="cy"></div></div>
-      <div id="legend"><span><span class="sw q"></span><span id="legq">query node</span></span><span><span class="sw o"></span>other nodes</span></div>
+      <div id="legend"><span><span class="sw q"></span><span id="legq">query node</span></span><span><span class="sw o"></span>other nodes</span><span id="legpair" hidden></span></div>
       <div class="panel"><span class="sec">Cost</span><div id="bars"></div><div id="costlab"></div></div>
       <details id="rawenc" open><summary><span class="sec">Raw encoding</span><svg class="chev" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg></summary><pre id="enc"></pre></details>
     </div>
@@ -467,24 +467,41 @@ function renderCost(turns,total){
 // Nodes are drawn with the names the model actually read (server-supplied `labels`):
 // integers for adjacency/incident, people for friendship. The integer id stays available
 // on hover, so a payload id can still be matched to what is on screen.
+// The drawing shows the GROUND TRUTH of the open question, never the debate's answer.
+// edge_existence lights both endpoints and bolds the queried pair when the graph states
+// it; when it does not, there is simply nothing between the two lit nodes. Everything
+// outside the two neighbourhoods is dimmed away. The other tasks keep the single lit
+// query node until their own drawings land.
 function renderGraph(g,task){
   LASTG={g,task};
   const lab=n=>labOf(g,n);
-  // Only the first queried node is lit for now; edge_existence's second endpoint joins it
-  // when the per-task drawings land.
-  const q=(g&&g.query_nodes&&g.query_nodes.length)?g.query_nodes[0]:null;
+  const qs=(g&&g.query_nodes)||[];
+  const pair=(task==='edge_existence'&&qs.length>=2)?qs:null;   // [u, v]
+  const q=qs.length?qs[0]:null;
   $('enc').textContent=g?g.encoding_text:'';
   $('gmeta').textContent=g?`${g.nnodes} nodes · ${g.edges.length} edges`:'';
-  $('legq').textContent=q!=null?`query node ${lab(q)}`:'query node';
+  $('legq').textContent=pair?`queried pair ${lab(pair[0])} · ${lab(pair[1])}`
+                            :(q!=null?`query node ${lab(q)}`:'query node');
+  $('legpair').hidden=true;
   if(cy){cy.destroy();cy=null;} if(!g||typeof cytoscape==='undefined'){ return; }
   const prop=cssv('--prop'),ink=cssv('--ink'),muted=cssv('--muted'),surf=cssv('--surface'),paper=cssv('--paper');
   // Named encodings get label-sized pills at 13px; numbered ones keep the original discs.
   const nodeSize=g.named?{'width':'label','height':'label','padding':'9px','font-size':13}
                         :{'width':27,'height':27,'font-size':12};
   const qSize=g.named?{'padding':'12px'}:{'width':32,'height':32};
-  const inc=new Set(); g.edges.forEach(([a,b])=>{ if(a===q||b===q) inc.add(a+'-'+b); });
-  const els=g.nodes.map(n=>({data:{id:''+n,label:lab(n)},position:g.positions[''+n],classes:n===q?'q':''}))
-    .concat(g.edges.map(([a,b])=>({data:{id:a+'-'+b,source:''+a,target:''+b},classes:inc.has(a+'-'+b)?'inc':''})));
+  const key=(a,b)=>a+'-'+b;
+  const queried=n=>pair?(n===pair[0]||n===pair[1]):n===q;
+  const inc=new Set(), near=new Set(qs);   // edges touching a queried node, and their far ends
+  g.edges.forEach(([a,b])=>{ if(queried(a)||queried(b)){ inc.add(key(a,b)); near.add(a); near.add(b); } });
+  const pairKey=pair&&[key(pair[0],pair[1]),key(pair[1],pair[0])].find(k=>inc.has(k));
+  const els=g.nodes.map(n=>({data:{id:''+n,label:lab(n)},position:g.positions[''+n],
+      classes:queried(n)?'q':(pair&&!near.has(n)?'far':'')}))
+    .concat(g.edges.map(([a,b])=>({data:{id:key(a,b),source:''+a,target:''+b},
+      classes:key(a,b)===pairKey?'pair':inc.has(key(a,b))?(pair?'ctx':'inc'):(pair?'far':'')})));
+  // Absence is drawn as absence: two lit nodes with nothing between them. (A dashed
+  // "phantom" line was tried and read as a connection, which is the opposite of the truth.)
+  if(pair){ $('legpair').hidden=false;
+    $('legpair').textContent=pairKey?'the pair is an edge':'no edge between them'; }
   cy=cytoscape({container:$('cy'),elements:els,layout:{name:'preset'},
     style:[
       {selector:'node',style:{'label':'data(label)','text-wrap':'none','background-color':surf,
@@ -492,8 +509,12 @@ function renderGraph(g,task){
         'text-valign':'center','text-halign':'center',...nodeSize}},
       {selector:'node.q',style:{'background-color':prop,'border-color':prop,'color':paper,
         'font-weight':'bold',...qSize}},
+      {selector:'node.far',style:{'opacity':.3}},
       {selector:'edge',style:{'width':1.5,'line-color':muted,'opacity':.45,'curve-style':'straight'}},
-      {selector:'edge.inc',style:{'line-color':prop,'opacity':1,'width':2.5}}]});
+      {selector:'edge.inc',style:{'line-color':prop,'opacity':1,'width':2.5}},
+      {selector:'edge.ctx',style:{'opacity':.6}},
+      {selector:'edge.far',style:{'opacity':.12}},
+      {selector:'edge.pair',style:{'line-color':prop,'opacity':1,'width':4}}]});
   cy.on('mouseover','node',e=>{ $('cy').title='node '+e.target.id(); });
   cy.on('mouseout','node',()=>{ $('cy').title=''; });
   cy.fit(undefined,26);
