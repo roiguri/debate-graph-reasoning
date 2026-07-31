@@ -121,6 +121,11 @@ def trace_file(run_dir: str | Path, condition: str, shard: int = 0) -> Path:
     return Path(run_dir) / condition / f"shard{shard:03d}.trace.jsonl"
 
 
+def trace_files(run_dir: str | Path) -> list[Path]:
+    """All trace sidecars under a run dir (the complement of `result_files`)."""
+    return sorted(Path(run_dir).glob("**/*.trace.jsonl"))
+
+
 def append_trace(path: str | Path, instance_id: str, turns: list[dict]) -> None:
     """Append one instance's transcript (flush+fsync), mirroring append_row's kill safety."""
     append_row(path, {"instance_id": instance_id, "turns": turns})

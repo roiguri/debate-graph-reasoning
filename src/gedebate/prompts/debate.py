@@ -194,6 +194,18 @@ _VERDICT_RE = re.compile(r"VERDICT:\s*(AGREE|REVISE)", re.IGNORECASE)
 _PROBLEM_RE = re.compile(r"^\s*-\s*(.+?)\s*$", re.MULTILINE)
 
 
+def has_answer_line(raw: str) -> bool:
+    """Whether a Proposer turn emitted the `ANSWER:` line the format block asks for.
+
+    Lives here (not in the diagnostics that consume it) for the same reason the parsers
+    do: it is a fact about the prompt's output format. Without the line `parse_proposer`
+    falls back to the whole text, which is a *silent* degradation -- it happens to work
+    for node_degree (last integer wins) and fails for connected_nodes -- so the rate is
+    worth reporting rather than inferring from `parse_ok`.
+    """
+    return _ANSWER_RE.search(raw) is not None
+
+
 def parse_proposer(
     raw: str, task: str, *, encoding: str | None = None, node_ids: list | None = None
 ) -> tuple["GroundTruth | None", bool, list[str]]:

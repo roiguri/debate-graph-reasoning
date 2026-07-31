@@ -8,6 +8,10 @@ a paired one:
 - **Cochran's Q** -- omnibus across all encodings of a task (any encoding differ?).
 - **McNemar** -- pairwise, used for the headline best-vs-worst gap.
 
+`chi2_2x2` is the exception: the Critic diagnostic (does a REVISE verdict track the
+Proposer actually being wrong?) is *unpaired*, one observation per verdict, so it
+takes a plain association test rather than a paired one.
+
 Both live at closed-form p-values here (Q has df = k-1 = 2 for our 3 encodings;
 McNemar has df = 1), so this module is pure stdlib -- no scipy, importable on the
 CPU-only analysis path. `wilson_ci` gives each cell's accuracy an interval for the
@@ -78,6 +82,32 @@ def mcnemar_from_bc(b: int, c: int) -> dict:
         return {"b": b, "c": c, "stat": float(k), "p": p}
     chi = (abs(b - c) - 1) ** 2 / n
     return {"b": b, "c": c, "stat": chi, "p": 2 * _norm_sf(math.sqrt(chi))}
+
+
+def chi2_2x2(a: int, b: int, c: int, d: int) -> dict:
+    """Independence test for an *unpaired* 2x2 table, laid out as [[a, b], [c, d]].
+
+    Used for the Critic diagnostic: is a REVISE verdict associated with the Proposer
+    actually being wrong? That question is unpaired (each verdict is its own
+    observation), so McNemar does not apply -- the right test is a plain chi-square
+    of association, reported with `phi` (the effect size, signed) and the odds ratio,
+    because with N in the thousands a tiny association can still clear p < 0.05.
+
+    Returns `phi`/`odds_ratio` as nan when a margin is empty (no association is
+    defined). Continuity correction is deliberately omitted: this is a descriptive
+    association measure, and `phi` is what we actually report.
+    """
+    n = a + b + c + d
+    rows_, cols = (a + b, c + d), (a + c, b + d)
+    if n == 0 or 0 in rows_ or 0 in cols:
+        return {"a": a, "b": b, "c": c, "d": d, "n": n, "chi2": 0.0, "p": 1.0,
+                "phi": float("nan"), "odds_ratio": float("nan")}
+    denom = math.sqrt(rows_[0] * rows_[1] * cols[0] * cols[1])
+    phi = (a * d - b * c) / denom
+    chi = n * phi * phi
+    odds = (a * d) / (b * c) if (b * c) else float("inf")
+    return {"a": a, "b": b, "c": c, "d": d, "n": n, "chi2": chi,
+            "p": 2 * _norm_sf(math.sqrt(chi)), "phi": phi, "odds_ratio": odds}
 
 
 def mcnemar(rows: list[dict], enc_a: str, enc_b: str) -> dict:
