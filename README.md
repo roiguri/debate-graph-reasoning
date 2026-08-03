@@ -53,7 +53,8 @@ scripts/        entry points (build_dataset, show_results, debate_viewer, smoke)
 slurm/          batch-job scripts, specific to our compute setup
 results/        run outputs, JSON/CSV (gitignored)
 analysis/       derived tables and figures (gitignored)
-docs/           proposal, reproduce guide, cluster runbook, debate viewer, design notes
+docs/           proposal, reproduce guide, cluster runbook, debate viewer, design notes,
+                findings (what the runs showed)
 ```
 
 ## Data and attribution

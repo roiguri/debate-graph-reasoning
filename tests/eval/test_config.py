@@ -38,6 +38,7 @@ def test_from_dict_full():
     {"model": "m", "out_dir": "o", "dataset": "d", "condition": "quux"},  # unknown condition
     {"model": "m", "out_dir": "o", "dataset": "d", "n_samples": 0},      # must be >= 1
     {"model": "m", "out_dir": "o", "dataset": "d", "temperature": 0},    # must be > 0
+    {"model": "m", "out_dir": "o", "dataset": "d", "prompt_version": "v99"},  # unknown version
     {"model": "m", "out_dir": "o", "dataset": "d", "top_p": 0},          # must be in (0,1]
     {"model": "m", "out_dir": "o", "dataset": "d", "top_p": 1.5},        # must be <= 1
     {"model": "m", "out_dir": "o", "dataset": "d", "top_k": -1},         # must be >= 0
@@ -93,3 +94,16 @@ def test_repo_p3_matrix_config():
     assert cfg.dataset == "data/main.jsonl"
     assert cfg.out_dir == "results/main"
     assert "Qwen" in cfg.model
+
+
+def test_prompt_version_defaults_to_v1_so_existing_configs_are_unaffected():
+    # results/main was produced under v1; a config that predates v2 must keep emitting
+    # the v1 wording rather than silently picking up the fix.
+    cfg = RunConfig.from_dict({"model": "m", "out_dir": "o", "dataset": "d"})
+    assert cfg.prompt_version == "v1"
+
+
+def test_prompt_version_is_opt_in():
+    cfg = RunConfig.from_dict({"model": "m", "out_dir": "o", "dataset": "d",
+                               "condition": "debate", "prompt_version": "v2"})
+    assert cfg.prompt_version == "v2"

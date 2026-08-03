@@ -13,6 +13,7 @@ from pathlib import Path
 
 from gedebate.data.dataset import ENCODINGS as ALL_ENCODINGS
 from gedebate.data.dataset import TASKS as ALL_TASKS
+from gedebate.prompts.debate import DEFAULT_PROMPT_VERSION, PROMPT_VERSIONS
 
 KNOWN_CONDITIONS = ("baseline", "majority_vote", "debate")
 
@@ -35,6 +36,10 @@ class RunConfig:
     temperature: float = 0.7
     top_p: float = 0.8
     top_k: int = 20
+    # Debate Proposer/revision wording (ignored by baseline/majority-vote). Versioned so
+    # a prompt fix cannot retroactively change what an existing config would emit; the
+    # default is v1, which is what results/main was run under. See prompts/debate.py.
+    prompt_version: str = DEFAULT_PROMPT_VERSION
 
     @classmethod
     def from_dict(cls, data: dict) -> "RunConfig":
@@ -66,6 +71,12 @@ class RunConfig:
             raise ValueError(f"top_p must be in (0, 1], got {top_p}")
         if top_k < 0:
             raise ValueError(f"top_k must be >= 0 (0 disables), got {top_k}")
+        prompt_version = data.get("prompt_version", DEFAULT_PROMPT_VERSION)
+        if prompt_version not in PROMPT_VERSIONS:
+            raise ValueError(
+                f"unknown prompt_version {prompt_version!r}; "
+                f"known: {tuple(PROMPT_VERSIONS)}"
+            )
 
         return cls(
             model=data["model"],
@@ -79,6 +90,7 @@ class RunConfig:
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
+            prompt_version=prompt_version,
         )
 
 

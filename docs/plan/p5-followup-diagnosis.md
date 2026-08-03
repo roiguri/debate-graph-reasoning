@@ -34,10 +34,10 @@ judging* was correct (pooled, 6,553 verdicts):
 
 |                      | AGREE | REVISE |                            |
 |----------------------|-------|--------|----------------------------|
-| Proposer **correct** |  1400 |   1746 | false-alarm rate **0.555** |
-| Proposer **wrong**   |  1417 |   1990 | detection rate **0.584**   |
+| Proposer **correct** |  1399 |   1744 | false-alarm rate **0.555** |
+| Proposer **wrong**   |  1418 |   1992 | detection rate **0.584**   |
 
-chi2 = 5.65 (1 df, p = 0.017), phi = +0.029, odds ratio 1.13. With N in the thousands
+chi2 = 5.72 (1 df, p = 0.017), phi = +0.030, odds ratio 1.13. With N in the thousands
 that clears p < 0.05, and it still means nothing in practice: a REVISE moves P(wrong)
 from the base rate 0.520 to 0.533. The verdict is worth about one accuracy point of
 information.
@@ -46,11 +46,11 @@ information.
 
 | cell                      | verdicts | FA (REVISE given correct) | detection | phi   | p       |
 |---------------------------|----------|---------------------------|-----------|-------|---------|
-| edge_existence/incident   |      825 | 0.820                     | 0.966     | +0.21 | 1.3e-09 |
-| edge_existence/friendship |      708 | 0.706                     | 0.852     | +0.16 | 2.1e-05 |
-| connected_nodes/incident  |      709 | 0.336                     | 0.462     | +0.13 | 7.8e-04 |
-| connected_nodes/friendship|      745 | 0.514                     | 0.506     | -0.01 | 0.86    |
-| node_degree/adjacency     |      716 | 0.452                     | 0.468     | +0.02 | 0.68    |
+| edge_existence/incident   |      825 | 0.819                     | 0.967     | +0.21 | <1e-09  |
+| edge_existence/friendship |      708 | 0.705                     | 0.852     | +0.16 | <1e-04  |
+| connected_nodes/incident  |      709 | 0.330                     | 0.469     | +0.14 | 2.0e-04 |
+| connected_nodes/friendship|      745 | 0.545                     | 0.499     | -0.04 | 0.34    |
+| node_degree/adjacency     |      716 | 0.452                     | 0.467     | +0.02 | 0.68    |
 
 On `edge_existence/incident` the Critic detects a wrong answer 97 percent of the time,
 but it also cries REVISE on 82 percent of *correct* answers. The discrimination is real
@@ -79,8 +79,8 @@ incident-edge tasks, a fifth to a third of its cited evidence is an edge that is
 the graph, despite the prompt saying the graph text is the only source of truth.
 
 **The Proposer mostly ignores it anyway.** After a REVISE the Proposer changes its answer
-only 1,178 of 3,734 times (32 percent). Pooled across cells the direction is roughly a
-wash (`ok_to_bad` 394 vs `bad_to_ok` 366), but it is strongly cell-dependent:
+only 1,180 of 3,734 times (32 percent). Pooled across cells the direction is roughly a
+wash (`ok_to_bad` 397 vs `bad_to_ok` 356), but it is strongly cell-dependent:
 `edge_existence/adjacency` nets +36 while `edge_existence/incident` nets -35.
 
 Representative failure (`7/70/node_degree/friendship`, gold 4): the Proposer lists four
@@ -97,12 +97,12 @@ settings, so the two separate with no new runs:
 
 | task/encoding             | baseline | turn-1 | final | CoT delta (p)       | loop delta (p)      |
 |---------------------------|----------|--------|-------|---------------------|---------------------|
-| connected_nodes/adjacency |    0.280 |  0.285 | 0.270 | +0.005 (0.880)      | -0.015 (0.328)      |
-| connected_nodes/friendship|    0.263 |  0.192 | 0.228 | **-0.072 (0.0009)** | **+0.037 (0.0009)** |
-| connected_nodes/incident  |    0.373 |  0.452 | 0.402 | **+0.078 (0.0050)** | **-0.050 (2e-05)**  |
+| connected_nodes/adjacency |    0.280 |  0.293 | 0.272 | +0.013 (0.598)      | -0.022 (0.137)      |
+| connected_nodes/friendship|    0.263 |  0.188 | 0.207 | **-0.075 (0.0005)** | +0.018 (0.091)      |
+| connected_nodes/incident  |    0.373 |  0.462 | 0.415 | **+0.088 (0.0015)** | **-0.047 (7e-05)**  |
 | edge_existence/adjacency  |    0.703 |  0.663 | 0.723 | -0.040 (0.087)      | **+0.060 (0.0025)** |
-| edge_existence/friendship |    0.695 |  0.705 | 0.697 | +0.010 (0.722)      | -0.008 (0.688)      |
-| edge_existence/incident   |    0.690 |  0.743 | 0.685 | **+0.053 (0.0499)** | **-0.058 (0.0144)** |
+| edge_existence/friendship |    0.695 |  0.705 | 0.693 | +0.010 (0.722)      | -0.012 (0.547)      |
+| edge_existence/incident   |    0.690 |  0.740 | 0.685 | +0.050 (0.068)      | **-0.055 (0.0219)** |
 | node_degree/adjacency     |    0.388 |  0.440 | 0.443 | **+0.052 (0.0426)** | +0.003 (0.905)      |
 | node_degree/friendship    |    0.458 |  0.438 | 0.430 | -0.020 (0.441)      | -0.008 (0.511)      |
 | node_degree/incident      |    0.750 |  0.735 | 0.728 | -0.015 (0.515)      | -0.007 (0.344)      |
@@ -112,8 +112,8 @@ continuity-corrected chi-square), the same test the rest of the analysis uses.
 
 Two findings, both replicated across three seeds:
 
-- **The CoT prompt is not uniformly good.** It gains +0.078 on `connected_nodes/incident`
-  and +0.052 on `node_degree/adjacency`, and it *loses* -0.072 on
+- **The CoT prompt is not uniformly good.** It gains +0.088 on `connected_nodes/incident`
+  and +0.052 on `node_degree/adjacency`, and it *loses* -0.075 on
   `connected_nodes/friendship`. The claim-trace scaffold helps where the encoding is
   already tractable and hurts where it is not, which is the opposite of what a robustness
   intervention should do.
@@ -122,7 +122,7 @@ Two findings, both replicated across three seeds:
   partly cancel, which is exactly why the headline `debate vs baseline` delta looked like
   nothing.
 
-Seed 7 alone shows `connected_nodes/friendship` CoT delta at +0.000, not -0.072. The
+Seed 7 alone shows `connected_nodes/friendship` CoT delta at +0.000, not -0.075. The
 pooled result is the trustworthy one; this is why the primary tables are pooled.
 
 **Debate also makes fragility worse**, the opposite of the project's hypothesis
@@ -179,8 +179,8 @@ Beyond the format loss, the *shape* of the error differs (turn-1 answers, pooled
 | node_degree/incident       | mean signed error -0.12                                       |
 | node_degree/friendship     | mean signed error **+0.88**, overcounts on 37 percent         |
 | connected_nodes/adjacency  | mean Jaccard 0.601, 37 percent contain a non-neighbour        |
-| connected_nodes/incident   | mean Jaccard 0.770, 30 percent contain a non-neighbour        |
-| connected_nodes/friendship | mean Jaccard **0.556**, **62 percent** contain a non-neighbour|
+| connected_nodes/incident   | mean Jaccard 0.787, 23 percent contain a non-neighbour        |
+| connected_nodes/friendship | mean Jaccard **0.551**, **61 percent** contain a non-neighbour|
 | edge_existence/incident    | answers Yes 0.595 against a gold rate of 0.480 (**+0.115**)   |
 | edge_existence/adjacency   | answers Yes 0.442 against a gold rate of 0.470 (-0.029)       |
 
@@ -212,7 +212,8 @@ Every table above regenerates from a committed entry point.
       `debate_stopping_rules.csv`)
 - [x] `tests/eval/test_diagnostics.py` covering the counting rules against hand-built
       traces (a verdict is attributed to the answer it judged, not the final one)
-- [ ] Record the headline numbers in `docs/notes.md`
+- [x] Headline numbers recorded in [../findings.md](../findings.md) (the results log,
+      kept apart from notes.md's facts-and-decisions)
 
 ### Tier 1 — cheapest-first, and one bundled re-run
 
@@ -262,15 +263,100 @@ re-run, not three.
       *Limitation:* replay is only valid for rules that stop earlier. It cannot say what
       a *different* revision prompt, or a better Critic, would have produced. Those need
       GPU time, which is exactly what Tier 2 is for.
-- [ ] **1b. Prompt-fix pilot (small GPU).** Drop the literal `<one atomic claim>`
-      placeholder (the model copies it), give one worked example instead of a schema, add
-      stop strings, set a per-task token cap, and make truncation a reported metric rather
-      than a silent wrong answer. Pilot on the two worst cells only,
-      `connected_nodes/friendship` and `edge_existence/incident`. Success criterion is
-      mechanical, not accuracy: turn-1 unparsed drops from 12 to 13 percent toward zero.
-- [ ] **1c. One bundled re-run (the real GPU cost).** Now just the prompt fix: 1a ruled
-      the gating rules out, so there is nothing else to bundle. Its turn 1 *is* the CoT
-      condition, so the missing control comes free.
+- [x] **1b (code). Proposer prompt v2, approved and wired; the GPU run is still to do.**
+
+      Rendering the actual prompt turned up a **bug**, not just a formatting nuisance:
+      v1's `connected_nodes` answer hint said "a comma-separated list of node ids" for
+      *every* encoding, but that answer is in the encoding's label space, and friendship
+      labels nodes with names. 64 of 600 friendship turn-1 answers contain integers and no
+      name at all, and all 64 are unparsed. That is why the claim-trace prompt loses 0.075
+      on `connected_nodes/friendship` while gaining 0.078 on `/incident`: the debate prompt
+      introduced a label-space mismatch the zero-shot baseline never had. Full write-up in
+      [../findings.md](../findings.md) 3c.
+
+      v2 therefore does two things: names no label space, and replaces the fill-in
+      template with prose so there is nothing for the model to copy. It stays **zero-shot**
+      on purpose. My earlier "one worked example instead of a schema" would have made the
+      Proposer one-shot and broken comparability with the zero-shot baseline; that is the
+      fallback only if prose alone does not hold.
+
+      **Prompts are versioned rather than edited in place**, so `results/main` stays
+      reproducible from its own config: `PROMPT_VERSIONS` in `prompts/debate.py`,
+      selected by a `prompt_version` config field defaulting to v1, recorded in the run
+      manifest. Verified that all 27 v1 prompts (9 cells x 3 builders) are byte-identical
+      across the change, and no existing config was touched.
+
+      Two things I dropped after checking the data: **stop strings** (the degeneration is
+      repeated *near*-identical lines, which no stop string matches, and
+      `no_repeat_ngram_size` would break the legitimately repetitive claim format), and
+      **per-task token caps** (well-formed `connected_nodes` answers reach 253 tokens
+      against a 256 cap, so that task needs *more* headroom, not less; the others sit at
+      p99 = 166 to 188).
+- [x] **1b (run). Pilot v2 on the two worst cells, twice.** Two GPU rounds on
+      `connected_nodes/friendship` and `edge_existence/incident`, 200 seed-7 instances
+      each, paired against the v1 rows in `results/main`. Full tables in
+      [../findings.md](../findings.md) 3f.
+
+      The first round separated v2's two edits and showed they pull in **opposite**
+      directions. The label-space fix and the explicit `ANSWER:` sentence worked
+      (unparsed 25 → 1 and 27 → 0; missing `ANSWER:` 40 → 0 on `edge_existence`, worth
+      +0.075 turn-1 there). Dropping the numbered template backfired: the model stopped
+      numbering (2/200, switching to a `CLAIM:` prefix it invented) and on
+      `connected_nodes` enumerated the whole graph instead of the queried node's edges,
+      costing -0.085 turn-1 and -0.095 final (p=0.0117).
+
+      v2 was amended to state the numbering explicitly and rerun. Adopted result:
+      numbering restored (199/200), unparsed still 1, **truncation 23 → 1**, and
+      `edge_existence/incident` final +0.065 over v1. The mechanical criterion is met
+      outright. The accuracy criterion ("friendship turn-1 back to at least v1's 0.210")
+      is **narrowly missed** once scored under the adopted last-line parser: 0.205 vs
+      0.210, b=21/c=20, p=1.000, one instance out of 200. v2 is adopted for the mechanical
+      fixes and the edge_existence gain, not for a friendship accuracy improvement.
+
+      (Numbers quoted during the pilot used the older whole-text parser and read
+      marginally higher; the mechanical counts are unaffected.)
+
+      Two side effects worth carrying forward: the apparent loop gain on
+      `connected_nodes/friendship` in 3b was **an artefact of the label-space bug** -- it
+      is only +0.018 (ns) once v1 is re-scored under the corrected parser, and collapses
+      to +0.005 under v2 once turn-1 parses; and repairing 24 unparsed answers moved
+      accuracy by only +0.005, so friendship is genuinely hard rather than mis-parsed.
+- [x] **1b (parser). The answer parser no longer reads the reasoning.** A missing
+      `ANSWER:` line now falls back to the last non-empty line instead of the whole
+      output, which was harvesting node names out of *negated* claims. Not versioned, and
+      existing results need re-scoring (free, raw outputs are persisted).
+      See [../findings.md](../findings.md) 3g.
+- [x] **1b (freeze). v1 and v2 are both frozen.** A version freezes once results depend on
+      it; further iteration means adding v3. Pinned by golden literals for both.
+- [x] **1c. Full 3x3 re-run under v2, all three seeds.** Done: `results/v2-{main,seed11,
+      seed13}`, 5,400 instances, 24 shards, all COMPLETED. Results in
+      [../findings.md](../findings.md) 4. Three things came out of it:
+
+      **The loop is inert.** Under a Proposer whose output parses, the loop delta is
+      non-significant in 8 of 9 cells (the exception is `edge_existence/adjacency`, the
+      task that is not fragile anyway). That is the project's central negative result,
+      now without the parsing artefacts that muddied v1.
+
+      **Fragility gets worse, not better.** `connected_nodes` spread goes 0.110 (baseline)
+      -> 0.208 (v1) -> **0.333** (v2), because v2 lifts `connected_nodes/incident` by 0.120
+      while lowering adjacency. Gains land in the encoding that was already best. This
+      independently replicates what the oracle ceiling showed for a *perfect* Critic, so
+      the amplification is a property of the reasoning scaffold rather than of Critic
+      quality.
+
+      **A two-cell pilot was not enough.** v2 wins significantly on 2 cells, loses
+      significantly on `connected_nodes/adjacency` (-0.053, p=0.0034), and is a wash on
+      six. Neither pilot cell could have surfaced that regression.
+- [x] **Re-scored the existing runs under the last-line parser** with
+      `scripts/rescore.py`, so both arms use one scoring rule. 52 of 5,400 v1 rows flipped
+      (~1 percent); v2 ran under the current parser and needed no change. Two v1
+      significance calls moved: the `connected_nodes/friendship` loop gain is now +0.018
+      (ns) and the `edge_existence/incident` CoT gain +0.050 (ns).
+- [ ] **Open prompt question: the "none" case.** 0 of 18 correct on empty-answer
+      `connected_nodes` instances, under both v1 and v2, and the model contradicts its own
+      correct reasoning to emit a non-empty list ([../findings.md](../findings.md) 3h).
+      Worth ~+0.09 on the worst cell if it is a wording problem, nothing if it is a model
+      bias. Untested, and it needs a pilot before it goes anywhere near a full run.
 - [ ] **CoT as a first-class arm (optional).** Debate turn-1 is greedy, same prompt, same
       model, so the numbers already exist in the traces. Run it as its own condition only
       if the writeup wants it as a named arm in the results tables; it is the cheapest run

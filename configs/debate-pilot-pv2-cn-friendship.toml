@@ -1,0 +1,33 @@
+# Debate PILOT, Proposer prompt v2: connected_nodes x friendship, the cell v1's prompt
+# broke worst. v1's ANSWER hint said "node ids" for every encoding, but friendship labels
+# nodes with names, so the model answered in integers and 64 of 600 turn-1 answers were
+# unparseable (docs/findings.md 3c). v2 names no label space and drops the fill-in
+# template the model copied to the token cap (3d).
+#
+# Isolated throwaway out_dir, so results/main (produced under v1) stays intact. The same
+# frozen dataset and the same seed-7 instances are in results/main/debate, so this pilot
+# pairs against those rows instance-for-instance.
+#
+# ONE variable changes vs the v1 run: prompt_version. max_new_tokens stays at 256 even
+# though well-formed connected_nodes answers reach 253 tokens, so any delta is the prompt
+# and not the cap. The cap decision comes after, informed by this pilot's truncation count.
+#
+# Success criterion is MECHANICAL, not accuracy: turn-1 unparsed should fall from 0.13
+# toward zero. Check with:
+#   python scripts/debate_diagnostics.py results/debate-pilot-pv2-cn
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "debate"
+dataset = "data/main.jsonl"
+
+# n_samples is the debate response BUDGET (max turns), matched to majority-vote's N.
+# Greedy decoding (no temperature/top_p/top_k), identical to the v1 run.
+n_samples = 10
+max_new_tokens = 256
+
+prompt_version = "v2"
+
+tasks = ["connected_nodes"]
+encodings = ["friendship"]
+
+out_dir = "results/debate-pilot-pv2-cn"

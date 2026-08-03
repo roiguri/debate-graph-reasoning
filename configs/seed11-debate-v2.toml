@@ -1,0 +1,27 @@
+# Full debate re-run under Proposer prompt **v2** on seed 11 (Tier 1c).
+# Sibling of configs/seed11-debate.toml:
+# same model, dataset, tasks, encodings and response budget. The ONLY difference is
+# prompt_version, so any delta against the v1 rows is the prompt.
+#
+# v1's debate output stays where it is (results/seed11/debate) and is never touched:
+# v2 writes to a SEPARATE out_dir. Both are kept, and the analysis refuses to pool them
+# (rows carry prompt_version; pass --prompt-version to choose). Note this dir holds
+# debate only -- the baseline it is compared against lives in results/seed11, so pass
+# both dirs to the analysis scripts.
+#
+#   python scripts/debate_diagnostics.py results/seed11 results/v2-seed11 \
+#       --prompt-version v2
+
+model = "Qwen/Qwen2.5-3B-Instruct"
+condition = "debate"
+dataset = "data/seed11.jsonl"
+
+n_samples = 10
+max_new_tokens = 256
+
+prompt_version = "v2"
+
+tasks = ["node_degree", "connected_nodes", "edge_existence"]
+encodings = ["adjacency", "incident", "friendship"]
+
+out_dir = "results/v2-seed11"

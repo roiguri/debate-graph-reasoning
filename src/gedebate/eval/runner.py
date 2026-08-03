@@ -80,6 +80,7 @@ def manifest_record(cfg: RunConfig, config_path: str) -> dict:
         rec["n_samples"] = cfg.n_samples
     if cfg.condition == "debate":
         rec["max_responses"] = cfg.n_samples  # debate's response budget (= MV's N)
+        rec["prompt_version"] = cfg.prompt_version  # which Proposer wording produced these rows
     return rec
 
 
@@ -107,9 +108,11 @@ def run_instances(model, instances: list, cfg: RunConfig, manifest: dict, *, sha
             skipped += 1
         elif cfg.condition == "debate":
             record, turns = run_debate(
-                model, inst, max_new_tokens=cfg.max_new_tokens, max_responses=cfg.n_samples)
+                model, inst, max_new_tokens=cfg.max_new_tokens, max_responses=cfg.n_samples,
+                prompt_version=cfg.prompt_version)
             results.append_row(path, results.make_row(
-                inst, cfg.model, record, n_responses=record["n_responses"]))
+                inst, cfg.model, record, n_responses=record["n_responses"],
+                prompt_version=cfg.prompt_version))
             results.append_trace(trace_path, inst.instance_id, turns)
             progress.setdefault((cfg.condition, inst.instance_id), set()).add(0)
             written += 1

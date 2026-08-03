@@ -103,6 +103,24 @@ def _compare_to_csv(cmp: dict, a_name: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _select_prompt_version(debate_rows: list[dict], requested: str | None) -> list[dict]:
+    """Keep one Proposer wording's debate rows; refuse to silently pool two.
+
+    Different prompt versions live in different run dirs but share
+    `condition == "debate"`, so pooling them would average two experiments into one
+    accuracy. Mixed input is an error, not a warning.
+    """
+    present = sorted({results.row_prompt_version(r) for r in debate_rows})
+    if requested is None:
+        if len(present) > 1:
+            raise SystemExit(
+                f"run dirs mix debate prompt versions {present}; these are different "
+                f"experiments and must not be pooled. Pass --prompt-version."
+            )
+        return debate_rows
+    return [r for r in debate_rows if results.row_prompt_version(r) == requested]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir", nargs="+",
@@ -114,6 +132,9 @@ def main() -> None:
     ap.add_argument("--compare", action="store_true",
                     help="with both baseline + majority_vote present, print the "
                          "vote-vs-baseline delta table (accuracy delta + token cost)")
+    ap.add_argument("--prompt-version", default=None,
+                    help="which Proposer wording's debate rows to include (e.g. v1, v2); "
+                         "required when the run dirs contain more than one")
     ap.add_argument("--condition", default=None,
                     help="comma-separated conditions to include (default: all). "
                          "e.g. --condition baseline for a baseline-only pooled view")
@@ -181,7 +202,8 @@ def main() -> None:
 
     # -- debate (verify-and-revise): reuse the same summarize/fragility/significance path as
     # baseline; select by name so it never pools into the baseline table.
-    debate_rows = [r for r in rows if r["condition"] == "debate"]
+    debate_rows = _select_prompt_version(
+        [r for r in rows if r["condition"] == "debate"], args.prompt_version)
     deb_summary = report.summarize(debate_rows) if debate_rows else {}
     deb_vs_base: dict = {}
     deb_vs_mv: dict = {}

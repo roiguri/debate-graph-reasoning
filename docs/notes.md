@@ -2,9 +2,10 @@
 
 A running log of **reference facts** (from the literature) and **design
 decisions** (with rationale), kept separate from the phase plans in
-[plan/](plan/) so those stay about steps. Much of this feeds the methodology
-section of the final writeup. Newest decisions can go at the bottom of each
-section.
+[plan/](plan/) so those stay about steps, and from [findings.md](findings.md),
+which logs what the runs actually **showed**. Much of this feeds the methodology
+section of the final writeup (findings.md feeds the results section). Newest
+decisions can go at the bottom of each section.
 
 ---
 
@@ -186,6 +187,61 @@ partial credit). We mirror it: parsed value `==` normalized `ground_truth`, with
 reported metric. We do track a separate **`parse_ok`** flag so parse failures are
 visible and measurable rather than silently scored as wrong (a high parse-failure
 rate is a confound to watch, not a result).
+
+### Debate prompts are versioned, not edited in place — decision (P5 follow-up)
+The Proposer/revision wording is a first-class experimental variable, so a fix to it
+cannot be allowed to change what an *existing* config would emit: `results/main` was
+produced under one wording, and the run has to stay reproducible from the config that
+made it. `prompts/debate.py` therefore keeps every approved wording in a
+`PROMPT_VERSIONS` registry, a config selects one via `prompt_version`, and the default
+is **v1** so configs written before a new version existed are unaffected. The version is
+recorded in the run manifest alongside the dataset hash. Each version is pinned by a
+golden-literal test, and a one-off check confirmed all 27 v1 prompts (9 cells x 3
+builders) are byte-identical across the change.
+
+**v2** (approved, not yet run) fixes two defects the P5 traces exposed, see
+[findings.md](findings.md) 3c and 3d:
+- v1's `connected_nodes` answer hint read "a comma-separated list of **node ids**" for
+  every encoding, but that answer lives in the *encoding's* label space, and friendship
+  labels nodes with names. The model obeyed the hint, answered in integers, and 64 of 600
+  friendship answers became unparseable. v2 names no label space ("written exactly as the
+  graph writes them"), so one wording covers all three encodings with nothing to keep in
+  sync.
+- v1 showed a fill-in template (`1. <one atomic claim>`), which the model copied verbatim
+  until it hit the token cap. v2 states the format in prose **and states the numbering
+  explicitly** (`Number your claims 1., 2., 3., and so on`).
+
+The numbering is not cosmetic. v2's first draft dropped the template for pure prose and
+the model stopped numbering altogether (2/200), costing 0.085 turn-1 accuracy on
+connected_nodes because the list scaffold was what kept it enumerating the *queried*
+node's edges rather than the whole graph's. See [findings.md](findings.md) 3f.
+
+v2 deliberately stays **zero-shot**. A worked example would fix the copying too, but it
+would make the Proposer one-shot and break comparability with the zero-shot baseline the
+whole matrix rests on (see the baseline-prompt decision above). It is the fallback only if
+prose alone does not hold, and then the baseline would need the same treatment.
+
+**Both v1 and v2 are now frozen** (v2 adopted after its pilot). A version freezes as soon
+as results depend on it; iterating either means adding v3. v2 was itself amended in place
+once while still a draft, which is why its first pilot and its adopted wording differ.
+
+### The answer parser never reads the reasoning — decision (P5 follow-up)
+When the Proposer omits its `ANSWER:` line, `parse_proposer` falls back to the **last
+non-empty line**, not the whole output. Scanning the whole output was not answer
+extraction for connected_nodes: `_parse_node_list` collects every recognized label it
+sees, so a *negated* claim ("Robert is not connected to Susan") put Susan in the answer.
+Last-line matches what `_parse_int`/`_parse_bool` already do ("the answer is the last
+thing stated") and costs nothing (see [findings.md](findings.md) 3g).
+
+We rejected the stricter "explicit `ANSWER:` line or nothing" rule on comparability
+grounds: the **baseline has no label either** (it is told "answer with X and nothing
+else", and its answer is read off its last value), so requiring one of debate alone would
+cost up to 0.30 on node_degree purely from a formatting standard the baseline never faces.
+
+The parser is **not versioned**, unlike the prompts. Prompts are versioned because they
+change what the model generates; the parser only changes how already-generated text is
+scored, so versioning it would make conditions incomparable. One parser applies uniformly
+and affected results are re-scored, which needs no GPU because raw outputs are persisted.
 
 ---
 
