@@ -28,3 +28,6 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+
+# Provenance stamp written at sync time (docs/cluster-runbook.md); regenerated, never committed.
+.git_commit

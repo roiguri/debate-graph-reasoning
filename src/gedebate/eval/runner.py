@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 import gedebate
 from gedebate.conditions.baseline import run_instance
@@ -53,12 +54,30 @@ def parse_shard(spec: str) -> tuple[int, int]:
 
 # --- reproduction record ------------------------------------------------------
 
+# Written by the sync step, read when `git` is unavailable. Module-level so tests can
+# point it elsewhere.
+_COMMIT_STAMP = Path(__file__).resolve().parents[3] / ".git_commit"
+
+
 def _git_commit() -> str:
+    """The commit these rows were produced at, or "unknown".
+
+    Falls back to a `.git_commit` file because runs happen on the cluster, where the
+    tree is an rsync copy with no `.git` -- which is why every existing manifest records
+    "unknown". That was survivable while a run was identified by `prompt_version` alone,
+    and stopped being so once v2's text was edited in place: two runs can now both say
+    `prompt_version: "v2"` and mean different prompts, and the commit is what separates
+    them. Write the file as part of the sync (see docs/cluster-runbook.md).
+    """
     try:
         return subprocess.check_output(
             ["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
         ).strip()
     except Exception:
+        pass
+    try:
+        return _COMMIT_STAMP.read_text(encoding="utf-8").strip() or "unknown"
+    except OSError:
         return "unknown"
 
 

@@ -212,3 +212,28 @@ def test_verify_sample_matches_and_detects_mismatch(tmp_path):
 
     diff = verify_sample(_StubModel("No."), by_id, rows, k=3)  # now parse to False
     assert diff["checked"] == 3 and diff["matches"] == 0 and len(diff["mismatches"]) == 3
+
+
+# --- provenance: the commit must survive the trip to the cluster ---------------
+
+def test_git_commit_falls_back_to_the_sync_stamp(tmp_path, monkeypatch):
+    # Runs happen on an rsync copy with no .git, so `git rev-parse` fails there and every
+    # manifest recorded "unknown". Harmless until v2's prompts were edited in place: two
+    # runs now both say prompt_version "v2" and the commit is what separates them.
+    from gedebate.eval import runner
+
+    stamp = tmp_path / ".git_commit"
+    stamp.write_text("deadbeefcafe\n", encoding="utf-8")
+    monkeypatch.setattr(runner, "_COMMIT_STAMP", stamp)
+    monkeypatch.setattr(runner.subprocess, "check_output",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("no git here")))
+    assert runner._git_commit() == "deadbeefcafe"
+
+
+def test_git_commit_is_unknown_when_there_is_no_git_and_no_stamp(tmp_path, monkeypatch):
+    from gedebate.eval import runner
+
+    monkeypatch.setattr(runner, "_COMMIT_STAMP", tmp_path / "absent")
+    monkeypatch.setattr(runner.subprocess, "check_output",
+                        lambda *a, **k: (_ for _ in ()).throw(OSError("no git here")))
+    assert runner._git_commit() == "unknown"
