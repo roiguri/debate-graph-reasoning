@@ -6,7 +6,7 @@
 #SBATCH --time=120
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --mem=16000
 #SBATCH --gpus=1
 #SBATCH --constraint=geforce_rtx_2080
@@ -21,9 +21,17 @@
 #   sbatch --export=ALL,CONFIG=configs/seed11.toml --job-name=ge-seed11 --array=0-7 slurm/matrix.slurm
 #   sbatch --export=ALL,CONFIG=configs/seed13.toml --job-name=ge-seed13 --array=0-7 slurm/matrix.slurm
 #
-# The QOS (gpustudentkill) caps a student at 24 concurrent GPUs with no job-count
-# cap, so all 8 single-GPU shards run at once. Add a `%k` throttle (e.g. %6) only to
-# be a lighter cluster citizen. Killed shards rerun and skip already-done instances.
+# The QOS caps concurrent GPUs (measured: gres/gpu=12, not the 24 this comment used
+# to claim), but the real limit is the hardware: only s-004 and s-005 carry
+# geforce_rtx_2080, 16 GPUs between them, shared with every other student. Expect
+# shards to trickle rather than all start at once, and throttle with `%k` (e.g. %4)
+# to stay a good citizen. Killed shards rerun and skip already-done instances.
+#
+# `--cpus-per-task` is 2, not 4: the 2080 nodes fragment badly. s-004 has sat with 3
+# free GPUs and 0 free CPUs while s-005 had 8 free CPUs and 0 free GPUs, so a 4-CPU
+# ask could not land on either. Inference needs one GPU and very little CPU, so the
+# smaller ask fits gaps the larger one cannot. It does not touch the model, the
+# decoding, or determinism.
 # Non-array `sbatch` runs shard 0/1 (the whole matrix in one job).
 
 set -eo pipefail

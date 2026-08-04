@@ -6,7 +6,7 @@
 #SBATCH --time=30
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=2
 #SBATCH --mem=16000
 #SBATCH --gpus=1
 #SBATCH --constraint=geforce_rtx_2080
