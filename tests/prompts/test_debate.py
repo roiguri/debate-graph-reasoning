@@ -47,20 +47,25 @@ _ND_REVISION = (
 )
 
 
-# v2's adopted wording. BOTH literals are now frozen: v1 backs results/main + seed11 +
-# seed13, v2 backs the full re-run, and a version stops being editable once results
-# depend on it. A failure here means someone edited a frozen prompt; the fix is to add
-# v3, not to update the literal.
+# v2's adopted wording. v1's literal above is FROZEN -- it backs results/main + seed11 +
+# seed13, and a failure there means someone edited a prompt those results depend on; the
+# fix is to add a version, not to update the literal.
+#
+# v2's literal is NOT frozen: v2 was deliberately edited in place after results/v2-* were
+# produced (the symmetry fix, see the module comment), so this literal tracks the current
+# text rather than the one those runs used. Anything comparing fresh v2 output against
+# results/v2-* is comparing two different prompts.
 _ND_PROPOSER_V2 = (
     "Answer the question below using the graph. Build the answer as a numbered list of\n"
     "atomic claims -- each claim one verifiable fact about a single edge (that it exists,\n"
-    "or that no further edge involves the node) -- then give the final answer.\n"
+    "or that no further edge involves the node); an edge involves the node whether\n"
+    "the node is written first or second -- then give the final answer.\n"
     "Number your claims 1., 2., 3., and so on, one claim per line. Then write a\n"
     "final line that begins with ANSWER: followed by a single integer, the degree. "
     "Write nothing after\nthat line."
 )
 _ND_REVISION_V2 = (
-    "Give your corrected answer.\n"
+    "Give your answer.\n"
     "Number your claims 1., 2., 3., and so on, one claim per line. Then write a\n"
     "final line that begins with ANSWER: followed by a single integer, the degree. "
     "Write nothing after\nthat line."
@@ -151,14 +156,20 @@ def test_all_three_tasks_supported():
             "node_degree", "connected_nodes", "edge_existence"}
 
 
-def test_incident_tasks_share_one_critic_cue():
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_incident_tasks_share_one_critic_cue(version):
     # node_degree and connected_nodes must use the exact same Critic cue (no drift);
-    # edge_existence uses a different, pair-oriented cue.
-    nd = debate.critic_prompt(_node_degree_instance(), [{"role": "proposer", "raw": "1. x\nANSWER: 2"}])
-    cn = debate.critic_prompt(_instance("connected_nodes"), [{"role": "proposer", "raw": "1. x\nANSWER: 1"}])
-    ee = debate.critic_prompt(_instance("edge_existence"), [{"role": "proposer", "raw": "1. x\nANSWER: No"}])
-    assert debate._CRITIC_CUE_INCIDENT in nd and debate._CRITIC_CUE_INCIDENT in cn
-    assert debate._CRITIC_CUE_EDGE in ee and debate._CRITIC_CUE_INCIDENT not in ee
+    # edge_existence uses a different, pair-oriented cue. Holds in every version.
+    cue = debate.PROMPT_VERSIONS[version]["critic_cue"]
+    nd = debate.critic_prompt(_node_degree_instance(),
+                              [{"role": "proposer", "raw": "1. x\nANSWER: 2"}], version)
+    cn = debate.critic_prompt(_instance("connected_nodes"),
+                              [{"role": "proposer", "raw": "1. x\nANSWER: 1"}], version)
+    ee = debate.critic_prompt(_instance("edge_existence"),
+                              [{"role": "proposer", "raw": "1. x\nANSWER: No"}], version)
+    assert cue["node_degree"] == cue["connected_nodes"]
+    assert cue["node_degree"] in nd and cue["connected_nodes"] in cn
+    assert cue["edge_existence"] in ee and cue["node_degree"] not in ee
 
 
 def test_render_transcript_accumulates_turns():
@@ -286,3 +297,111 @@ def test_fallback_line_does_not_read_its_claim_number_as_a_node():
     value, ok, _ = debate.parse_proposer(
         raw, "connected_nodes", encoding="adjacency", node_ids=[3])
     assert (value, ok) == ([0], True)
+
+
+def test_v2_claim_kinds_state_that_an_edge_reads_both_ways():
+    # The Proposer read an edge only in the direction it was written: recall of a true
+    # neighbour was 0.909 with the queried node written first and 0.333 written second
+    # (adjacency). The Critic was always told this; the Proposer was not.
+    incident = debate.PROMPT_VERSIONS["v2"]["claim_kind"]["node_degree"]
+    edge = debate.PROMPT_VERSIONS["v2"]["claim_kind"]["edge_existence"]
+    assert "written first or second" in incident
+    assert "in\neither order" in edge
+    assert "exact edge" not in edge          # "exact" invited literal order-matching
+
+
+def test_v2_connected_nodes_answers_with_the_far_endpoint():
+    # Claims are about edges (pairs), the answer is nodes, and nothing used to bridge
+    # them: 578 answers listed the queried node itself.
+    block = debate._format_block("connected_nodes", "v2")
+    assert "the node at the other end" in block
+
+
+def test_v1_claim_kinds_are_untouched_by_the_v2_edit():
+    # The claim kinds used to be shared across versions, so editing v2's would have
+    # silently rewritten v1's prompts -- and v1 backs results/main + seed11 + seed13.
+    v1 = debate.PROMPT_VERSIONS["v1"]["claim_kind"]
+    assert "written first or second" not in v1["node_degree"]
+    assert "exact edge" in v1["edge_existence"]
+    assert v1["node_degree"] == v1["connected_nodes"]   # still one shared constant
+
+
+# --- v2 Critic: the format must let the Critic AGREE with evidence ------------
+
+@pytest.mark.parametrize("task", ["node_degree", "connected_nodes", "edge_existence"])
+def test_v2_critic_gives_agree_its_own_evidence_slot(task):
+    # v1 put the bullet only under REVISE, so a Critic holding the evidence for a CORRECT
+    # answer had nowhere to put it but the REVISE channel: on edge_existence gold=False it
+    # said REVISE 96.3% of the time, usually with "- no such edge appears" -- agreement.
+    v1 = debate.PROMPT_VERSIONS["v1"]["critic_cue"][task]
+    v2 = debate.PROMPT_VERSIONS["v2"]["critic_cue"][task]
+    assert v1.count("VERDICT: AGREE\nor") == 1        # v1: AGREE has no bullet
+    agree = v2.split("VERDICT: AGREE\n")[1]
+    assert agree.lstrip().startswith("-")             # v2: AGREE takes evidence
+
+
+def test_v2_critic_edge_cue_stops_treating_absence_as_a_problem():
+    v2 = debate.PROMPT_VERSIONS["v2"]["critic_cue"]["edge_existence"]
+    assert "absence is the evidence FOR that answer" in v2
+    # the v1 phrasing filed the No-evidence under the REVISE branch
+    assert "Otherwise REVISE and ground it" not in v2
+
+
+def test_v2_critic_incident_cue_requires_cited_edges_to_be_relevant():
+    # v1 required only that a cited edge "actually appears in the list", which an edge from
+    # a different part of the graph satisfies: 12.5% of problem lines cited exactly that.
+    v2 = debate.PROMPT_VERSIONS["v2"]["critic_cue"]["node_degree"]
+    assert "must appear in the list and involve the queried node" in v2
+
+
+def test_v2_critic_incident_cue_judges_the_answer_not_the_claims():
+    # v1 gated AGREE on the claim list ("supporting edges are exactly the ones in the
+    # graph") while the experiment scores the answer, so a right answer with an untidy
+    # trace had to be REVISEd -- and 19 of 76 such revisions turned it wrong.
+    v1 = debate.PROMPT_VERSIONS["v1"]["critic_cue"]["node_degree"]
+    v2 = debate.PROMPT_VERSIONS["v2"]["critic_cue"]["node_degree"]
+    assert "AGREE only if the Proposer's supporting edges are exactly" in v1
+    assert "Judge the answer, not the tidiness of the claims" in v2
+
+
+def test_v1_critic_cues_are_untouched_by_the_v2_edit():
+    # The cues used to be shared across versions and critic_prompt ignored its `version`
+    # argument, so editing them would have rewritten v1's Critic too.
+    v1 = debate.PROMPT_VERSIONS["v1"]["critic_cue"]
+    assert "Judge the answer" not in v1["node_degree"]
+    assert "absence is the evidence" not in v1["edge_existence"]
+
+
+# --- v2 revision: send the Proposer back to the graph, not to the transcript ---
+
+def test_v2_revision_names_the_graph_as_the_source_of_truth():
+    # v1's only sourcing instruction was "using the whole exchange", pointing at the
+    # transcript. _CRITIC_TOP had always named the graph; the reviser never did, and it
+    # showed: where the Critic asserted a queried pair was absent against a "Yes", the
+    # Proposer flipped 330/482 times and 151 of those flips gave up a CORRECT answer.
+    v1 = debate.PROMPT_VERSIONS["v1"]["revision_top"]
+    v2 = debate.PROMPT_VERSIONS["v2"]["revision_top"]
+    assert "ONLY source of truth" in v2 and "ONLY source of truth" not in v1
+    assert "using the\nwhole exchange" in v1
+    assert "check each objection against" in v2
+
+
+def test_v2_revision_lets_a_correct_answer_stand():
+    # v1 asserted the objections were real ("found problems", "verified") and asked for a
+    # "corrected" answer, so nothing in the prompt allowed the answer to be kept.
+    v1 = debate.PROMPT_VERSIONS["v1"]
+    v2 = debate.PROMPT_VERSIONS["v2"]
+    assert "found problems" in v1["revision_top"]
+    assert "Keep your answer if the objection is wrong" in v2["revision_top"]
+    assert v1["revision_preamble"].startswith("Give your corrected answer")
+    assert v2["revision_preamble"].strip() == "Give your answer."   # presupposes nothing
+
+
+def test_every_prompt_piece_is_versioned():
+    # Three separate in-place edits were nearly made to prompts v1 depends on, because
+    # claim kinds, Critic cues and the revision framing were all module-level constants
+    # shared across versions. Each version must now carry its own copy of every piece.
+    keys = {"answer_format", "format_block", "proposer_preamble", "revision_preamble",
+            "claim_kind", "critic_cue", "revision_top"}
+    for version, spec in debate.PROMPT_VERSIONS.items():
+        assert set(spec) == keys, version

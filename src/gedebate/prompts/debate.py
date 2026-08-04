@@ -34,12 +34,20 @@ if TYPE_CHECKING:
 
 # --- prompt versions ----------------------------------------------------------
 #
-# **Both v1 and v2 are now FROZEN.** A version is frozen once results depend on it: edit
-# it and those results stop being reproducible from the config that made them. v1 backs
-# `results/main`, `seed11` and `seed13`; v2 was adopted after its pilot (docs/findings.md
-# 3f) and backs the full re-run. Iterating either one now means adding **v3**, not editing
-# in place. (v2 itself was iterated in place while it was still a draft feeding only
-# throwaway pilot dirs, the same way the Critic wording went c1 -> c2 -> c3 during P5.)
+# **v1 is FROZEN.** A version is frozen once results depend on it: edit it and those
+# results stop being reproducible from the config that made them. v1 backs `results/main`,
+# `seed11` and `seed13`, and must stay byte-identical.
+#
+# **v2 was edited in place after `results/v2-*` were produced** (the symmetry fix below),
+# by explicit decision rather than by adding a v3. The cost is recorded here because
+# nothing else records it: those runs' manifests say `prompt_version: "v2"`, but the v2
+# they ran is the text as of commit 73ba8e0, not the text in this file. Re-running that
+# config now produces different prompts, so `results/v2-*` are no longer reproducible from
+# it. Anything comparing new v2 output against those rows is comparing two prompts.
+#
+# Because the claim kinds were shared across versions, editing v2's would have silently
+# rewritten v1's prompts too; `claim_kind` is now part of the per-version spec so v1 is
+# unaffected.
 #
 # A config selects via `prompt_version`, defaulting to v1, so configs predating v2 are
 # unaffected. Both are pinned by golden literals in tests/prompts/test_debate.py.
@@ -74,26 +82,52 @@ _ANSWER_FORMAT_V2 = {
     "node_degree": "a single integer, the degree",
     # Deliberately label-space free: "as the graph writes them" resolves to integers
     # under adjacency/incident and to names under friendship, with no per-encoding
-    # override to keep in sync.
-    "connected_nodes": ("the connected nodes, comma-separated, written exactly as the "
-                        "graph writes them, or none"),
+    # override to keep in sync. "the other end" is the edge->node step: the claims are
+    # about edges (pairs) and the answer is nodes, and nothing used to bridge them, so
+    # 578 answers listed the queried node itself -- 405 of them after claims that had
+    # already named the right edges, i.e. the reasoning was right and the write-up lost it.
+    "connected_nodes": ("the node at the other end of each of those edges, "
+                        "comma-separated, written exactly as the graph writes them, "
+                        "or none"),
 }
 
 # What one atomic claim asserts, per task. node_degree and connected_nodes both reason over
 # the queried node's incident edges, so they share ONE constant (they cannot drift);
 # edge_existence gets its own wording when its prompt is approved.
-_INCIDENT_CLAIM = (
+_INCIDENT_CLAIM_V1 = (
     "each claim one verifiable fact about a single edge (that it exists,\n"
     "or that no further edge involves the node)"
 )
-_EDGE_CLAIM = (
+_EDGE_CLAIM_V1 = (
     "each claim one verifiable fact about the queried pair (whether that exact edge\n"
     "appears in the graph's edge list)"
 )
-_CLAIM_KIND = {
-    "node_degree": _INCIDENT_CLAIM,
-    "connected_nodes": _INCIDENT_CLAIM,
-    "edge_existence": _EDGE_CLAIM,
+# v2 states that the relation is symmetric in the TEXT, which neither v1 claim kind did.
+# The Proposer read an edge only in the direction it was written: recall of a true
+# neighbour was 0.909 when the queried node was written first and 0.333 when it was
+# written second (adjacency; friendship 0.850/0.653, incident 0.870/0.778), and on
+# edge_existence a true edge asked in the reverse of its written order scored 0.678
+# against 0.963. Not early stopping -- recall is flat across the list's first, middle and
+# last third. The Critic was told this from the start ("in either order", "every edge that
+# involves the queried node") and the Proposer never was.
+_INCIDENT_CLAIM_V2 = (
+    "each claim one verifiable fact about a single edge (that it exists,\n"
+    "or that no further edge involves the node); an edge involves the node whether\n"
+    "the node is written first or second"
+)
+_EDGE_CLAIM_V2 = (
+    "each claim one verifiable fact about the queried pair (whether that pair, in\n"
+    "either order, appears in the graph's edge list)"
+)
+_CLAIM_KIND_V1 = {
+    "node_degree": _INCIDENT_CLAIM_V1,
+    "connected_nodes": _INCIDENT_CLAIM_V1,
+    "edge_existence": _EDGE_CLAIM_V1,
+}
+_CLAIM_KIND_V2 = {
+    "node_degree": _INCIDENT_CLAIM_V2,
+    "connected_nodes": _INCIDENT_CLAIM_V2,
+    "edge_existence": _EDGE_CLAIM_V2,
 }
 
 # The shared numbered-claim + ANSWER block. `_format_block` is used by BOTH the Proposer
@@ -120,16 +154,13 @@ _PROPOSER_PREAMBLE_V2 = (
     "Answer the question below using the graph. Build the answer as a numbered list of\n"
     "atomic claims -- {claim} -- then give the final answer.\n"
 )
-_REVISION_PREAMBLE_V2 = "Give your corrected answer.\n"
+# "corrected", like v1's "found problems", presupposed that a change is due. The answer
+# may be right; the instruction should not decide that before the graph is re-read.
+_REVISION_PREAMBLE_V2 = "Give your answer.\n"
 
-PROMPT_VERSIONS = {
-    "v1": {"answer_format": _ANSWER_FORMAT_V1, "format_block": _FORMAT_BLOCK_V1,
-           "proposer_preamble": _PROPOSER_PREAMBLE_V1,
-           "revision_preamble": _REVISION_PREAMBLE_V1},
-    "v2": {"answer_format": _ANSWER_FORMAT_V2, "format_block": _FORMAT_BLOCK_V2,
-           "proposer_preamble": _PROPOSER_PREAMBLE_V2,
-           "revision_preamble": _REVISION_PREAMBLE_V2},
-}
+# The registry itself is assembled further down, once the Critic cues it collects have
+# been defined (see PROMPT_VERSIONS below the Critic section).
+
 # What a config gets when it does not ask. v1, so configs predating v2 are unaffected.
 DEFAULT_PROMPT_VERSION = "v1"
 
@@ -150,7 +181,8 @@ def supported_tasks(version: str = DEFAULT_PROMPT_VERSION) -> tuple[str, ...]:
     per-task pieces the shared scaffold needs. Derived, so approving a task adds it in
     exactly one place.
     """
-    return tuple(t for t in _CLAIM_KIND if t in _spec(version)["answer_format"])
+    spec = _spec(version)
+    return tuple(t for t in spec["claim_kind"] if t in spec["answer_format"])
 
 
 def _require_supported(task: str, version: str = DEFAULT_PROMPT_VERSION) -> None:
@@ -178,7 +210,7 @@ _CRITIC_TOP = (
     "the answer out yourself from the graph, then verify the LATEST Proposer answer; the\n"
     "debate so far is shown."
 )
-_CRITIC_CUE_INCIDENT = (
+_CRITIC_CUE_INCIDENT_V1 = (
     "Work only from the graph text. First, independently go through the graph's edge list and\n"
     "pick out every edge that involves the queried node, copying each exactly as written (an\n"
     "edge counts only if it is in the list; never introduce one that is not there). Those\n"
@@ -196,7 +228,38 @@ _CRITIC_CUE_INCIDENT = (
     "VERDICT: REVISE\n"
     "- <an edge the Proposer missed or wrongly included, quoted from the graph's edge list>"
 )
-_CRITIC_CUE_EDGE = (
+# v2 fixes three defects the P5 traces exposed, all of them about what the format LETS the
+# Critic say rather than about its judgement:
+#   - AGREE had no evidence slot, so a Critic holding the evidence for a correct answer had
+#     only the REVISE channel to put it in. On connected_nodes it REVISEd a correct "none"
+#     while citing an edge from elsewhere in the graph.
+#   - "cite an edge that actually appears in the list" constrained existence but not
+#     RELEVANCE: only 39 percent of problem lines cited an edge involving the queried node,
+#     12 percent cited a real but unrelated edge, 11 percent an edge in no list at all.
+#   - AGREE was gated on the CLAIMS ("supporting edges are exactly the ones in the graph")
+#     while the experiment scores the ANSWER, so a right answer with an untidy trace had to
+#     be REVISEd. 19 of 76 false alarms on connected_nodes/adjacency then turned a right
+#     answer wrong -- in one, a perfect 7-claim answer was revised down to a single node.
+_CRITIC_CUE_INCIDENT_V2 = (
+    "Work only from the graph text. First, independently go through the graph's edge list and\n"
+    "pick out every edge that involves the queried node, copying each exactly as written (an\n"
+    "edge counts only if it is in the list; never introduce one that is not there). Those\n"
+    "edges determine the correct answer. Then compare them to the Proposer's final answer, in\n"
+    "both directions:\n"
+    "- did the Proposer MISS an edge that is in the list?\n"
+    "- did the Proposer INCLUDE an edge that is not in the list?\n"
+    "Judge the answer, not the tidiness of the claims: AGREE whenever the answer matches the\n"
+    "edges you found, including when the correct answer is that no edge involves the node.\n"
+    "Otherwise REVISE and name each wrong edge. Every edge you cite, under either verdict,\n"
+    "must appear in the list and involve the queried node; do not repeat a problem the\n"
+    "Proposer has already fixed. Respond in exactly this format and nothing else:\n"
+    "VERDICT: AGREE\n"
+    "- <an edge from the list that supports the answer, or: no edge involves the node>\n"
+    "or\n"
+    "VERDICT: REVISE\n"
+    "- <an edge the Proposer missed or wrongly included, quoted from the graph's edge list>"
+)
+_CRITIC_CUE_EDGE_V1 = (
     "Work only from the graph text. Look in the graph's edge list for the exact pair the\n"
     "question asks about, in either order. If that pair appears, the answer is Yes; if it\n"
     "does not, the answer is No -- decide this yourself from the list. Then check the\n"
@@ -210,16 +273,84 @@ _CRITIC_CUE_EDGE = (
     "VERDICT: REVISE\n"
     "- <the queried edge quoted from the list, or a note that it does not appear>"
 )
-_CRITIC_CUE = {
-    "node_degree": _CRITIC_CUE_INCIDENT,
-    "connected_nodes": _CRITIC_CUE_INCIDENT,
-    "edge_existence": _CRITIC_CUE_EDGE,
+# v1 put the evidence for a correct "No" -- "or state that no such edge appears" -- inside
+# the REVISE branch, and gave AGREE no bullet to put it in. So a Critic that had correctly
+# verified the pair was absent filed that finding as a REVISE: on gold=False instances it
+# REVISEd 96.3 percent of the time, and 1024 of 2308 Critic turns (44.4 percent) were
+# REVISEs whose only grounding asserted absence against a Proposer who had answered No.
+# Reading those as the agreement they are moves false alarm 0.774 -> 0.305 and the
+# detection gap +0.180 -> +0.258, i.e. findings.md 4e was partly measuring this format.
+_CRITIC_CUE_EDGE_V2 = (
+    "Work only from the graph text. Look in the graph's edge list for the exact pair the\n"
+    "question asks about, in either order. If that pair appears, the answer is Yes; if it\n"
+    "does not, the answer is No -- decide this yourself from the list. Then check the\n"
+    "Proposer's answer.\n"
+    "AGREE if the Proposer's Yes/No matches the edge list. That includes the case where the\n"
+    "pair is absent and the Proposer answered No: absence is the evidence FOR that answer,\n"
+    "not a problem with it. Otherwise REVISE. Ground both verdicts the same way -- quote the\n"
+    "queried pair from the list if it is there, or say that it does not appear -- and never\n"
+    "invent an edge. Respond in exactly this format and nothing else:\n"
+    "VERDICT: AGREE\n"
+    "- <the queried pair quoted from the list, or a note that it does not appear>\n"
+    "or\n"
+    "VERDICT: REVISE\n"
+    "- <the queried pair quoted from the list, or a note that it does not appear>"
+)
+_CRITIC_CUE_V1 = {
+    "node_degree": _CRITIC_CUE_INCIDENT_V1,
+    "connected_nodes": _CRITIC_CUE_INCIDENT_V1,
+    "edge_existence": _CRITIC_CUE_EDGE_V1,
 }
-_REVISION_TOP = (
+_CRITIC_CUE_V2 = {
+    "node_degree": _CRITIC_CUE_INCIDENT_V2,
+    "connected_nodes": _CRITIC_CUE_INCIDENT_V2,
+    "edge_existence": _CRITIC_CUE_EDGE_V2,
+}
+
+# (the version registry is assembled at the end of this section, once every per-version
+# piece it collects -- including the revision framing below -- has been defined)
+_REVISION_TOP_V1 = (
     "You are the Proposer in the debate below. A checker verified your latest claims against\n"
     "the graph and found problems. Produce a corrected answer that fixes them, using the\n"
     "whole exchange."
 )
+# v1 pointed the reviser at the TRANSCRIPT ("using the whole exchange") and nowhere at the
+# graph: `_CRITIC_TOP` opens with "the graph text is the ONLY source of truth" and the
+# revision had no equivalent line. It also asserted the objections were real ("found
+# problems", "verified") before the Proposer had looked, and never said an answer may
+# stand. So the Proposer treated an objection as evidence instead of a claim to check:
+# where the Critic asserted the queried pair was absent against a "Yes", it flipped to "No"
+# 330 times out of 482 (68.5 percent), and 151 of those flips (45.8 percent) abandoned a
+# CORRECT answer. It did not re-derive anything -- it rewrote the contested claim into its
+# own negation in the Critic's words and left the uncontested claims untouched.
+#
+# This is not the Critic's false-alarm problem wearing a different hat. Those 482 are
+# genuine disagreements, so the v2 Critic still says REVISE on them; the deference is the
+# revision prompt's own.
+_REVISION_TOP_V2 = (
+    "You are the Proposer in the debate below. A checker has objected to your latest\n"
+    "answer. The graph text is the ONLY source of truth: check each objection against\n"
+    "the graph's edge list yourself. Keep your answer if the objection is wrong; change\n"
+    "it only if the objection is right."
+)
+
+
+# Every per-version piece -- Proposer scaffold, claim kind, answer format, Critic cue,
+# revision framing -- collected in one place. Lives at the end of the section rather than
+# beside DEFAULT_PROMPT_VERSION because a dict literal evaluates its values immediately,
+# so it must follow every constant it names.
+PROMPT_VERSIONS = {
+    "v1": {"answer_format": _ANSWER_FORMAT_V1, "format_block": _FORMAT_BLOCK_V1,
+           "proposer_preamble": _PROPOSER_PREAMBLE_V1,
+           "revision_preamble": _REVISION_PREAMBLE_V1,
+           "claim_kind": _CLAIM_KIND_V1, "critic_cue": _CRITIC_CUE_V1,
+           "revision_top": _REVISION_TOP_V1},
+    "v2": {"answer_format": _ANSWER_FORMAT_V2, "format_block": _FORMAT_BLOCK_V2,
+           "proposer_preamble": _PROPOSER_PREAMBLE_V2,
+           "revision_preamble": _REVISION_PREAMBLE_V2,
+           "claim_kind": _CLAIM_KIND_V2, "critic_cue": _CRITIC_CUE_V2,
+           "revision_top": _REVISION_TOP_V2},
+}
 
 
 # --- running transcript -------------------------------------------------------
@@ -246,7 +377,7 @@ def proposer_prompt(instance: "Instance", version: str = DEFAULT_PROMPT_VERSION)
     """Turn-1 Proposer prompt: numbered-claim trace + ANSWER, then the question verbatim."""
     spec = _spec(version)
     _require_supported(instance.task, version)
-    instruction = (spec["proposer_preamble"].format(claim=_CLAIM_KIND[instance.task])
+    instruction = (spec["proposer_preamble"].format(claim=spec["claim_kind"][instance.task])
                    + _format_block(instance.task, version))
     return f"{instruction}\n\n{instance.question}"
 
@@ -256,21 +387,28 @@ def critic_prompt(
 ) -> str:
     """Critic prompt: verify the latest Proposer answer given the full transcript.
 
-    Takes `version` for a uniform call signature, but the Critic wording is currently
-    identical across versions (v2 changed only the Proposer side), so it is unused here.
+    The cue is per-version: v2 gives AGREE its own evidence bullet, ties grounding to the
+    queried node, and judges the answer rather than the claim list. v1's wording is frozen
+    because `results/main`, `seed11` and `seed13` were produced under it.
     """
     _require_supported(instance.task, version)
-    return f"{_CRITIC_TOP}\n\n{render_transcript(instance, turns)}\n\n{_CRITIC_CUE[instance.task]}"
+    cue = _spec(version)["critic_cue"][instance.task]
+    return f"{_CRITIC_TOP}\n\n{render_transcript(instance, turns)}\n\n{cue}"
 
 
 def revision_prompt(
     instance: "Instance", turns: list[dict], version: str = DEFAULT_PROMPT_VERSION
 ) -> str:
-    """Proposer revision prompt: corrected answer given the full transcript."""
+    """Proposer revision prompt: re-answer given the full transcript.
+
+    The framing is per-version: v2 sends the Proposer back to the graph and says the
+    answer may stand, where v1 asserted the objections were real and pointed only at the
+    exchange. v1's wording is frozen -- `results/main`, `seed11` and `seed13` used it.
+    """
     spec = _spec(version)
     _require_supported(instance.task, version)
     fmt = spec["revision_preamble"] + _format_block(instance.task, version)
-    return f"{_REVISION_TOP}\n\n{render_transcript(instance, turns)}\n\n{fmt}"
+    return f"{spec['revision_top']}\n\n{render_transcript(instance, turns)}\n\n{fmt}"
 
 
 # --- parsers (co-located with the prompts they parse) -------------------------
