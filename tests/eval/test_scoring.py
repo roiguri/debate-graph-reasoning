@@ -123,3 +123,20 @@ def test_score_exact_match_across_shapes():
 def test_score_parse_failure_is_incorrect():
     assert score(None, True) is False
     assert score(None, False) is False
+
+
+def test_parse_connected_nodes_keeps_the_source_in_a_bare_list():
+    # A bare list is the answer verbatim: naming the queried node asserts a self-
+    # connection, which the gold never contains, so it must survive to score wrong.
+    # Dropping it silently forgave 10 percent of debate's rows against the baseline's 3.
+    value, ok = parse("connected_nodes", "0, 1, 2", encoding="adjacency", node_ids=[0])
+    assert ok is True and value == [0, 1, 2]
+
+
+def test_parse_connected_nodes_still_drops_a_source_echoed_in_prose():
+    # Prose names the source because it restates the question, not to claim membership.
+    value, ok = parse(
+        "connected_nodes", "The nodes connected to 2 are: 6, 10.",
+        encoding="adjacency", node_ids=[2],
+    )
+    assert ok is True and value == [6, 10]

@@ -20,6 +20,10 @@ from gedebate.graphqa import graph_text_encoder
 _YES_NO = re.compile(r"\b(yes|no)\b", re.IGNORECASE)
 _INT = re.compile(r"-?\d+")
 _WORD = re.compile(r"[A-Za-z0-9]+")
+# A bare answer list ("1, 2" / "James, David"): labels and separators only, no prose.
+# Distinguishes an answer whose tokens ARE the answer from one that restates the
+# question around it ("the nodes connected to 2 are: 6, 10") -- see _parse_node_list.
+_BARE_LIST = re.compile(r"^[A-Za-z0-9]+(\s*,\s*[A-Za-z0-9]+)*\.?$")
 # Explicit "empty set" markers for connected_nodes (matches the "none" instruction
 # and GraphQA's own "No nodes." gold answer).
 _EMPTY_MARKER = re.compile(r"\b(none|no nodes|no other|nothing|empty)\b", re.IGNORECASE)
@@ -66,11 +70,24 @@ def _parse_int(text: str) -> tuple[int | None, bool]:
 def _parse_node_list(
     text: str, encoding: str | None, node_ids: list | None
 ) -> tuple[list | None, bool]:
-    """Map answer labels back to sorted node ids, dropping the (never-neighbor) source.
+    """Map answer labels back to sorted node ids. Whether the source counts depends on form.
 
     Labels are resolved through the encoding's id->label table, so this handles both
     integer encodings ("1, 2") and named ones ("James, John"). An explicit empty
     marker ("none" / "No nodes.") yields []; unrecognized output yields a failure.
+
+    **The source node is dropped only from prose.** A bare list is the model's answer
+    verbatim, so "Robert, James" for a query about Robert asserts that Robert is
+    connected to itself -- an error, and one the gold never contains (these graphs have
+    no self-loops), so it must score wrong. Prose is different: "the nodes connected to 2
+    are: 6, 10" mentions the source because it restates the question, not because it
+    claims membership, so there the echo is still dropped.
+
+    Silently dropping it everywhere was not a neutral leniency. Debate emitted the source
+    in 36 percent of `connected_nodes` answers against the baseline's 23 percent (the
+    Critic quotes edges as pairs, and the Proposer copies both endpoints), so forgiving it
+    handed debate 10 percent of the task's rows for free against the baseline's 3 percent
+    -- a measured advantage that came from the parser, not the condition.
     """
     if encoding is None:
         raise ValueError("connected_nodes parsing requires the encoding")
@@ -78,6 +95,8 @@ def _parse_node_list(
         label: nid for nid, label in graph_text_encoder.TEXT_ENCODER_DICT[encoding].items()
     }
     source = node_ids[0] if node_ids else None
+    if _BARE_LIST.match(text.strip()):
+        source = None  # the list is the answer: an echoed source is a claim, not a restatement
 
     found = {
         label_to_id[tok]

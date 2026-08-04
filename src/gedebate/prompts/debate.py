@@ -275,8 +275,16 @@ def revision_prompt(
 
 # --- parsers (co-located with the prompts they parse) -------------------------
 
-_ANSWER_RE = re.compile(r"ANSWER:\s*(.+)", re.IGNORECASE)
+# Scoped to the REST OF THE ANSWER LINE (`.` never crosses a newline), so a bare
+# `ANSWER:` matches with an empty capture instead of not matching at all. The old
+# `\s*(.+)` skipped over the newline to harvest a later line, which meant a model that
+# wrote `ANSWER:` and stopped -- the format's own way of saying "none" -- fell through to
+# the last-line fallback and landed on the string "ANSWER:", scoring a parse failure.
+_ANSWER_RE = re.compile(r"ANSWER:[ \t]*(.*)", re.IGNORECASE)
 _CLAIM_RE = re.compile(r"^\s*\d+\.\s*(.+?)\s*$", re.MULTILINE)
+# A leading claim number on a fallback line ("5. The nodes connected to 3 are 0.").
+# Under adjacency/incident the labels ARE integers, so the claim number parses as a node.
+_CLAIM_NUM_RE = re.compile(r"^\s*\d+[.:]\s+")
 _VERDICT_RE = re.compile(r"VERDICT:\s*(AGREE|REVISE)", re.IGNORECASE)
 _PROBLEM_RE = re.compile(r"^\s*-\s*(.+?)\s*$", re.MULTILINE)
 
@@ -292,9 +300,13 @@ def has_answer_line(raw: str) -> bool:
 
     Lives here (not in the diagnostics that consume it) for the same reason the parsers
     do: it is a fact about the prompt's output format. Without the line `parse_proposer`
-    falls back to the whole text, which is a *silent* degradation -- it happens to work
-    for node_degree (last integer wins) and fails for connected_nodes -- so the rate is
-    worth reporting rather than inferring from `parse_ok`.
+    falls back to the last line, a *silent* degradation -- it happens to work for
+    node_degree (last integer wins) and misreads a claim line for connected_nodes -- so
+    the rate is worth reporting rather than inferring from `parse_ok`.
+
+    A bare `ANSWER:` counts as emitted: the model produced the line the format asked for,
+    and an empty one is how it says "none". Format compliance and answer content are
+    different facts, and this reports the first.
     """
     return _ANSWER_RE.search(raw) is not None
 
@@ -316,11 +328,36 @@ def parse_proposer(
     ("the answer is the last thing stated") and what the label-free baseline relies on,
     and it costs nothing: on seed 7 it scores 0.210 / 0.460 against the old whole-text
     harvest's 0.210 / 0.455 (docs/findings.md 3g).
+
+    Two shapes the raw text takes that the answer parser must not see:
+
+    **An empty `ANSWER:` line is the empty set, not a parse failure.** The format hint
+    ends "...or none", and the model's way of complying is to write `ANSWER:` and stop.
+    That is a real answer for `connected_nodes` and a non-answer for the other two tasks,
+    whose answers (a degree, a Yes/No) are never empty. It is not truncation: every such
+    output stopped well inside the token cap.
+
+    **A fallback line keeps its claim number out of the answer.** The fallback lands on a
+    numbered line often enough ("5. The nodes connected to 3 are 0.") that the leading "5"
+    was being harvested as node 5 under the integer encodings.
     """
-    m = list(_ANSWER_RE.finditer(raw))
-    answer_text = m[-1].group(1).strip() if m else _last_line(raw)
-    value, ok = _parse_answer(task, answer_text, encoding=encoding, node_ids=node_ids)
     claims = [c.group(1) for c in _CLAIM_RE.finditer(raw)]
+    m = list(_ANSWER_RE.finditer(raw))
+    if not m:
+        answer_text = _CLAIM_NUM_RE.sub("", _last_line(raw))
+    else:
+        answer_text = m[-1].group(1).strip()
+        if not answer_text:
+            # `ANSWER:` ends the line. Content on a LATER line is still the answer (the
+            # old regex's one useful behaviour); nothing after it at all means "none".
+            following = [ln for ln in raw[m[-1].end():].splitlines() if ln.strip()]
+            if following:
+                answer_text = following[0].strip()
+            elif task == "connected_nodes":
+                return [], True, claims
+            else:
+                return None, False, claims
+    value, ok = _parse_answer(task, answer_text, encoding=encoding, node_ids=node_ids)
     return value, ok, claims
 
 

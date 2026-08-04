@@ -226,14 +226,16 @@ def test_missing_answer_line_falls_back_to_the_last_line_only():
     raw = ("1. Robert is connected to Michael.\n"
            "2. Robert is not connected to Susan.\n"
            "3: Robert, Michael")
-    # Robert (1) is the queried node, so he is dropped as a never-neighbour of himself;
-    # Michael is 3 and Susan is 16.
+    # Robert is 1 (the queried node), Michael 3, Susan 16.
     value, ok, _ = debate.parse_proposer(
         raw, "connected_nodes", encoding="friendship", node_ids=[1])
     assert ok
-    assert value == [3]                       # Michael only
     # Whole-text parsing returned [3, 16]: Susan (16) harvested from a negated claim.
     assert 16 not in value
+    # The fallback line's claim number ("3:") is stripped, leaving the bare list
+    # "Robert, Michael" -- which names Robert, so the answer CLAIMS a self-connection
+    # and is kept (and will score wrong against a gold that never contains the source).
+    assert value == [1, 3]
 
 
 def test_an_explicit_answer_line_still_wins_over_the_last_line():
@@ -251,3 +253,36 @@ def test_last_line_fallback_is_used_when_there_is_no_answer_line():
 def test_empty_output_parses_as_a_failure_not_a_crash():
     value, ok, _ = debate.parse_proposer("", "node_degree")
     assert (value, ok) == (None, False)
+
+
+def test_bare_answer_line_is_the_empty_set_for_connected_nodes():
+    # "...or none" is answered by writing ANSWER: and stopping. The old regex needed a
+    # character after the colon, so this fell through to the last-line fallback, landed on
+    # the string "ANSWER:", and scored a parse failure -- on instances whose gold IS empty.
+    raw = "1. No edge involves Robert.\nANSWER:"
+    value, ok, _ = debate.parse_proposer(
+        raw, "connected_nodes", encoding="friendship", node_ids=[1])
+    assert (value, ok) == ([], True)
+
+
+@pytest.mark.parametrize("task", ["node_degree", "edge_existence"])
+def test_bare_answer_line_is_a_failure_where_empty_is_not_an_answer(task):
+    # A degree and a Yes/No are never empty, so an empty line is a non-answer, not "none".
+    value, ok, _ = debate.parse_proposer("1. a claim\nANSWER:", task)
+    assert (value, ok) == (None, False)
+
+
+def test_answer_on_the_line_after_the_label_is_still_the_answer():
+    # The old regex's `\s*` crossed the newline to find this; the line-scoped one must
+    # keep doing so, or a split answer becomes a phantom empty set.
+    value, ok, _ = debate.parse_proposer("1. a claim\nANSWER:\n3", "node_degree")
+    assert (value, ok) == (3, True)
+
+
+def test_fallback_line_does_not_read_its_claim_number_as_a_node():
+    # Under adjacency/incident the labels ARE integers, so the leading "5." parsed as
+    # node 5 and corrupted an otherwise correct answer.
+    raw = "4. Node 3 has one edge.\n5. The nodes connected to 3 in alphabetical order are 0."
+    value, ok, _ = debate.parse_proposer(
+        raw, "connected_nodes", encoding="adjacency", node_ids=[3])
+    assert (value, ok) == ([0], True)

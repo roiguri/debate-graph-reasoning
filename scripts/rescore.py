@@ -6,9 +6,12 @@ conditions incomparable. When the rule changes, every affected run is re-scored 
 That costs no GPU because the raw model output is persisted in both the rows and the
 trace sidecars, so correctness is re-derivable exactly.
 
-Only **debate** output is affected. `parse_proposer` (debate-only) is what changed; the
-baseline and majority-vote call `scoring.parse` on output that is already a bare answer,
-and that path is untouched.
+**Every condition is re-scored**, because the shared `scoring.parse` can change and not
+just the debate-only `parse_proposer`. Scoring one condition under a new rule and leaving
+another on the old one would silently bias the comparison between them -- the exact
+unequal-standards trap docs/findings.md 3g warns about -- so this walks every row it
+finds. Majority vote needs no special handling: the vote is derived from the parsed
+answers at report time, never stored, so re-scoring its sample rows re-derives it.
 
 Dry-run by default -- it prints what would change and writes nothing:
 
@@ -29,6 +32,7 @@ from pathlib import Path
 import gedebate
 from gedebate.data.store import load_dataset
 from gedebate.eval import results
+from gedebate.eval.scoring import parse as parse_answer
 from gedebate.eval.scoring import score
 from gedebate.prompts.debate import parse_proposer
 
@@ -45,13 +49,23 @@ def _node_ids(run_dir: str, override: str | None) -> dict[str, list]:
 
 
 def _reparse(raw: str, row: dict, node_ids: list | None):
-    value, ok, _ = parse_proposer(
-        raw, row["task"], encoding=row["encoding"], node_ids=node_ids)
+    """Re-derive (value, parse_ok, correct) under the parser this row's condition uses.
+
+    Debate output carries the claim + `ANSWER:` scaffold, so it goes through
+    `parse_proposer`; baseline and majority-vote output is already a bare answer and goes
+    straight to `scoring.parse`, which is what those conditions called when they ran.
+    """
+    if row["condition"] == "debate":
+        value, ok, _ = parse_proposer(
+            raw, row["task"], encoding=row["encoding"], node_ids=node_ids)
+    else:
+        value, ok = parse_answer(
+            row["task"], raw, encoding=row["encoding"], node_ids=node_ids)
     return value, ok, score(value, row["ground_truth"])
 
 
 def rescore_dir(run_dir: str, dataset: str | None, write: bool) -> dict:
-    """Re-derive every debate row + trace turn from its persisted raw text."""
+    """Re-derive every row (all conditions) + every debate trace turn from persisted raw text."""
     node_ids = _node_ids(run_dir, dataset)
     rows_by_id: dict[str, dict] = {}
     for f in results.result_files(run_dir):
@@ -59,7 +73,8 @@ def rescore_dir(run_dir: str, dataset: str | None, write: bool) -> dict:
             if r["condition"] == "debate":
                 rows_by_id[r["instance_id"]] = r
 
-    stat = {"rows": 0, "rows_changed": 0, "flips": 0, "turns": 0, "turns_changed": 0}
+    stat = {"rows": 0, "rows_changed": 0, "flips": 0, "turns": 0, "turns_changed": 0,
+            "conditions": set()}
 
     # traces first: every turn, so turn-level diagnostics match the rows
     for f in results.trace_files(run_dir):
@@ -94,10 +109,12 @@ def rescore_dir(run_dir: str, dataset: str | None, write: bool) -> dict:
         rows = results.read_rows(f)
         dirty = False
         for r in rows:
-            if r["condition"] != "debate":
-                continue
             stat["rows"] += 1
-            raw = final_raw.get(r["instance_id"], r["raw_output"])
+            stat["conditions"].add(r["condition"])
+            # A debate row records the FINAL proposer turn, which lives in the trace;
+            # every other condition already stores its own answer.
+            raw = (final_raw.get(r["instance_id"], r["raw_output"])
+                   if r["condition"] == "debate" else r["raw_output"])
             value, ok, correct = _reparse(raw, r, node_ids.get(r["instance_id"]))
             if (r["parsed_answer"] != value or bool(r["parse_ok"]) != ok
                     or bool(r["correct"]) != correct):
@@ -109,18 +126,24 @@ def rescore_dir(run_dir: str, dataset: str | None, write: bool) -> dict:
             Path(f).write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
 
     if write and stat["rows_changed"]:
-        _stamp_manifest(run_dir)
+        _stamp_manifest(run_dir, sorted(stat["conditions"]))
     return stat
 
 
-def _stamp_manifest(run_dir: str) -> None:
-    """Record that this run's debate rows were re-scored, and under what code version."""
+def _stamp_manifest(run_dir: str, conditions: list[str]) -> None:
+    """Record which of this run's conditions were re-scored, and under what code version.
+
+    Stamps each condition that was actually walked, not just debate: a run whose baseline
+    was re-scored under a new shared parser must say so, or its provenance claims a
+    scoring rule it no longer uses.
+    """
     path = results.manifest_path(run_dir)
     if not path.exists():
         return
     manifest = json.loads(path.read_text(encoding="utf-8"))
-    cond = manifest.setdefault("conditions", {}).setdefault("debate", {})
-    cond["rescored_by"] = f"scripts/rescore.py (gedebate {gedebate.__version__})"
+    for name in conditions:
+        cond = manifest.setdefault("conditions", {}).setdefault(name, {})
+        cond["rescored_by"] = f"scripts/rescore.py (gedebate {gedebate.__version__})"
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
@@ -140,7 +163,8 @@ def main() -> None:
         verb = "changed" if args.write else "would change"
         print(f"{d}: {s['rows_changed']}/{s['rows']} rows {verb} "
               f"({s['flips']} correctness flips), "
-              f"{s['turns_changed']}/{s['turns']} proposer turns {verb}")
+              f"{s['turns_changed']}/{s['turns']} proposer turns {verb}"
+              f"  [conditions: {', '.join(sorted(s['conditions']))}]")
 
 
 if __name__ == "__main__":
