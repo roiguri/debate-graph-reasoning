@@ -170,9 +170,9 @@ is where grounding fails most: on `edge_existence` the Critic mostly cites no pa
 and writes prose instead (551 of 643 on incident), and where it does cite, a quarter of
 the cited pairs on adjacency are edges that do not exist.
 
-**The Proposer mostly ignores it.** After a REVISE the answer changes 25 to 44 percent of
+**The Proposer mostly ignores it.** After a REVISE the answer changes 15 to 44 percent of
 the time, and the net effect of every revision in the study is **+74 corrections over
-3,459 critiques**.
+3,759 critiques**.
 
 ### 3c. The loop is a weak positive; the CoT scaffold carries the movement
 
@@ -244,8 +244,8 @@ the claim format itself needs a pilot.
 
 ### 3e. Format compliance is good under v2, with one exception
 
-Turn-1 Proposer compliance (cap = 256 new tokens): unparsed answers are at or below 2
-percent in eight of nine cells. The exception is **`edge_existence/friendship`: 53 of 600
+Turn-1 Proposer compliance (cap = 256 new tokens): unparsed answers are below 2.4 percent
+in eight of nine cells. The exception is **`edge_existence/friendship`: 53 of 600
 truncated and 52 unparsed (0.087)**, the worst parse loss in the matrix, which plausibly
 accounts for its -0.040. The token cap for that cell is the obvious suspect and is
 untested.
