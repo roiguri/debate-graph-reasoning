@@ -1,0 +1,43 @@
+# COMPLIANCE PILOT 2 of 2, Llama-3.3-70B via Together: connected_nodes x adjacency.
+# Sibling of llama70b-pilot-ee-friendship.toml; same purpose, different failure mode.
+#
+# Why this cell: docs/findings.md 7 turned two Proposer behaviours into scored,
+# model-dependent quantities, and both live in the connected_nodes path under integer
+# labels.
+#
+#   1. Echoing the queried node. Gold contains it in 0 of 1,800 instances (no
+#      self-loops), so an answer that echoes it is now correctly scored wrong. Qwen-3B
+#      echoes in 32.3 percent of debate answers against the baseline's 23.1 -- the Critic
+#      quotes edges as pairs and the Proposer copies both endpoints. That gap was worth
+#      7.2 points of connected_nodes accuracy to debate before it was fixed. A different
+#      model will echo at a different rate, and it lands straight in this cell.
+#   2. Claim numbers read as node ids. Under adjacency the labels ARE integers, so
+#      "5. The nodes connected to 3 are 0." is only unambiguous because the parser now
+#      strips the claim number. Whether a new model numbers its claims the same way is
+#      not something the frozen prompt guarantees.
+#
+# adjacency rather than incident because it is also where debate does worst under Qwen
+# (-0.100, p=6e-07, the largest single move in the matrix), so any mechanical artefact
+# here is the one most likely to be mistaken for a result.
+#
+# Read it with:
+#   python scripts/debate_diagnostics.py results/llama70b-pilot-cn-adjacency
+# checking turn1_unparsed, turn1_truncated, and the source-echo rate against Qwen's.
+# Mechanical counts only -- this cell is 200 seed-7 instances and cannot support an
+# accuracy claim.
+
+model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+provider = "together"
+condition = "debate"
+dataset = "data/main.jsonl"
+
+n_samples = 10
+max_new_tokens = 256
+
+prompt_version = "v2"
+
+tasks = ["connected_nodes"]
+encodings = ["adjacency"]
+
+# Throwaway dir; never pooled with results/v2-* (different tokenizer, different model).
+out_dir = "results/llama70b-pilot-cn-adjacency"

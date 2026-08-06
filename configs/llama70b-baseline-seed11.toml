@@ -1,0 +1,28 @@
+# Llama-3.3-70B baseline, seed 11. Stage 1 of the Llama re-run.
+#
+# Answer-only zero-shot, the arm every other condition is measured against. Mirrors
+# configs/seed11.toml (the Qwen2.5-3B baseline) in dataset, tasks and encodings, so the
+# two are paired instance-for-instance and a Llama-vs-Qwen comparison stays a McNemar
+# on identical instances rather than two unpaired means.
+#
+# max_new_tokens is 256, not the Qwen baseline's 128. A cap is a safety limit rather
+# than a condition: it only affects a run if it binds, and Llama's verbosity already
+# forced the debate cap from 256 to 512 (see llama70b-pilot-cn-adjacency-cap512.toml).
+# Raising it here strictly removes a truncation artefact and costs nothing if it never
+# binds. Check `n_gen_tokens` against 256 when the run lands -- if anything is at the
+# cap, this cell needs looking at before the number is trusted.
+#
+# Shares out_dir with the debate arm (sibling baseline/ and debate/ subfolders), so
+# debate_diagnostics.py computes the CoT split from one directory.
+
+model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+provider = "together"
+condition = "baseline"
+dataset = "data/seed11.jsonl"
+
+tasks = ["edge_existence", "node_degree", "connected_nodes"]
+encodings = ["adjacency", "incident", "friendship"]
+
+max_new_tokens = 256
+
+out_dir = "results/llama70b-seed11"

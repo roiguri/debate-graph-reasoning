@@ -1,0 +1,39 @@
+# Llama-3.3-70B debate, seed 13. Stage 1 of the Llama re-run.
+#
+# Proposer-Critic loop at Proposer prompt v2, the one frozen wording. Paired with the
+# baseline in the same out_dir and run over the same frozen dataset, so debate-vs-baseline
+# is a within-instance comparison.
+#
+# max_new_tokens is 512, adopted matrix-wide on the strength of the two compliance
+# pilots. At 256 Llama ran into the cap hard on connected_nodes: Proposer truncation
+# 36/224, Critic truncation 82/210, and 74 of 210 verdicts unparseable. That last number
+# is the blocker -- conditions.debate defaults an unparseable verdict to AGREE and breaks
+# the loop, so a third of instances were ending in a cap-manufactured fake consensus, and
+# diagnostics._count_verdicts folds those into the AGREE cells and inflates the Critic's
+# apparent precision. At 512 the same cell reads 0/218, 12/214 and 11 unparsed.
+#
+# The cap is uniform across cells on purpose: a per-cell cap is a confound. The
+# edge_existence pilot passed at 256 and needs no re-run, since raising a cap strictly
+# removes truncations. Doubling it cost nothing measurable -- 1,838 tokens/instance at
+# 512 against 1,846 at 256, because the cap only ever bound a minority of turns.
+#
+# n_samples is the response BUDGET (max turns), matched to majority vote's N so debate
+# can never out-spend the vote it has to beat. Majority vote is deliberately NOT part of
+# stage 1; it is the compute control and is only worth its ~$21 if debate shows a gain
+# worth controlling for. Confirm the budget claim against Llama's own MV spend if that
+# arm is ever run -- findings.md 2 states it against Qwen's numbers, not Llama's.
+
+model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+provider = "together"
+condition = "debate"
+dataset = "data/seed13.jsonl"
+
+n_samples = 10
+max_new_tokens = 512
+
+prompt_version = "v2"
+
+tasks = ["edge_existence", "node_degree", "connected_nodes"]
+encodings = ["adjacency", "incident", "friendship"]
+
+out_dir = "results/llama70b-seed13"
