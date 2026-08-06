@@ -272,6 +272,14 @@ from the stored traces. Nothing else in this file depends on those two numbers â
 section 2 accuracy for `node_degree/incident` is unaffected, since the final answer is
 scored whether or not the loop ended early.
 
+Recomputing that cell over the 443 parsed verdicts alone gives phi = +0.106 (p=0.026) and a
+loop delta of +0.030 (p=0.061) â€” both moving as expected once the artefact is removed, and
+both **selection-biased**, since the excluded turns are the long high-degree instances.
+Treat those as a sensitivity check, not a correction. The cap's rationale, the two distinct
+kinds of truncation behind it, the full option/cost table and the open questions are
+recorded in [llama70b-cap-decision.md](llama70b-cap-decision.md); the choice of 512 is not
+principled and should not be defended as such.
+
 ## 7. What is missing: the compute control
 
 Debate spends **2.16 responses and 1,663 tokens per instance against the baseline's 1.00
