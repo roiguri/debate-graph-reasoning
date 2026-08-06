@@ -59,14 +59,14 @@ ROW_FIELDS = (
                      # DEFAULT_ROW_PROMPT_VERSION).
 )
 
-# What a row without a `prompt_version` means. Every debate row written before the field
-# existed came from the single pre-versioning wording, which is v1.
+# What a row without a `prompt_version` means: the single pre-versioning wording, v1.
 #
-# This stays "v1" even though v1's prompt text has been deleted from the code: it labels
-# what those persisted rows ARE, not what the code can still produce. `results/main`,
-# `seed11` and `seed13` hold them. Renaming this to the surviving version would let v1
-# rows pool with v2 rows into one accuracy -- the exact accident this field exists to
-# prevent -- so it is not a leftover to tidy up.
+# No such rows remain in the tree -- the v1 debate rows were deleted when the project
+# consolidated on the frozen v2 prompt, and every debate row on disk now carries
+# `prompt_version: "v2"`. This stays as a guard rather than being deleted with them: an
+# unlabelled debate row can only have come from before the field existed, and defaulting
+# it to the surviving version would silently pool a v1 answer into a v2 accuracy. It must
+# never be "helpfully" changed to v2.
 DEFAULT_ROW_PROMPT_VERSION = "v1"
 
 
