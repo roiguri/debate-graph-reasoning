@@ -194,10 +194,11 @@ it misses more than half of wrong answers rather than flagging everything.
 `edge_existence/adjacency` (**−25**) and `/friendship` (**−15**), which is the mechanism
 behind those cells' negative loop deltas in section 4.
 
-### 5a. The Critic's cited evidence is frequently fabricated
+### 5a. The grounding audit does not measure what its column names claim
 
-The Critic is instructed to quote an edge from the graph. Resolving every cited label pair
-back to node ids:
+The Critic is instructed to quote an edge from the graph. `diagnostics._classify_evidence`
+resolves every cited label pair back to node ids and bins it as *real* (the pair is an edge),
+*hallucinated* (it is not), or *no pair*:
 
 | task/encoding              | REVISEs | real edge | hallucinated | no pair |
 |----------------------------|---------|-----------|--------------|---------|
@@ -211,16 +212,43 @@ back to node ids:
 | edge_existence/adjacency   |     163 |  16 (0.10)|   144 (0.89) |       1 |
 | edge_existence/friendship  |     142 |   6 (0.04)|   134 (0.96) |       0 |
 
-**On `edge_existence` the Critic is simultaneously the most accurate and the least
-grounded**: detection 0.92–1.00 while 76–96 percent of its cited pairs are edges that do
-not exist in the graph. Its verdicts are right; its stated reasons are not. This matters
-for any claim that debate works *because* verification is grounded in the input — on this
-task it demonstrably is not.
+**The `hallucinated` column does not mean fabrication, and must not be read as it.** The
+classifier asks only whether a cited pair is an edge; it never asks whether the Critic
+claimed it *was* one. A critique asserting a **non**-relationship — "no such edge as (5,13)
+appears in the list" — cites a pair that is correctly not in the edge set, and is binned as
+hallucinated. That is valid negative evidence being scored as invention.
 
-Consistent with that, evidence-gating does not help. Vetoing REVISEs whose citation is
-fabricated changes nothing where debate is winning and *gains* +0.048 on
-`edge_existence/adjacency` — i.e. the only thing gating achieves is partially switching off
-a loop that was already harmful there.
+Checking which flagged citations involve a node the question actually asked about, pooled
+over all three seeds:
+
+| task/encoding              | flagged | involving the queried node(s) |
+|----------------------------|---------|-------------------------------|
+| edge_existence/adjacency   |     144 | 144 (100%)                    |
+| edge_existence/friendship  |     134 | 134 (100%)                    |
+| edge_existence/incident    |      26 |  26 (100%)                    |
+| connected_nodes/friendship |      47 |  46 (98%)                     |
+| connected_nodes/adjacency  |      28 |  28 (100%)                    |
+| connected_nodes/incident   |      26 |  26 (100%)                    |
+| node_degree/adjacency      |      13 |  12 (92%)                     |
+| node_degree/friendship     |       9 |   9 (100%)                    |
+| node_degree/incident       |       2 |   2 (100%)                    |
+
+**Only 2 of 429 flagged citations across the whole arm do not involve the queried node.**
+On `edge_existence` the flagged pair is the queried pair itself in 100 percent of cases —
+necessarily so, since a correct "this edge is absent" critique can cite nothing else.
+
+The honest conclusion is therefore the opposite of what the column name suggests: **there is
+no evidence in this arm that the Critic fabricates supporting edges.** What the audit
+establishes is a null — it cannot separate invention from correct negative evidence, so it
+says nothing either way. Measuring fabrication properly requires parsing the polarity of
+each cited claim (asserted present vs asserted absent), which the current classifier does
+not do.
+
+This also reinterprets the stopping-rule result. `gate_hallucinated`, which vetoes REVISEs
+whose citation is not a real edge, is on this data mostly vetoing *correct* negative
+critiques. Its +0.048 on `edge_existence/adjacency` is not evidence that ungrounded
+critiques are harmful; it is the gate switching off a loop that section 4 already showed to
+be harmful on that task.
 
 ## 6. Format compliance is good, with one cell that is not trustworthy
 
@@ -270,8 +298,11 @@ marginalize over — but that is an argument, not a measurement.
    `edge_existence`, 3 for 3 (section 3).
 4. Most of the gain is the reasoning scaffold; the verify-and-revise loop adds a smaller
    but significant increment, and is actively harmful on `edge_existence` (section 4).
-5. The Critic carries real signal (phi = +0.440) while frequently citing evidence that does
-   not exist, most extremely on the task where its verdicts are most accurate (section 5).
+5. The Critic carries real signal (phi = +0.440): conservative (false alarm 0.050), catching
+   under half of wrong answers (detection 0.435), and a REVISE quadruples P(wrong) from
+   0.144 to 0.594 (section 5). The grounding audit's `hallucinated` column does **not**
+   show fabrication — 427 of its 429 flags involve the queried node and are consistent with
+   valid negative evidence, so that audit is a null, not a finding (section 5a).
 6. One cell, `node_degree/incident`, has Critic truncation at 0.257 and its loop and Critic
    numbers must not be used (section 6).
 7. No compute control has been run, which bounds what can be claimed (section 7).
