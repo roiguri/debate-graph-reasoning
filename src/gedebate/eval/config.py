@@ -16,6 +16,10 @@ from gedebate.data.dataset import TASKS as ALL_TASKS
 from gedebate.prompts.debate import DEFAULT_PROMPT_VERSION, PROMPT_VERSIONS
 
 KNOWN_CONDITIONS = ("baseline", "majority_vote", "debate")
+# Where `model` is served from. "hf" loads it in-process on a GPU; "together" posts to
+# the Together.ai API. The two are NOT interchangeable within an analysis: token counts
+# come from different tokenizers and sampled draws only replay under "hf".
+KNOWN_PROVIDERS = ("hf", "together")
 
 
 @dataclass(frozen=True)
@@ -24,6 +28,10 @@ class RunConfig:
     out_dir: str
     dataset: str  # path to a frozen dataset artifact (data/main.jsonl)
     condition: str = "baseline"
+    # Serving backend for `model`. Defaults to "hf" so every existing config keeps
+    # meaning exactly what it meant. Recorded in the manifest: rows from different
+    # providers carry token counts from different tokenizers and must not be pooled.
+    provider: str = "hf"
     # tasks/encodings act as FILTERS over the loaded dataset (default: all of it).
     tasks: tuple[str, ...] = tuple(ALL_TASKS)
     encodings: tuple[str, ...] = tuple(ALL_ENCODINGS)
@@ -58,6 +66,9 @@ class RunConfig:
         condition = data.get("condition", "baseline")
         if condition not in KNOWN_CONDITIONS:
             raise ValueError(f"unknown condition {condition!r}; known: {KNOWN_CONDITIONS}")
+        provider = data.get("provider", "hf")
+        if provider not in KNOWN_PROVIDERS:
+            raise ValueError(f"unknown provider {provider!r}; known: {KNOWN_PROVIDERS}")
 
         n_samples = int(data.get("n_samples", 10))
         temperature = float(data.get("temperature", 0.7))
@@ -83,6 +94,7 @@ class RunConfig:
             out_dir=data["out_dir"],
             dataset=data["dataset"],
             condition=condition,
+            provider=provider,
             tasks=tasks,
             encodings=encodings,
             max_new_tokens=int(data.get("max_new_tokens", 64)),

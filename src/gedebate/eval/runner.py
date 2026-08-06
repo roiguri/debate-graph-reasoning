@@ -24,7 +24,7 @@ from gedebate.conditions.majority_vote import run_sample
 from gedebate.data.dataset import build_dataset
 from gedebate.data.store import dataset_identity, load_dataset
 from gedebate.eval import report, results
-from gedebate.eval.config import RunConfig, load_config
+from gedebate.eval.config import KNOWN_PROVIDERS, RunConfig, load_config
 
 DEFAULT_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"  # smoke only; real model comes from config
 
@@ -88,6 +88,7 @@ def manifest_record(cfg: RunConfig, config_path: str) -> dict:
     rec = {
         "dataset": cfg.dataset,
         "dataset_sha256": dataset_identity(cfg.dataset),
+        "provider": cfg.provider,  # which backend served `model` (see eval/config.py)
         "decoding": decoding,
         "max_new_tokens": cfg.max_new_tokens,
         "gedebate_version": gedebate.__version__,
@@ -216,20 +217,34 @@ def first_instance(n_graphs: int, seed: int, task: str, encoding: str):
 
 # --- CLI ----------------------------------------------------------------------
 
+def load_provider_model(provider: str, name: str):
+    """Load `name` from `provider`.
+
+    Both imports stay deferred: torch is a cluster-only extra, and the API path must
+    remain importable on a machine that has never installed it.
+    """
+    if provider == "together":
+        from gedebate.together import load_model
+
+        return load_model(name)
+    from gedebate.model import load_model
+
+    return load_model(name)
+
+
 def _run_config(config_path: str, shard_spec: str) -> None:
     cfg = load_config(config_path)
     shard, n_shards = parse_shard(shard_spec)
     instances = select_shard(build_instances(cfg), shard, n_shards)
     manifest = manifest_record(cfg, config_path)
     print(
-        f"config={config_path} model={cfg.model} dataset={cfg.dataset} "
-        f"shard={shard}/{n_shards} instances={len(instances)} -> {cfg.out_dir}",
+        f"config={config_path} model={cfg.model} provider={cfg.provider} "
+        f"dataset={cfg.dataset} shard={shard}/{n_shards} "
+        f"instances={len(instances)} -> {cfg.out_dir}",
         flush=True,
     )
 
-    from gedebate.model import load_model  # deferred: torch is a cluster-only extra
-
-    model = load_model(cfg.model)
+    model = load_provider_model(cfg.provider, cfg.model)
     print(f"Loaded on device={model.device}. Running ...", flush=True)
     stats = run_instances(model, instances, cfg, manifest, shard=shard)
     print(f"done: wrote {stats['written']}, skipped {stats['skipped']}\n", flush=True)
@@ -249,9 +264,7 @@ def _verify_sample(config_path: str, k: int) -> None:
     if not rows:
         raise SystemExit(f"no persisted rows in {cfg.out_dir} to verify")
 
-    from gedebate.model import load_model
-
-    model = load_model(cfg.model)
+    model = load_provider_model(cfg.provider, cfg.model)
     res = verify_sample(model, by_id, rows, k, max_new_tokens=cfg.max_new_tokens)
     print(f"verify-sample: {res['matches']}/{res['checked']} parsed answers reproduce")
     for iid, was, now in res["mismatches"]:
@@ -262,10 +275,8 @@ def _verify_sample(config_path: str, k: int) -> None:
 
 def _run_smoke(args) -> None:
     inst = first_instance(args.n_graphs, args.seed, args.task, args.encoding)
-    from gedebate.model import load_model
-
-    print(f"Loading {args.model} ...", flush=True)
-    model = load_model(args.model)
+    print(f"Loading {args.model} (provider={args.provider}) ...", flush=True)
+    model = load_provider_model(args.provider, args.model)
     print(f"Loaded on device={model.device}. Running one instance ...\n", flush=True)
     record = run_instance(model, inst, max_new_tokens=args.max_new_tokens)
     print(f"question : {inst.question!r}\n")
@@ -282,6 +293,9 @@ def main() -> None:
                     help="re-run K persisted instances and check parsed answers match")
     # single-instance smoke knobs (used only when --config is omitted):
     ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--provider", default="hf", choices=KNOWN_PROVIDERS,
+                    help="serving backend for --model (smoke path only; a config "
+                         "carries its own `provider`)")
     ap.add_argument("--n-graphs", type=int, default=4)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--task", default="edge_existence")
