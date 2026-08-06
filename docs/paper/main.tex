@@ -360,8 +360,16 @@ positive ($+0.060$ and $+0.055$), worth $+0.014$ on the mean, and it never rever
 sign the scaffold set. The loop is therefore not literally inert --- it recovers part of
 what the scaffold costs --- but it is a weak correction on top of a large format effect,
 and it does not touch the spread. Fragility amplification is a property of the
-\emph{reasoning format}, which helps where the encoding already affords enumeration and
-hurts where it does not, rather than of the verification procedure layered over it.
+\emph{reasoning format}, not of the verification procedure layered over it.
+
+\paragraph{The scaffold fails at declining to enumerate.} Splitting
+\textsc{connected\_nodes} by whether the gold answer is empty localizes the entire CoT
+penalty. On the 207 empty-gold instances the answer-only baseline is essentially perfect
+(0.990) while the claim-trace Proposer scores \textbf{0.077}; on the remaining 1{,}593 the
+scaffold is a net \emph{gain} (0.180 to 0.234). Having written claims that name nodes, the
+model harvests those names into its answer --- one instance states ``There is no edge
+involving Robert'' and answers ``James, John, Michael.'' Fragility amplification survives
+the split: on the non-empty bucket the spread still widens, 0.141 to 0.258.
 
 \begin{table*}[t]
   \centering
@@ -422,13 +430,12 @@ verdict is significantly \emph{anti}-correlated with error ($\phi=-0.076$, $p=0.
 $\mathrm{OR}=0.73$), and \textsc{connected\_nodes}/adjacency trends the same way. A loop
 acting on those verdicts is actively misinformed.
 
-\textbf{Its evidence is frequently fabricated.} The Critic is instructed that the graph
-text is the only source of truth and told to quote the offending edge. Resolving every
-cited pair back to node ids, 4--26\% of cited pairs are edges that do not exist in the
-graph, worst on \textsc{edge\_existence}/adjacency (0.26). On the \textsc{edge\_existence}
-cells it usually cites no pair at all and writes prose instead (551 of 643 \textsc{revise}s
-on incident). The one sub-task the entire design assumed was easy --- checking whether a
-pair is in a list --- is where grounding fails most often.
+\textbf{Its evidence is frequently fabricated.} Told that the graph text is the only
+source of truth and to quote the offending edge, the Critic cites pairs that do not exist
+in the graph 4--26\% of the time, worst on \textsc{edge\_existence}/adjacency. On the
+\textsc{edge\_existence} cells it usually cites no pair at all and writes prose (551 of
+643 \textsc{revise}s on incident). The one sub-task the design assumed was easy --- is a
+pair in a list --- is where grounding fails most.
 
 Downstream, the Proposer changes its answer after only 25--44\% of \textsc{revise}s, and
 the net effect of every revision in the study is $+74$ corrections over 3{,}459
@@ -437,14 +444,12 @@ critiques.
 \subsection{How much headroom is left in the loop?}
 
 One might object that the loop is fine and only its stopping rule is wrong. We bound that
-with an oracle: for each instance, take the best answer any Proposer turn produced ---
-perfect foresight over the turns that actually occurred. Pooled accuracy rises from 0.496
-to 0.557 ($+0.062$). The ceiling is small and distributed exactly the wrong way: $+0.105$
-to $+0.150$ on the three \textsc{edge\_existence} cells (the non-fragile task) against
-$+0.012$ on \textsc{node\_degree}/incident, and it leaves \textsc{connected\_nodes}
-spanning 0.160--0.467. No stopping rule, not even a clairvoyant one, recovers the encoding
-gap from these transcripts, and four counterfactual stopping rules replayed offline all
-do worse than the oracle.
+with an oracle: per instance, the best answer any Proposer turn produced --- perfect
+foresight over the turns that occurred. Pooled accuracy rises from 0.496 to 0.557
+($+0.062$), and that ceiling is distributed exactly the wrong way: $+0.105$ to $+0.150$ on
+the three \textsc{edge\_existence} cells (the non-fragile task) against $+0.012$ on
+\textsc{node\_degree}/incident, leaving \textsc{connected\_nodes} spanning 0.160--0.467.
+No stopping rule, not even a clairvoyant one, recovers the encoding gap here.
 
 \section{Discussion}
 
