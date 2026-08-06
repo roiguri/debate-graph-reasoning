@@ -242,17 +242,19 @@ reasoning.
 \subsection{Debate is not null --- it is bidirectional}
 \label{sec:debate}
 
-Mean accuracy over the nine cells is 0.496 for debate against 0.501 for the baseline: on
-the headline number, debate does nothing. That headline is misleading. Per cell
-(Table~\ref{tab:main}) debate moves accuracy from $-0.100$ to $+0.095$, and five of nine
-moves are significant --- three losses, two gains. The near-zero mean is cancellation, not
+Mean accuracy over the nine cells is 0.496 for debate against 0.501 for the baseline, and
+that gap is smaller than the seed-to-seed spread (per-seed deltas $+0.012$, $+0.002$,
+$-0.029$), so on the mean the two are indistinguishable. Per cell
+(Table~\ref{tab:main}) debate moves accuracy from $-0.100$ to $+0.095$ and five of nine
+moves are significant --- three losses, two gains. The flat mean is cancellation, not
 inertness.
 
 The direction of that cancellation is the result. Debate \emph{amplifies} encoding
-fragility (Table~\ref{tab:fragility}, Figure~\ref{fig:fragility}): on
-\textsc{connected\_nodes} the max--min spread goes from 0.127 to 0.298, because debate
-lifts incident by $+0.095$ while dropping adjacency by $-0.100$ and friendship by
-$-0.077$. The gains land in the encoding that was already best.
+fragility (Table~\ref{tab:fragility}, Figure~\ref{fig:fragility}): the
+\textsc{connected\_nodes} spread goes from 0.127 to 0.298, because debate lifts incident
+by $+0.095$ while dropping adjacency by $-0.100$ and friendship by $-0.077$. The gains
+land in the encoding that was already best, and unlike the mean this replicates in all
+three seeds independently.
 
 The sharpest form of this is \textsc{edge\_existence}. At baseline it is
 encoding-insensitive ($Q=0.52$, $p=0.77$). Under debate the same task becomes
@@ -362,14 +364,22 @@ what the scaffold costs --- but it is a weak correction on top of a large format
 and it does not touch the spread. Fragility amplification is a property of the
 \emph{reasoning format}, not of the verification procedure layered over it.
 
-\paragraph{The scaffold fails at declining to enumerate.} Splitting
-\textsc{connected\_nodes} by whether the gold answer is empty localizes the entire CoT
-penalty. On the 207 empty-gold instances the answer-only baseline is essentially perfect
-(0.990) while the claim-trace Proposer scores \textbf{0.077}; on the remaining 1{,}593 the
-scaffold is a net \emph{gain} (0.180 to 0.234). Having written claims that name nodes, the
-model harvests those names into its answer --- one instance states ``There is no edge
-involving Robert'' and answers ``James, John, Michael.'' Fragility amplification survives
-the split: on the non-empty bucket the spread still widens, 0.141 to 0.258.
+\paragraph{What the scaffold changes is the answer prior.} The claim trace does not make
+the model reason better or worse --- it shifts which answer the model will commit to, away
+from negative and empty answers. It says \emph{Yes} on \textsc{edge\_existence} 24\% of
+the time as a bare baseline and 56\% with the scaffold (gold rate 51\%), and it answers
+the empty list on \textsc{connected\_nodes} 22\% of the time as a baseline and
+\textbf{0.9\%} with the scaffold (gold rate 12\%). Accuracy follows exactly:
+
+on the 207 empty-gold \textsc{connected\_nodes} instances the baseline scores 0.990 and the
+scaffold \textbf{0.077}, while on the other 1{,}593 the scaffold \emph{gains} (0.180 to
+0.234); on \textsc{edge\_existence} the same signature, gold-No $0.963 \!\to\! 0.652$ and
+gold-Yes $0.438 \!\to\! 0.780$. The scaffold is worth $+0.342$ where the answer is Yes and
+$-0.311$ where it is No. Having written claims that name nodes, the model harvests those
+names into its answer: one instance states ``There is no edge involving Robert'' and
+answers ``James, John, Michael.'' A cell's apparent gain or loss is therefore largely a
+fact about its gold prior. Fragility amplification is not an artefact of this --- on the
+non-empty bucket the spread still widens, 0.141 to 0.258.
 
 \begin{table*}[t]
   \centering
@@ -425,10 +435,14 @@ observations sharpen this beyond ``the critic is weak.''
 discrimination, $\phi$ up to $+0.27$ --- but simultaneously fires on 70--82\% of correct
 ones. It knows something and cannot express it as a usable decision.
 
-\textbf{In two cells it is worse than chance.} On \textsc{node\_degree}/adjacency the
-verdict is significantly \emph{anti}-correlated with error ($\phi=-0.076$, $p=0.048$,
-$\mathrm{OR}=0.73$), and \textsc{connected\_nodes}/adjacency trends the same way. A loop
-acting on those verdicts is actively misinformed.
+\textbf{Its flag rate is set backwards.} On the three \textsc{edge\_existence} cells the
+Proposer is wrong about 30\% of the time and the Critic objects to roughly 80\% of its
+answers; on the other six the Proposer is wrong 28--88\% of the time and the Critic objects
+far less. It is most critical where the Proposer is most reliable. The high
+\textsc{edge\_existence} detection figure is largely this: a near-constant \textsc{revise}
+catches most errors because it catches most of everything. And on
+\textsc{node\_degree}/adjacency the verdict is significantly \emph{anti}-correlated with
+error ($\phi=-0.076$, $p=0.048$).
 
 \textbf{Its evidence is frequently fabricated.} Told that the graph text is the only
 source of truth and to quote the offending edge, the Critic cites pairs that do not exist
@@ -463,11 +477,10 @@ show debate fails where verification is hard, and one may always answer that a c
 domain would differ. We built the checkable domain.
 
 The second finding we did not expect. Interventions that raised mean accuracy raised the
-encoding spread with it: the CoT scaffold is worth up to $+0.077$ in the encoding that
-affords enumeration and costs up to $0.118$ in ones that do not, and the oracle ceiling
-redistributes the same way. If this generalizes, robustness to serialization is not
-something better inference-time reasoning delivers for free --- it may be in tension with
-it, because a scaffold is itself a format that some encodings suit better than others.
+encoding spread with it, and the oracle ceiling redistributes the same way. If this
+generalizes, robustness to serialization is not something better inference-time reasoning
+delivers for free --- it may be in tension with it, because a scaffold is itself a format
+that some encodings suit better than others.
 
 A methodological note that cost most of the project's effort: our first Proposer prompt
 contained a bug that presented as a finding. Its answer hint requested ``a comma-separated

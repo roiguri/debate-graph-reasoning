@@ -140,7 +140,7 @@ It is not uniformly at chance, and the per-cell pattern is the interesting part:
 | node_degree/adjacency     |      681 | 0.489                     | 0.412     | **-0.076** | 0.048 |
 | connected_nodes/adjacency |      741 | 0.664                     | 0.586     | -0.058 | 0.115  |
 
-Two readings, both worth stating:
+Three readings, and the third is the one that matters:
 
 - **The failure is calibration, not ignorance.** On `edge_existence` the Critic detects
   95 to 96 percent of wrong answers, real discrimination, and simultaneously fires on 70
@@ -149,6 +149,28 @@ Two readings, both worth stating:
   *anti*-correlated with error (phi=-0.076, p=0.048, OR=0.73), and
   `connected_nodes/adjacency` trends the same way. A loop acting on those verdicts is
   actively misinformed.
+- **Its flag rate is close to a per-cell constant, and it is set backwards.** Comparing how
+  often it says REVISE against how often the Proposer was actually wrong:
+
+| task/encoding              | REVISE rate | Proposer actually wrong | gap        |
+|----------------------------|-------------|-------------------------|------------|
+| edge_existence/incident    |       0.849 |                   0.303 | **+0.547** |
+| edge_existence/adjacency   |       0.777 |                   0.297 | **+0.480** |
+| edge_existence/friendship  |       0.875 |                   0.396 | **+0.478** |
+| node_degree/friendship     |       0.483 |                   0.602 |     -0.119 |
+| node_degree/incident       |       0.161 |                   0.283 |     -0.122 |
+| node_degree/adjacency      |       0.442 |                   0.606 |     -0.164 |
+| connected_nodes/incident   |       0.402 |                   0.620 |     -0.218 |
+| connected_nodes/adjacency  |       0.598 |                   0.843 |     -0.246 |
+| connected_nodes/friendship |       0.543 |                   0.878 | **-0.335** |
+
+  On the three `edge_existence` cells the Proposer is wrong about 30 percent of the time
+  and the Critic objects to about 80 percent of its answers. On the six others the
+  Proposer is wrong 28 to 88 percent of the time and the Critic objects far less often.
+  **It is most critical exactly where the Proposer is most reliable, and least critical
+  where the Proposer is least reliable.** The high `edge_existence` "detection" figure in
+  the table above is largely this: a near-constant REVISE catches most errors because it
+  catches most of everything.
 
 **Its evidence is often fabricated.** Each REVISE is supposed to quote an edge from the
 graph. Resolving every cited pair back to node ids:
@@ -203,24 +225,49 @@ separates them with no new runs:
 So fragility amplification is a property of the **reasoning format**, not of the
 verification procedure layered on top of it.
 
-### 3d. The whole `connected_nodes` CoT penalty is the empty-answer case
+### 3d. What the scaffold actually changes is the model's answer prior
 
-Splitting `connected_nodes` by whether the gold answer is the empty set (turn-1 vs
-baseline, pooled n=1,800):
+The single most explanatory result in the study. The claim-trace format does not make the
+model reason better or worse; it shifts **which answer it is willing to commit to**, away
+from negative and empty answers and towards positive, enumerated ones.
 
-| bucket        |    n | baseline | turn-1 (CoT) | CoT delta  |
-|---------------|------|----------|--------------|------------|
-| gold **= {}** |  207 |    0.990 |    **0.077** | **-0.913** |
-| gold **≠ {}** | 1593 |    0.180 |    **0.234** | **+0.053** |
+What each condition *answers*, regardless of correctness:
 
-Per encoding, the empty case collapses everywhere (adjacency 0.986→0.029, friendship
-0.986→0.000, incident 1.000→0.203) while the non-empty case is flat-to-positive
-(adjacency -0.009, friendship +0.026, incident +0.143).
+| measure (rate over all 1,800 instances)        | baseline | turn-1 (CoT) | debate final | gold  |
+|------------------------------------------------|----------|--------------|--------------|-------|
+| `edge_existence`: says **Yes**                 |    0.241 |    **0.562** |        0.382 | 0.508 |
+| `connected_nodes`: answers the **empty list**  |    0.217 |    **0.009** |        0.037 | 0.115 |
 
-**The baseline answers "none" almost perfectly (205 of 207). The claim-trace Proposer
-essentially cannot.** The mechanism is the trace-versus-answer disconnect: having written
-claims that name nodes, the model harvests those names into the answer. On `7/80` it
-reasons correctly and then contradicts itself:
+The baseline is biased the *other* way: it says Yes at less than half the gold rate, and
+over-produces the empty list (0.217 against a gold rate of 0.115). The scaffold does not correct that bias, it
+overshoots past it — and on `connected_nodes` it essentially abolishes the empty answer,
+from 217 in 1000 to 9 in 1000.
+
+Accuracy follows the prior exactly. Splitting each task by whether its gold answer is the
+"negative" one (turn-1 vs baseline, pooled):
+
+| task            | bucket        |    n | baseline | turn-1 (CoT) | CoT delta  |
+|-----------------|---------------|------|----------|--------------|------------|
+| connected_nodes | gold **= {}** |  207 |    0.990 |    **0.077** | **-0.913** |
+| connected_nodes | gold ≠ {}     | 1593 |    0.180 |        0.234 | **+0.053** |
+| edge_existence  | gold **No**   |  885 |    0.963 |    **0.652** | **-0.311** |
+| edge_existence  | gold Yes      |  915 |    0.438 |    **0.780** | **+0.342** |
+| node_degree     | gold 0        |  168 |    0.625 |        0.583 |     -0.042 |
+| node_degree     | gold >0       | 1632 |    0.523 |        0.506 |     -0.017 |
+
+The two tasks with a clean negative answer show the same signature, large and opposite:
+the scaffold is worth **+0.342** where the answer is Yes and **-0.311** where it is No,
+**+0.053** on a real neighbour list and **-0.913** on an empty one. `node_degree` has no
+such answer (0 is just another integer) and shows no such split.
+
+**This means the headline accuracies are largely a coincidence of the gold prior.** The
+baseline's 0.696 on `edge_existence` is not edge-existence competence: it is 0.963 on the
+No half and 0.438 on the Yes half, of a set that is 50.8 percent Yes. Whether an
+intervention "helps" on a cell depends mostly on which way that cell's gold prior points.
+
+The mechanism is visible in the traces: having written claims that name nodes, the model
+harvests those names into its answer. On `7/80` it reasons correctly and then contradicts
+itself —
 
 ```
 1. Robert is an end node.
@@ -228,19 +275,29 @@ reasons correctly and then contradicts itself:
 3. ANSWER: James, John, Michael
 ```
 
-and on `7/56` it writes "John is not connected to any other node" and answers
+— and on `7/56` it writes "John is not connected to any other node" and answers
 "James, David".
 
-This reframes 3c for `connected_nodes`: **the scaffold does not fail at enumeration, it
-fails at declining to enumerate.** On real neighbour lists the claim trace is a net gain
-on all three encodings. Note also that fragility amplification survives the split — on the
-non-empty bucket alone the spread still widens, baseline max-min 0.141 to CoT 0.258 — so
-section 3a does not rest on the empty case.
+**It also explains the graph-size dependence.** Negative answers are concentrated in small
+graphs (`connected_nodes` gold is empty on 0.196 of 5-9-node graphs against 0.048 of
+15-19-node ones), and that is exactly where debate loses:
 
-Fixing this is the single largest identified win available on `connected_nodes` (207
-instances, 11.5 percent of the task) and it is **untested**: whether it is a wording
-problem (the `or none` clause is buried mid-sentence in the answer spec) or a behaviour of
-the claim format itself needs a pilot.
+| task            | 5-9 nodes            | 10-14                | 15-19                |
+|-----------------|----------------------|----------------------|----------------------|
+| connected_nodes | 0.422 → 0.327 (-0.095) | 0.225 → 0.232 (+0.007) | 0.143 → 0.162 (+0.020) |
+| edge_existence  | 0.821 → 0.788 (-0.033) | 0.631 → 0.690 (+0.059) | 0.611 → 0.681 (+0.070) |
+| node_degree     | 0.619 → 0.621 (+0.001) | 0.555 → 0.520 (-0.035) | 0.405 → 0.390 (-0.014) |
+
+(baseline → debate). For `connected_nodes` the size effect *is* the empty-answer effect.
+For `edge_existence` the No-rate is flat across sizes (0.52/0.51/0.44), so its size effect
+is separate: the scaffold genuinely helps locate a pair in a long edge list.
+
+Two consequences for how the rest of this file should be read. First, section 3a's
+fragility amplification is **not** an artefact of this: on the non-empty
+`connected_nodes` bucket alone the spread still widens, baseline max-min 0.141 to CoT
+0.258. Second, the most promising untested intervention in the project is making the
+scaffold able to answer "none" / "No" — worth 207 instances on `connected_nodes` and 885
+on `edge_existence`, and it needs a prompt pilot, not more compute.
 
 ### 3e. Format compliance is good under v2, with one exception
 
@@ -308,6 +365,26 @@ At pooled n=600 the discordant-pair counts per cell run 124 to 253, which resolv
 effect of about 0.05. The condition effects that are near zero are near zero, not hidden
 by noise. More seeds will not turn them significant.
 
+**What replicates per seed, and what does not.** Each seed is an independent 200-graph
+draw, so this separates the stable results from the pooled artefacts:
+
+| seed | baseline mean | debate mean | delta   | connected_nodes spread, base → debate |
+|------|---------------|-------------|---------|----------------------------------------|
+| 7    |         0.486 |       0.498 | **+0.012** | 0.150 → 0.280                       |
+| 11   |         0.501 |       0.503 | **+0.002** | 0.125 → 0.350                       |
+| 13   |         0.516 |       0.487 | **-0.029** | 0.105 → 0.265                       |
+
+- **The mean debate-vs-baseline delta does not have a stable sign.** It is +0.012, +0.002
+  and -0.029 across the three seeds. The correct statement is that debate is
+  **indistinguishable from the baseline on the mean**, not that it is below it; the pooled
+  -0.005 is inside the seed-to-seed spread and must not be read as a small negative effect.
+- **The fragility amplification replicates 3 for 3.** `connected_nodes` spread widens in
+  every seed independently, and by a factor of 1.9 to 2.8. This is the result to lean on.
+
+The contrast is the point: pooling is what makes the *per-cell* effects significant, but
+the headline mean is a number that moves with the seed, while the spread effect is one
+that does not.
+
 ## 6. What the writeup says
 
 `docs/paper/main.tex` is the ACL writeup built on exactly these numbers. Its spine: the
@@ -356,8 +433,9 @@ version of this file was written** (73ba8e0), and every run dir was re-scored. T
 
 Defects 1 and 3 raised accuracy when fixed; defect 2 lowered it and dominated. The net
 effect was to remove an advantage debate was receiving from the scorer rather than from
-the condition, which is why debate now sits slightly *below* baseline (0.496 vs 0.501)
-rather than level with it. **The parser is deliberately not versioned:** prompts are
+the condition. Pooled, debate now reads 0.496 against the baseline's 0.501 — but see
+section 5: that gap is smaller than the seed-to-seed spread, so the honest statement is
+that the two are indistinguishable on the mean, not that debate is behind. **The parser is deliberately not versioned:** prompts are
 versioned because they change what the model generates, whereas the parser only changes
 how stored text is scored, so one rule applies uniformly and affected runs are re-scored
 with `scripts/rescore.py`. That costs no GPU because raw output is persisted.
