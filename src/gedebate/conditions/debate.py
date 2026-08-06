@@ -56,8 +56,9 @@ def run_debate(
     summed `n_prompt_tokens`/`n_gen_tokens`, `n_responses` (= turns), and `critic_unparsed`
     (count of verdicts that defaulted to AGREE). `max_responses` is the response budget.
 
-    `prompt_version` selects the Proposer/revision wording; it defaults to v1 (what
-    `results/main` was run under) so a run stays reproducible from its own config.
+    `prompt_version` selects the Proposer/revision wording. There is one frozen version,
+    v2, so it defaults to that; the argument stays because rows and manifests record the
+    version, which keeps a run self-describing if a second one is ever added.
     """
     turns: list[dict] = [_proposer_turn(
         model, instance, proposer_prompt(instance, prompt_version), max_new_tokens)]

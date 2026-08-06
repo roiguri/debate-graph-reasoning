@@ -61,6 +61,12 @@ ROW_FIELDS = (
 
 # What a row without a `prompt_version` means. Every debate row written before the field
 # existed came from the single pre-versioning wording, which is v1.
+#
+# This stays "v1" even though v1's prompt text has been deleted from the code: it labels
+# what those persisted rows ARE, not what the code can still produce. `results/main`,
+# `seed11` and `seed13` hold them. Renaming this to the surviving version would let v1
+# rows pool with v2 rows into one accuracy -- the exact accident this field exists to
+# prevent -- so it is not a leftover to tidy up.
 DEFAULT_ROW_PROMPT_VERSION = "v1"
 
 

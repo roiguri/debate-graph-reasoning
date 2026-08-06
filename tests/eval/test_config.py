@@ -96,11 +96,11 @@ def test_repo_p3_matrix_config():
     assert "Qwen" in cfg.model
 
 
-def test_prompt_version_defaults_to_v1_so_existing_configs_are_unaffected():
-    # results/main was produced under v1; a config that predates v2 must keep emitting
-    # the v1 wording rather than silently picking up the fix.
+def test_prompt_version_defaults_to_the_single_frozen_version():
+    # v1 was deleted when the project consolidated on one prompt; a config that names no
+    # version gets v2, the only one that exists.
     cfg = RunConfig.from_dict({"model": "m", "out_dir": "o", "dataset": "d"})
-    assert cfg.prompt_version == "v1"
+    assert cfg.prompt_version == "v2"
 
 
 def test_prompt_version_is_opt_in():
