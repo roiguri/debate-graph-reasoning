@@ -15,6 +15,13 @@ results/*
 analysis/*
 !analysis/README.md
 
+# LaTeX build artifacts (the .tex/.bib/.sty and the built PDF are committed)
+docs/paper/*.aux
+docs/paper/*.bbl
+docs/paper/*.blg
+docs/paper/*.log
+docs/paper/*.out
+
 # HuggingFace cache, if ever created locally
 .hf_cache/
 hf_cache/
