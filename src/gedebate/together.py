@@ -120,7 +120,11 @@ class TogetherModel:
                 payload["top_p"] = top_p
             # top_k is not honoured by every served model. It is forwarded so the
             # request matches the recorded decoding; it is not a guarantee.
-            if top_k is not None:
+            # `top_k = 0` is the config's documented way to DISABLE top-k truncation, so
+            # it is omitted rather than sent as a literal 0 -- the API accepts 0 but does
+            # not document what it means by it, and a silently reinterpreted decoding
+            # parameter is exactly the kind of thing that invalidates a run after the fact.
+            if top_k:
                 payload["top_k"] = top_k
             if seed is not None:
                 payload["seed"] = seed  # forwarded, not a replay guarantee

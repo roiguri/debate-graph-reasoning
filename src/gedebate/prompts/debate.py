@@ -62,23 +62,6 @@ _ANSWER_FORMAT = {
                         "graph writes them, or none"),
 }
 
-# What one atomic claim asserts, per task. node_degree and connected_nodes both reason over
-# the queried node's incident edges, so they share ONE constant (they cannot drift);
-# edge_existence checks a single pair, so it gets its own wording.
-_INCIDENT_CLAIM = (
-    "each claim one verifiable fact about a single edge (that it exists,\n"
-    "or that no further edge involves the node)"
-)
-_EDGE_CLAIM = (
-    "each claim one verifiable fact about the queried pair (whether that exact edge\n"
-    "appears in the graph's edge list)"
-)
-_CLAIM_KIND = {
-    "node_degree": _INCIDENT_CLAIM,
-    "connected_nodes": _INCIDENT_CLAIM,
-    "edge_existence": _EDGE_CLAIM,
-}
-
 # The shared claim-list + ANSWER block, used by BOTH the Proposer (turn 1) and the
 # revision, so their format is identical by construction rather than by copy. It states
 # the numbering explicitly and carries no fill-in template: v1's "1. <one atomic claim>"
@@ -89,30 +72,34 @@ _FORMAT_BLOCK = (
     "final line that begins with ANSWER: followed by {answer}. Write nothing after\n"
     "that line."
 )
+# Turn-1 framing. ONE wording for all three tasks: what a claim asserts is stated
+# generically ("about the graph's nodes or edges"), so there is no per-task slot left --
+# this used to be a template with a `{claim}` hole filled from a per-task dict. The
+# per-task detail that remains lives entirely in `_FORMAT_BLOCK`'s answer hint.
 _PROPOSER_PREAMBLE = (
     "Answer the question below using the graph. Build the answer as a numbered list of\n"
-    "atomic claims -- {claim} -- then give the final answer.\n"
+    "concise, atomic claims -- each stating exactly one simple, verifiable fact about\n"
+    "the graph's nodes or edges -- then give the final answer.\n"
 )
 _REVISION_PREAMBLE = "Give your corrected answer.\n"
 
-# Critic framing. `_CRITIC_TOP` is shared; the cue varies by task where the verification
-# differs. node_degree + connected_nodes both check the queried node's incident edges, so
-# they share ONE cue; edge_existence checks a single pair, so it gets its own.
+# Critic framing. `_CRITIC_TOP` is SETUP ONLY -- who is speaking, what they produced, and
+# that a transcript follows. Every instruction it used to carry (work only from the graph
+# text, an edge counts only if the list has it, derive the answer yourself, verify the
+# latest answer) was already restated by both cues below, so it said each thing twice; the
+# cues are now the single place those rules live. The cue varies by task where the
+# verification differs: node_degree + connected_nodes both check the queried node's
+# incident edges, so they share ONE cue; edge_existence checks a single pair.
 _CRITIC_TOP = (
     "Another model is answering the graph question below by writing numbered atomic claims\n"
-    "(each about one edge) and a final answer. You are the checker. The graph text is the\n"
-    "ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work\n"
-    "the answer out yourself from the graph, then verify the LATEST Proposer answer; the\n"
-    "debate so far is shown."
+    "(each about one edge or node) and a final answer. You are the checker; the debate so\n"
+    "far is shown."
 )
 _CRITIC_CUE_INCIDENT = (
-    "Work only from the graph text. First, independently go through the graph's edge list and\n"
-    "pick out every edge that involves the queried node, copying each exactly as written (an\n"
-    "edge counts only if it is in the list; never introduce one that is not there). Those\n"
-    "edges determine the correct answer. Then compare them to the Proposer's claims and final\n"
+    "Work only from the graph text. Review the Proposer's claims and final\n"
     "answer, in both directions:\n"
-    "- did the Proposer MISS an edge that is in the list?\n"
-    "- did the Proposer INCLUDE an edge that is not in the list?\n"
+    "- did the Proposer MISS an edge that is in the graph?\n"
+    "- did the Proposer INCLUDE an edge that is not in the graph?\n"
     "AGREE only if the Proposer's supporting edges are exactly the ones in the graph and the\n"
     "answer follows. Otherwise REVISE and name each wrong edge, quoting it from the graph's\n"
     "edge list. Every problem you raise must cite an edge that actually appears in the list;\n"
@@ -151,7 +138,7 @@ _REVISION_TOP = (
 PROMPT_VERSIONS = {
     "v2": {"answer_format": _ANSWER_FORMAT, "format_block": _FORMAT_BLOCK,
            "proposer_preamble": _PROPOSER_PREAMBLE, "revision_preamble": _REVISION_PREAMBLE,
-           "claim_kind": _CLAIM_KIND, "critic_cue": _CRITIC_CUE,
+           "critic_cue": _CRITIC_CUE,
            "revision_top": _REVISION_TOP},
 }
 DEFAULT_PROMPT_VERSION = "v2"
@@ -169,12 +156,13 @@ def _spec(version: str) -> dict:
 def supported_tasks(version: str = DEFAULT_PROMPT_VERSION) -> tuple[str, ...]:
     """Tasks this prompt version can build for.
 
-    A task is supported iff it has both a claim kind and an answer format, the two
-    per-task pieces the shared scaffold needs. Derived, so approving a task adds it in
-    exactly one place.
+    A task is supported iff it has both an answer format and a Critic cue -- the two
+    remaining per-task pieces now that one claim wording serves every task. Derived, so
+    approving a task adds it in exactly one place. Checking the cue matters: without it a
+    task could pass here and then KeyError inside `critic_prompt`.
     """
     spec = _spec(version)
-    return tuple(t for t in spec["claim_kind"] if t in spec["answer_format"])
+    return tuple(t for t in spec["answer_format"] if t in spec["critic_cue"])
 
 
 def _require_supported(task: str, version: str = DEFAULT_PROMPT_VERSION) -> None:
@@ -215,8 +203,7 @@ def proposer_prompt(instance: "Instance", version: str = DEFAULT_PROMPT_VERSION)
     """Turn-1 Proposer prompt: numbered-claim trace + ANSWER, then the question verbatim."""
     spec = _spec(version)
     _require_supported(instance.task, version)
-    instruction = (spec["proposer_preamble"].format(claim=spec["claim_kind"][instance.task])
-                   + _format_block(instance.task, version))
+    instruction = spec["proposer_preamble"] + _format_block(instance.task, version)
     return f"{instruction}\n\n{instance.question}"
 
 

@@ -31,8 +31,8 @@ def _instance(task):
 
 _ND_PROPOSER = (
     "Answer the question below using the graph. Build the answer as a numbered list of\n"
-    "atomic claims -- each claim one verifiable fact about a single edge (that it exists,\n"
-    "or that no further edge involves the node) -- then give the final answer.\n"
+    "concise, atomic claims -- each stating exactly one simple, verifiable fact about\n"
+    "the graph's nodes or edges -- then give the final answer.\n"
     "Number your claims 1., 2., 3., and so on, one claim per line. Then write a\n"
     "final line that begins with ANSWER: followed by a single integer, the degree. "
     "Write nothing after\nthat line."
@@ -105,7 +105,7 @@ def test_proposer_prompt_wraps_question_with_instruction():
     inst = _node_degree_instance()
     p = debate.proposer_prompt(inst)
     assert p.endswith(inst.question)          # question verbatim at the end
-    assert "numbered list of\natomic claims" in p
+    assert "numbered list of\nconcise, atomic claims" in p
     assert "ANSWER: followed by a single integer, the degree" in p
 
 
@@ -135,7 +135,7 @@ def test_every_prompt_piece_is_carried_by_the_version():
     # constants shared across versions, which made an in-place edit silently rewrite a
     # published prompt. Every piece must hang off the version spec.
     keys = {"answer_format", "format_block", "proposer_preamble", "revision_preamble",
-            "claim_kind", "critic_cue", "revision_top"}
+            "critic_cue", "revision_top"}
     for version, spec in debate.PROMPT_VERSIONS.items():
         assert set(spec) == keys, version
 

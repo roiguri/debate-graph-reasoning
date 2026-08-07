@@ -84,6 +84,15 @@ def test_sampling_forwards_the_recorded_decoding(model):
     assert payload["seed"] == 41
 
 
+def test_top_k_zero_is_omitted_not_sent(model):
+    """`top_k = 0` is the config's way of disabling top-k. Sending a literal 0 would
+    leave its meaning up to the API, which does not document it."""
+    m, t = model([_reply()])
+    m.generate("q", temperature=0.7, top_p=0.9, top_k=0)
+    assert "top_k" not in t.payloads[0]
+    assert t.payloads[0]["top_p"] == 0.9
+
+
 def test_missing_usage_raises_rather_than_writing_zeros(model):
     """A row with 0 tokens would silently corrupt the matched-compute table, so this
     has to be loud."""
