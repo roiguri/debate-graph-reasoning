@@ -24,20 +24,20 @@ def _instance(task):
 
 # --- drift guard: the frozen wording must be reproduced byte for byte ---------
 #
-# There is now ONE prompt version, v2, and it is frozen: it backs results/v2-* and every
+# v2 is FROZEN: it backs results/v2-* (Qwen) and results/llama70b-* (Llama), and every
 # number in docs/findings.md section 4. A failure here means someone edited a prompt that
-# published results depend on. The fix is to add a new version key, never to update this
-# literal. (v1 and a later revision of v2 were deleted; see the module comment.)
+# published results depend on. The fix is to add a new version key -- as v3 is -- never to
+# update this literal. (v1 and a later revision of v2 were deleted; see the module comment.)
 
-_ND_PROPOSER = (
+_V2_ND_PROPOSER = (
     "Answer the question below using the graph. Build the answer as a numbered list of\n"
-    "concise, atomic claims -- each stating exactly one simple, verifiable fact about\n"
-    "the graph's nodes or edges -- then give the final answer.\n"
+    "atomic claims -- each claim one verifiable fact about a single edge (that it exists,\n"
+    "or that no further edge involves the node) -- then give the final answer.\n"
     "Number your claims 1., 2., 3., and so on, one claim per line. Then write a\n"
     "final line that begins with ANSWER: followed by a single integer, the degree. "
     "Write nothing after\nthat line."
 )
-_ND_REVISION = (
+_V2_ND_REVISION = (
     "Give your corrected answer.\n"
     "Number your claims 1., 2., 3., and so on, one claim per line. Then write a\n"
     "final line that begins with ANSWER: followed by a single integer, the degree. "
@@ -45,18 +45,43 @@ _ND_REVISION = (
 )
 
 
-def test_prompts_are_byte_identical_to_the_frozen_wording():
+def test_v2_prompts_are_byte_identical_to_the_frozen_wording():
     inst = _node_degree_instance()
-    assert debate.proposer_prompt(inst) == f"{_ND_PROPOSER}\n\n{inst.question}"
+    assert debate.proposer_prompt(inst, "v2") == f"{_V2_ND_PROPOSER}\n\n{inst.question}"
     turns = [{"role": "proposer", "raw": "1. foo\nANSWER: 2"}]
-    assert debate.revision_prompt(inst, turns).endswith(f"\n\n{_ND_REVISION}")
+    assert debate.revision_prompt(inst, turns, "v2").endswith(f"\n\n{_V2_ND_REVISION}")
 
 
-def test_there_is_exactly_one_version_and_it_is_v2():
-    # The single source of truth. results/v2-* manifests record prompt_version "v2", so
-    # the key must keep that name for those runs to stay self-describing.
-    assert list(debate.PROMPT_VERSIONS) == ["v2"]
+def test_v2_and_v3_are_both_present_and_v2_is_the_default():
+    # Manifests record the version, and the analysis filters on it, so these key names
+    # are load-bearing. The default stays v2: it is what every committed result was run
+    # under, and what a config omitting `prompt_version` must keep meaning.
+    assert list(debate.PROMPT_VERSIONS) == ["v2", "v3"]
     assert debate.DEFAULT_PROMPT_VERSION == "v2"
+
+
+def test_v3_differs_from_v2_in_every_role_it_changed():
+    inst = _node_degree_instance()
+    turns = [{"role": "proposer", "raw": "1. foo\nANSWER: 2"}]
+    assert debate.proposer_prompt(inst, "v3") != debate.proposer_prompt(inst, "v2")
+    assert debate.critic_prompt(inst, turns, "v3") != debate.critic_prompt(inst, turns, "v2")
+    # the revision role was NOT changed, so only the transcript inside it may differ
+    assert debate.PROMPT_VERSIONS["v3"]["revision_top"] == \
+        debate.PROMPT_VERSIONS["v2"]["revision_top"]
+
+
+def test_the_versions_share_no_mutable_constant():
+    """Editing one version must not be able to reach the other.
+
+    Two versions pointing at ONE object is exactly what let an in-place edit rewrite a
+    published prompt, so every per-version piece is a distinct object even where the text
+    is identical today.
+    """
+    v2, v3 = debate.PROMPT_VERSIONS["v2"], debate.PROMPT_VERSIONS["v3"]
+    assert set(v2) == set(v3)
+    for key in v2:
+        if isinstance(v2[key], dict):  # the per-task dicts must not be the same object
+            assert v2[key] is not v3[key], key
 
 
 def test_the_frozen_prompt_carries_no_fill_in_template():
@@ -105,7 +130,7 @@ def test_proposer_prompt_wraps_question_with_instruction():
     inst = _node_degree_instance()
     p = debate.proposer_prompt(inst)
     assert p.endswith(inst.question)          # question verbatim at the end
-    assert "numbered list of\nconcise, atomic claims" in p
+    assert "numbered list of\natomic claims" in p  # v2, the default
     assert "ANSWER: followed by a single integer, the degree" in p
 
 
@@ -135,7 +160,7 @@ def test_every_prompt_piece_is_carried_by_the_version():
     # constants shared across versions, which made an in-place edit silently rewrite a
     # published prompt. Every piece must hang off the version spec.
     keys = {"answer_format", "format_block", "proposer_preamble", "revision_preamble",
-            "critic_cue", "revision_top"}
+            "critic_top", "critic_cue", "revision_top"}
     for version, spec in debate.PROMPT_VERSIONS.items():
         assert set(spec) == keys, version
 

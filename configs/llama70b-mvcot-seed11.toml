@@ -35,6 +35,9 @@ provider = "together"
 condition = "majority_vote_cot"
 dataset = "data/seed11.jsonl"
 
+# PROVISIONAL: 3 was token-matched against debate under v2, where the loop stopped at
+# turn 2 on 85-96% of instances. v3 changes the Critic, so re-measure debate's turn
+# counts on the v3 run and re-derive N before spending on this arm.
 n_samples = 3
 temperature = 0.6
 top_p = 0.9
@@ -43,7 +46,7 @@ top_k = 0  # disables top-k; omitted from the request rather than sent as a lite
 # The Proposer wording these draws sample. Recorded per row and in the manifest, exactly
 # as debate records it -- without it two runs of this arm under different prompt texts
 # would be indistinguishable.
-prompt_version = "v2"
+prompt_version = "v3"
 
 # 512 matches the debate arm. The terse arm's 128 would truncate a claims-plus-ANSWER
 # trace, and a per-arm cap is a confound.
