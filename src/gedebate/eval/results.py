@@ -31,6 +31,11 @@ if TYPE_CHECKING:
 
 SCHEMA_VERSION = 1
 
+# Conditions that write N rows per instance (one per `sample_index`) rather than one.
+# Named here, in the layer that decides when an instance is "done", so adding a vote arm
+# never leaves a resume check silently treating N rows as N finished instances.
+VOTE_CONDITIONS = ("majority_vote", "majority_vote_cot")
+
 # Fields persisted per attempt, in order. Identical across all three conditions.
 ROW_FIELDS = (
     "schema_version",
@@ -201,8 +206,8 @@ def read_rows(path: str | Path) -> list[dict]:
 # --- resume -------------------------------------------------------------------
 
 def expected_attempts(condition: str, n_samples: int = 1) -> int:
-    """Attempts that make an instance 'done': N for majority-vote, else 1."""
-    return n_samples if condition == "majority_vote" else 1
+    """Attempts that make an instance 'done': N for either vote arm, else 1."""
+    return n_samples if condition in VOTE_CONDITIONS else 1
 
 
 def load_progress(run_dir: str | Path) -> dict[tuple[str, str], set[int]]:

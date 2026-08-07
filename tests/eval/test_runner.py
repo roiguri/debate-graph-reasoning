@@ -15,11 +15,14 @@ from gedebate.eval import results
 from gedebate.eval.config import RunConfig
 from gedebate.eval.runner import (
     build_instances,
+    manifest_record,
     parse_shard,
     run_instances,
     select_shard,
     verify_sample,
 )
+from gedebate.prompts import build_prompt
+from gedebate.prompts.debate import proposer_prompt
 
 MANIFEST = {"dataset_sha256": "testhash"}  # minimal reproduction record for the guard
 
@@ -237,3 +240,55 @@ def test_git_commit_is_unknown_when_there_is_no_git_and_no_stamp(tmp_path, monke
     monkeypatch.setattr(runner.subprocess, "check_output",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("no git here")))
     assert runner._git_commit() == "unknown"
+
+
+# --- the reasoned vote arm (same N-row persistence, Proposer prompt) -----------
+
+def test_majority_vote_cot_persists_n_rows_and_records_the_prompt_version(tmp_path):
+    cfg = _cfg(tmp_path, condition="majority_vote_cot", n_samples=3, temperature=0.6,
+               prompt_version="v2", max_new_tokens=512)
+    instances = build_instances(cfg)
+
+    model = _StubModel("1. The pair is in the edge list.\nANSWER: Yes")
+    stats = run_instances(model, instances, cfg, MANIFEST)
+    assert stats == {"written": 15, "skipped": 0} and model.calls == 15  # 5 insts x 3
+
+    rows = results.read_rows(results.shard_file(cfg.out_dir, "majority_vote_cot"))
+    assert len(rows) == 15
+    assert {r["condition"] for r in rows} == {"majority_vote_cot"}
+    # the wording is recorded per row, as debate records it -- two runs of this arm under
+    # different prompt texts must not be poolable.
+    assert {r["prompt_version"] for r in rows} == {"v2"}
+    assert all(r["temperature"] == 0.6 and r["seed"] is not None for r in rows)
+
+    # fully-done instances are skipped on resume, exactly like the terse arm
+    assert run_instances(_StubModel(), instances, cfg, MANIFEST) == {"written": 0, "skipped": 5}
+
+
+def test_majority_vote_cot_sends_the_proposer_prompt(tmp_path):
+    cfg = _cfg(tmp_path, condition="majority_vote_cot", n_samples=2, temperature=0.6,
+               prompt_version="v2")
+    inst = build_instances(cfg)[0]
+
+    seen = []
+
+    class _Recorder(_StubModel):
+        def generate(self, prompt, *, max_new_tokens=64, **kw):
+            seen.append(prompt)
+            return super().generate(prompt, max_new_tokens=max_new_tokens, **kw)
+
+    run_instances(_Recorder("ANSWER: Yes"), [inst], cfg, MANIFEST)
+    assert seen and all(p == proposer_prompt(inst, "v2") for p in seen)
+    assert build_prompt(inst) not in seen
+
+
+def test_manifest_records_the_vote_arms_budget_and_wording(tmp_path):
+    terse = manifest_record(_cfg(tmp_path, condition="majority_vote", n_samples=4), "c.toml")
+    assert terse["n_samples"] == 4 and "prompt_version" not in terse
+    assert terse["decoding"].startswith("temperature=")
+
+    cot = manifest_record(
+        _cfg(tmp_path, condition="majority_vote_cot", n_samples=3, prompt_version="v2"),
+        "c.toml")
+    assert cot["n_samples"] == 3 and cot["prompt_version"] == "v2"
+    assert cot["decoding"].startswith("temperature=")

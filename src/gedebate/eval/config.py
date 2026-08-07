@@ -13,9 +13,10 @@ from pathlib import Path
 
 from gedebate.data.dataset import ENCODINGS as ALL_ENCODINGS
 from gedebate.data.dataset import TASKS as ALL_TASKS
+from gedebate.eval.results import VOTE_CONDITIONS
 from gedebate.prompts.debate import DEFAULT_PROMPT_VERSION, PROMPT_VERSIONS
 
-KNOWN_CONDITIONS = ("baseline", "majority_vote", "debate")
+KNOWN_CONDITIONS = ("baseline", "debate", *VOTE_CONDITIONS)
 # Where `model` is served from. "hf" loads it in-process on a GPU; "together" posts to
 # the Together.ai API. The two are NOT interchangeable within an analysis: token counts
 # come from different tokenizers and sampled draws only replay under "hf".
@@ -44,9 +45,10 @@ class RunConfig:
     temperature: float = 0.7
     top_p: float = 0.8
     top_k: int = 20
-    # Debate Proposer/revision wording (ignored by baseline/majority-vote). Versioned so
-    # a prompt fix cannot retroactively change what an existing config would emit; the
-    # default is v1, which is what results/main was run under. See prompts/debate.py.
+    # Proposer wording, used by `debate` and by `majority_vote_cot` (which samples the
+    # debate's turn-1 Proposer prompt); ignored by baseline and by the terse vote arm.
+    # Versioned so a prompt fix cannot retroactively change what an existing config would
+    # emit. See prompts/debate.py.
     prompt_version: str = DEFAULT_PROMPT_VERSION
 
     @classmethod

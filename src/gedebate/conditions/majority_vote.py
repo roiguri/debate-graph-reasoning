@@ -19,12 +19,19 @@ from typing import TYPE_CHECKING
 
 from gedebate.eval.scoring import parse, score
 from gedebate.prompts import build_prompt
+from gedebate.prompts.debate import parse_proposer, proposer_prompt
 
 if TYPE_CHECKING:
     from gedebate.data.instance import GroundTruth, Instance
     from gedebate.model import Model
 
 CONDITION = "majority_vote"
+# The reasoned arm: the same vote, taken over the debate's turn-1 Proposer prompt instead
+# of the terse baseline one. A SEPARATE condition name, not a flag on the old one, because
+# the two answer different questions and their rows must never pool: the terse arm
+# controls for the BASELINE (does extra compute help a direct answer?) and the reasoned
+# arm controls for DEBATE (does the Critic beat drawing the same reasoned answer N times?).
+CONDITION_COT = "majority_vote_cot"
 
 
 def sample_seed(instance_id: str, sample_index: int) -> int:
@@ -47,6 +54,7 @@ def run_sample(
     top_p: float | None = None,
     top_k: int | None = None,
     max_new_tokens: int = 128,
+    prompt_version: str | None = None,
 ) -> dict:
     """One sampled draw -> parse -> score -> attempt record (baseline's shape + seed).
 
@@ -54,19 +62,40 @@ def run_sample(
     them via `results.make_row` without recomputing. `top_p`/`top_k` are passed
     through to the model so the sampling truncation is explicit, not the model's
     shipped default.
+
+    `prompt_version` selects the ARM, because the two differ only in what is sampled:
+
+    * `None` -- the terse baseline prompt, read by the shared answer parser. Voting over
+      a near-single-token answer; this is what `results/main` holds.
+    * a version string -- the debate's turn-1 Proposer prompt, read by `parse_proposer`.
+      Same generation format the Proposer uses, N independent draws, no Critic.
+
+    The parser must follow the prompt: `scoring.parse` scans the whole text, which on a
+    numbered-claim trace harvests every label it sees ("Robert is *not* connected to
+    Susan" would put Susan in the answer). `parse_proposer` takes the `ANSWER:` line, with
+    the last-non-empty-line fallback and the claim-number strip the Proposer format needs.
     """
-    prompt = build_prompt(instance)
+    if prompt_version is None:
+        condition, prompt = CONDITION, build_prompt(instance)
+    else:
+        condition = CONDITION_COT
+        prompt = proposer_prompt(instance, prompt_version)
     seed = sample_seed(instance.instance_id, sample_index)
     gen = model.generate(
         prompt, max_new_tokens=max_new_tokens, temperature=temperature,
         top_p=top_p, top_k=top_k, seed=seed,
     )
-    parsed, parse_ok = parse(
-        instance.task, gen.text, encoding=instance.encoding, node_ids=instance.node_ids
-    )
+    if prompt_version is None:
+        parsed, parse_ok = parse(
+            instance.task, gen.text, encoding=instance.encoding, node_ids=instance.node_ids
+        )
+    else:
+        parsed, parse_ok, _claims = parse_proposer(
+            gen.text, instance.task, encoding=instance.encoding, node_ids=instance.node_ids
+        )
     correct = score(parsed, instance.ground_truth)
     return {
-        "condition": CONDITION,
+        "condition": condition,
         "task": instance.task,
         "encoding": instance.encoding,
         "prompt": prompt,

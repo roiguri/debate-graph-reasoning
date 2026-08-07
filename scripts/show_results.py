@@ -138,6 +138,10 @@ def main() -> None:
     ap.add_argument("--condition", default=None,
                     help="comma-separated conditions to include (default: all). "
                          "e.g. --condition baseline for a baseline-only pooled view")
+    ap.add_argument("--vote-condition", default="majority_vote", choices=results.VOTE_CONDITIONS,
+                    help="which vote arm the majority-vote views report: the terse "
+                         "baseline-prompt one (default) or the reasoned Proposer-prompt "
+                         "one. They answer different questions and are never pooled.")
     ap.add_argument("--save", metavar="DIR", default=None,
                     help="write summary/fragility/significance CSVs here (e.g. analysis/baseline)")
     ap.add_argument("--raw", action="store_true", help="print per-instance raw_output -> parsed")
@@ -160,7 +164,9 @@ def main() -> None:
     # "not majority_vote": once P5's debate/ rows share the dir, an inequality would
     # silently pool them into the baseline table.
     base_rows = [r for r in rows if r["condition"] == "baseline"]
-    mv_rows = [r for r in rows if r["condition"] == "majority_vote"]
+    mv_rows = [r for r in rows if r["condition"] == args.vote_condition]
+    # Tag saved filenames with the arm, so the two never overwrite each other in one dir.
+    mv_tag = "mv" if args.vote_condition == "majority_vote" else "mvcot"
 
     summary = report.summarize(base_rows) if base_rows else {}
     frag = report.fragility(summary) if base_rows else {}
@@ -186,7 +192,7 @@ def main() -> None:
 
     vote_summary = report.summarize_votes(mv_rows) if mv_rows else {}
     if mv_rows:
-        print("\n-- majority vote (voted per instance; 1samp = mean single-draw acc) --")
+        print(f"\n-- {args.vote_condition} (voted per instance; 1samp = mean single-draw acc) --")
         print(report.format_vote_summary(vote_summary))
 
     # vote-vs-baseline comparison (needs both conditions): printed on --compare,
@@ -198,7 +204,7 @@ def main() -> None:
                   "(delta = vote_acc - baseline_acc; x = token multiplier) --")
             print(report.format_comparison(comparison))
         else:
-            print("\n-- --compare needs both baseline and majority_vote rows in the run dir --")
+            print(f"\n-- --compare needs both baseline and {args.vote_condition} rows in the run dir --")
 
     # -- debate (verify-and-revise): reuse the same summarize/fragility/significance path as
     # baseline; select by name so it never pools into the baseline table.
@@ -243,13 +249,13 @@ def main() -> None:
             (out / "baseline_significance.csv").write_text(report.significance_to_csv(sig), encoding="utf-8")
             wrote += ["baseline_summary.csv", "baseline_fragility.csv", "baseline_significance.csv"]
         if mv_rows:
-            (out / "mv_vote_summary.csv").write_text(
+            (out / f"{mv_tag}_vote_summary.csv").write_text(
                 report.vote_summary_to_csv(vote_summary), encoding="utf-8")
-            wrote.append("mv_vote_summary.csv")
+            wrote.append(f"{mv_tag}_vote_summary.csv")
         if comparison:
-            (out / "mv_vs_baseline.csv").write_text(
+            (out / f"{mv_tag}_vs_baseline.csv").write_text(
                 report.comparison_to_csv(comparison), encoding="utf-8")
-            wrote.append("mv_vs_baseline.csv")
+            wrote.append(f"{mv_tag}_vs_baseline.csv")
         if debate_rows:
             (out / "debate_summary.csv").write_text(report.summary_to_csv(deb_summary), encoding="utf-8")
             (out / "debate_fragility.csv").write_text(
@@ -261,8 +267,8 @@ def main() -> None:
             (out / "debate_vs_baseline.csv").write_text(_compare_to_csv(deb_vs_base, "baseline"), encoding="utf-8")
             wrote.append("debate_vs_baseline.csv")
         if deb_vs_mv:
-            (out / "debate_vs_mv.csv").write_text(_compare_to_csv(deb_vs_mv, "vote"), encoding="utf-8")
-            wrote.append("debate_vs_mv.csv")
+            (out / f"debate_vs_{mv_tag}.csv").write_text(_compare_to_csv(deb_vs_mv, "vote"), encoding="utf-8")
+            wrote.append(f"debate_vs_{mv_tag}.csv")
         print(f"\nsaved {' + '.join(wrote)} -> {out}/")
 
     if not args.raw:

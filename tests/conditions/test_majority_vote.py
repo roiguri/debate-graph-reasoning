@@ -9,8 +9,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from gedebate.conditions.majority_vote import run_sample, sample_seed, vote
+from gedebate.conditions.majority_vote import (
+    CONDITION_COT,
+    run_sample,
+    sample_seed,
+    vote,
+)
 from gedebate.eval.runner import first_instance
+from gedebate.eval.scoring import parse as _scoring_parse
+from gedebate.prompts import build_prompt
+from gedebate.prompts.debate import parse_proposer, proposer_prompt
 
 
 # --- vote rule ----------------------------------------------------------------
@@ -81,9 +89,11 @@ class _StubModel:
     def __init__(self, reply: str):
         self.reply = reply
         self.seen: list[dict] = []
+        self.prompts: list[str] = []
 
     def generate(self, prompt: str, *, max_new_tokens: int = 64, temperature=None,
                  top_p=None, top_k=None, seed=None):
+        self.prompts.append(prompt)
         self.seen.append({"temperature": temperature, "top_p": top_p,
                           "top_k": top_k, "seed": seed})
         return _StubGen(self.reply, n_gen_tokens=9, n_prompt_tokens=13)
@@ -110,3 +120,49 @@ def test_run_sample_record_shape_and_passes_sampling_kwargs():
     assert model.seen[0]["top_p"] == 1.0 and model.seen[0]["top_k"] == 0
     assert rec["seed"] == sample_seed(inst.instance_id, 2)
     assert model.seen[0]["seed"] == rec["seed"]
+
+
+# --- the reasoned arm: same vote, sampled over the Proposer prompt ------------
+
+def test_terse_arm_samples_the_baseline_prompt():
+    inst = _edge_instance()
+    model = _StubModel("Yes.")
+    rec = run_sample(model, inst, sample_index=0, temperature=0.6)
+    assert rec["condition"] == "majority_vote"
+    assert model.prompts[0] == build_prompt(inst)
+
+
+def test_cot_arm_samples_the_debate_proposer_prompt():
+    inst = _edge_instance()
+    gold = "Yes" if inst.ground_truth else "No"
+    model = _StubModel(f"1. The pair appears in the edge list.\nANSWER: {gold}")
+
+    rec = run_sample(model, inst, sample_index=1, temperature=0.6, top_p=0.9,
+                     prompt_version="v2")
+
+    # A separate condition name, so the two arms can never pool into one accuracy.
+    assert rec["condition"] == CONDITION_COT
+    assert model.prompts[0] == proposer_prompt(inst, "v2")
+    assert rec["correct"] is True and rec["parse_ok"] is True
+    assert model.seen[0]["temperature"] == 0.6 and model.seen[0]["top_p"] == 0.9
+    assert rec["seed"] == sample_seed(inst.instance_id, 1)
+
+
+def test_cot_arm_reads_the_answer_line_not_the_whole_trace():
+    """The parser must follow the prompt: `scoring.parse` scans the whole output and
+    harvests every label it recognises, so on a numbered-claim trace a negated claim
+    ("not connected to 3") leaks into the answer. The reasoned arm must use
+    `parse_proposer`, which reads the ANSWER: line."""
+    inst = first_instance(n_graphs=4, seed=7, task="connected_nodes", encoding="adjacency")
+    raw = "1. Node 1 is connected to node 0.\n2. Node 1 is not connected to node 3.\nANSWER: 0"
+    model = _StubModel(raw)
+
+    rec = run_sample(model, inst, sample_index=0, temperature=0.6, prompt_version="v2")
+
+    expected, _ok, _claims = parse_proposer(raw, inst.task, encoding=inst.encoding,
+                                            node_ids=inst.node_ids)
+    assert rec["parsed_answer"] == expected == [0]
+    # the parser the terse arm uses would have read the trace, not the answer
+    whole_text, _ = _scoring_parse(inst.task, raw, encoding=inst.encoding,
+                                   node_ids=inst.node_ids)
+    assert whole_text != expected

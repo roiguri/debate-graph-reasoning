@@ -33,6 +33,7 @@ from pathlib import Path
 from gedebate.data.store import load_dataset
 from gedebate.eval import results
 from gedebate.eval.config import RunConfig, load_config
+from gedebate.eval.results import VOTE_CONDITIONS
 from gedebate.prompts import build_prompt
 from gedebate.prompts.debate import critic_prompt, proposer_prompt, revision_prompt
 
@@ -159,8 +160,10 @@ def _header(cfg: RunConfig, config_path: str, source: str) -> str:
             f"max_responses    {cfg.n_samples}   (the response budget)",
             f"transcript       {source}",
         ]
-    elif cfg.condition == "majority_vote":
-        lines.append(f"n_samples        {cfg.n_samples}")
+    elif cfg.condition in VOTE_CONDITIONS:
+        lines.append(f"n_samples        {cfg.n_samples}   (draws per instance, then voted)")
+        if cfg.condition == "majority_vote_cot":
+            lines.append(f"prompt_version   {cfg.prompt_version}")
     lines += [
         "",
         "Each prompt below is sent as a SINGLE user message with no system prompt; the",
@@ -191,8 +194,12 @@ def render(
             blocks = debate_prompts(instance, turns or placeholder_turns(rounds),
                                     cfg.prompt_version)
             blocks = [(lbl, p) for lbl, p in blocks if _role_of(lbl) in roles]
+        elif cfg.condition == "majority_vote_cot":
+            # The reasoned vote arm samples the debate's turn-1 Proposer prompt N times.
+            blocks = [(f"PROPOSER PROMPT (x{cfg.n_samples} sampled draws, then voted)",
+                       proposer_prompt(instance, cfg.prompt_version))]
         else:
-            # baseline and majority-vote send the same single prompt; MV only re-samples it.
+            # baseline and the terse vote arm send the same single prompt; MV re-samples it.
             blocks = [(f"{cfg.condition.upper()} PROMPT", build_prompt(instance))]
         out.extend(_block(lbl, p) for lbl, p in blocks)
     return "\n".join(out)

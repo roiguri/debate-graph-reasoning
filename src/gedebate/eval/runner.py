@@ -20,7 +20,7 @@ from pathlib import Path
 import gedebate
 from gedebate.conditions.baseline import run_instance
 from gedebate.conditions.debate import run_debate
-from gedebate.conditions.majority_vote import run_sample
+from gedebate.conditions.majority_vote import CONDITION_COT, run_sample
 from gedebate.data.dataset import build_dataset
 from gedebate.data.store import dataset_identity, load_dataset
 from gedebate.eval import report, results
@@ -84,7 +84,7 @@ def _git_commit() -> str:
 def manifest_record(cfg: RunConfig, config_path: str) -> dict:
     """The reproduction record stored in the run manifest (guards on dataset_sha256)."""
     decoding = (f"temperature={cfg.temperature},top_p={cfg.top_p},top_k={cfg.top_k}"
-                if cfg.condition == "majority_vote" else "greedy")  # baseline + debate greedy
+                if cfg.condition in results.VOTE_CONDITIONS else "greedy")  # baseline + debate greedy
     rec = {
         "dataset": cfg.dataset,
         "dataset_sha256": dataset_identity(cfg.dataset),
@@ -96,8 +96,12 @@ def manifest_record(cfg: RunConfig, config_path: str) -> dict:
         "config": config_path,
         "created": datetime.now(timezone.utc).isoformat(),
     }
-    if cfg.condition == "majority_vote":
+    if cfg.condition in results.VOTE_CONDITIONS:
         rec["n_samples"] = cfg.n_samples
+    if cfg.condition == CONDITION_COT:
+        # The reasoned arm samples the Proposer prompt, so its rows depend on that wording
+        # exactly as debate's do -- record it or two arms run months apart look identical.
+        rec["prompt_version"] = cfg.prompt_version
     if cfg.condition == "debate":
         rec["max_responses"] = cfg.n_samples  # debate's response budget (= MV's N)
         rec["prompt_version"] = cfg.prompt_version  # which Proposer wording produced these rows
@@ -120,7 +124,7 @@ def run_instances(model, instances: list, cfg: RunConfig, manifest: dict, *, sha
     trace_path = results.trace_file(cfg.out_dir, cfg.condition, shard)
     written = skipped = 0
     for inst in instances:
-        if cfg.condition == "majority_vote":
+        if cfg.condition in results.VOTE_CONDITIONS:
             n = _run_vote_samples(model, inst, cfg, path, progress)
             written += n
             skipped += n == 0  # instance already had all N samples
@@ -152,15 +156,19 @@ def _run_vote_samples(model, inst, cfg: RunConfig, path, progress) -> int:
     """
     missing = results.missing_samples(progress, cfg.condition, inst.instance_id, cfg.n_samples)
     seen = progress.setdefault((cfg.condition, inst.instance_id), set())
+    # None for the terse arm (baseline prompt); the config's version for the reasoned one,
+    # which is what selects the Proposer prompt inside `run_sample`.
+    prompt_version = cfg.prompt_version if cfg.condition == CONDITION_COT else None
     for si in missing:
         attempt = run_sample(
             model, inst, sample_index=si,
             temperature=cfg.temperature, top_p=cfg.top_p, top_k=cfg.top_k,
-            max_new_tokens=cfg.max_new_tokens,
+            max_new_tokens=cfg.max_new_tokens, prompt_version=prompt_version,
         )
         row = results.make_row(
             inst, cfg.model, attempt,
             sample_index=si, temperature=cfg.temperature, seed=attempt["seed"],
+            prompt_version=prompt_version,
         )
         results.append_row(path, row)
         seen.add(si)
@@ -174,7 +182,7 @@ def summarize_run(cfg: RunConfig) -> dict:
         r for f in results.result_files(cfg.out_dir) for r in results.read_rows(f)
         if r["condition"] == cfg.condition
     ]
-    if cfg.condition == "majority_vote":
+    if cfg.condition in results.VOTE_CONDITIONS:
         return report.summarize_votes(rows)
     return report.summarize(rows)
 
@@ -248,7 +256,7 @@ def _run_config(config_path: str, shard_spec: str) -> None:
     print(f"Loaded on device={model.device}. Running ...", flush=True)
     stats = run_instances(model, instances, cfg, manifest, shard=shard)
     print(f"done: wrote {stats['written']}, skipped {stats['skipped']}\n", flush=True)
-    fmt = (report.format_vote_summary if cfg.condition == "majority_vote"
+    fmt = (report.format_vote_summary if cfg.condition in results.VOTE_CONDITIONS
            else report.format_summary)
     print(fmt(summarize_run(cfg)), flush=True)
 

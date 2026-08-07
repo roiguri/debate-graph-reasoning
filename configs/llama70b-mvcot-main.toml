@@ -1,0 +1,51 @@
+# Llama-3.3-70B reasoned majority vote, seed 7. The control for DEBATE.
+#
+# The terse majority-vote arm (configs/mv.toml) votes over the baseline prompt, so it
+# controls for the BASELINE: does extra compute help a direct one-token answer? The answer
+# was no in all 9 cells. This arm votes over the debate's turn-1 Proposer prompt instead,
+# so the only difference from debate is whether the attempts see each other -- N
+# independent reasoned answers, voted, against N interacting ones.
+#
+# n_samples = 3 is TOKEN-matched to debate on this model, not guessed. Over 5,400 Llama
+# debates (3 seeds), debate spends 1,518-1,814 tokens per instance against a turn-1 cost
+# of 559-585, so debate buys 2.71 (edge_existence), 2.97 (node_degree) and 3.10
+# (connected_nodes) turn-1-equivalents. One uniform N covers all three, which keeps the
+# per-task budget from becoming a confound the way a per-cell token cap would.
+#
+# Matching on RESPONSES instead would say N=2, because Llama's debate almost never gets
+# past turn 2: 85-96% of debates stop there, with the Critic returning AGREE on its first
+# turn (and on 11.3% of node_degree / 6.4% of connected_nodes that "AGREE" is an
+# unparseable verdict the loop defaults to AGREE, not real agreement). N=2 is not a vote
+# -- two draws are either unanimous or a tie broken by first index, which is just sample 0
+# -- so N=3 is the smallest N that votes at all, and it still fits inside debate's tokens.
+#
+# Decoding is Llama-3.3-70B-Instruct's own generation_config: temperature 0.6, top_p 0.9,
+# no top_k. NOT the 0.7/0.8/20 in configs/mv.toml, which are Qwen2.5-Instruct's
+# recommended values and would import another model's defaults into this arm. The values
+# are the model's shipped ones on purpose: tuning a control's temperature until it shows
+# the diversity you want is choosing the result in advance. Realized diversity is a
+# DIAGNOSTIC to report (unanimity rate, distinct answers per instance), not a knob.
+
+model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+provider = "together"
+condition = "majority_vote_cot"
+dataset = "data/main.jsonl"
+
+n_samples = 3
+temperature = 0.6
+top_p = 0.9
+top_k = 0  # disables top-k; omitted from the request rather than sent as a literal 0
+
+# The Proposer wording these draws sample. Recorded per row and in the manifest, exactly
+# as debate records it -- without it two runs of this arm under different prompt texts
+# would be indistinguishable.
+prompt_version = "v2"
+
+# 512 matches the debate arm. The terse arm's 128 would truncate a claims-plus-ANSWER
+# trace, and a per-arm cap is a confound.
+max_new_tokens = 512
+
+tasks = ["edge_existence", "node_degree", "connected_nodes"]
+encodings = ["adjacency", "incident", "friendship"]
+
+out_dir = "results/llama70b-main"
