@@ -20,6 +20,11 @@ python scripts/show_results.py results/llama70b-main results/llama70b-seed11 \
 python scripts/debate_diagnostics.py results/llama70b-main results/llama70b-seed11 \
     results/llama70b-seed13 results/llama70b-v3-main results/llama70b-v3-seed11 \
     results/llama70b-v3-seed13 --prompt-version v3 --save analysis/llama70b-v3
+# the matched-compute vote arm (section 7)
+python scripts/show_results.py results/llama70b-main results/llama70b-seed11 \
+    results/llama70b-seed13 results/llama70b-v3-main results/llama70b-v3-seed11 \
+    results/llama70b-v3-seed13 --prompt-version v3 \
+    --vote-condition majority_vote_cot --compare --save analysis/llama70b-v3
 ```
 
 `--prompt-version v3` is **required**, not optional: the run dirs hold debate rows under two
@@ -28,23 +33,28 @@ prompt versions and the analysis refuses to pool them (see section 9).
 **Setup.** `meta-llama/Llama-3.3-70B-Instruct-Turbo` served by Together.ai (`provider =
 "together"`, FP8 endpoint), greedy decoding, Proposer prompt **v3**. Three independent
 200-graph draws (seeds 7/11/13) over the frozen dataset artifacts, 3 tasks x 3 encodings,
-**n=600 per cell**, 5,400 debate instances against 5,400 baseline instances. Encodings are
-applied to the same graphs, so all tests are paired (McNemar, Cochran's Q). Baseline
-generation cap 256 tokens, debate cap 512. Configs:
-`configs/llama70b-baseline-{main,seed11,seed13}.toml` and
-`configs/llama70b-debate-v3-{main,seed11,seed13}.toml`.
+**n=600 per cell** — 5,400 baseline instances, 5,400 debate instances, and 16,200
+majority-vote draws (3 per instance). Encodings are applied to the same graphs, so all
+tests are paired (McNemar, Cochran's Q). Baseline generation cap 256 tokens, debate and
+vote cap 512. Configs: `configs/llama70b-baseline-{main,seed11,seed13}.toml`,
+`configs/llama70b-debate-v3-{main,seed11,seed13}.toml` and
+`configs/llama70b-mvcot-{main,seed11,seed13}.toml`.
 
 **Conditions.** *Baseline* is one zero-shot answer-only response. *Debate* is a
 Proposer–Critic loop: the Proposer emits a numbered claim trace plus a final answer, the
 Critic reviews it against the encoding and returns AGREE/REVISE, the Proposer revises.
-Debate turn 1 is a single-turn chain-of-thought answer at the same decoding settings, which
-lets the scaffold effect and the loop effect be separated with no extra runs. The baseline
-prompt is untouched by the prompt versioning, so the same baseline rows serve every section.
+*Majority vote* draws the **same Proposer prompt** N=3 times independently (temperature 0.6,
+top_p 0.9 — the model's shipped defaults) and takes the mode of the parsed answers; it is
+the matched-compute control, differing from debate only in whether the attempts see each
+other. Debate turn 1 is a single-turn chain-of-thought answer at the same decoding settings,
+which lets the scaffold effect and the loop effect be separated with no extra runs. The
+baseline prompt is untouched by the prompt versioning, so the same baseline rows serve every
+section.
 
 **A note on `edge_existence`.** It is a single-pair lookup: the Proposer's trace reduces to
 one atomic claim, so a claim-by-claim critique has nothing to work on. It also starts near
 ceiling (0.867–0.980 at baseline). It behaves as a control rather than as a third fragile
-task, and sections 2–5 report both the full 9-cell scope and the 6-cell scope excluding it.
+task, and sections 2–7 report both the full 9-cell scope and the 6-cell scope excluding it.
 Both are given everywhere; the exclusion is never applied silently.
 
 ---
