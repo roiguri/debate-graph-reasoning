@@ -43,13 +43,21 @@ python -m gedebate.eval.runner --config configs/matrix.toml       # run the base
 python scripts/show_results.py results/main --fragility           # per-encoding accuracy + spread
 ```
 
+To read the prompts a config actually sends -- the Proposer, Critic and revision text
+assembled whole, not the pieces they are stored as -- run:
+
+```bash
+python scripts/show_prompts.py configs/llama70b-debate-main.toml            # every cell
+python scripts/show_prompts.py configs/llama70b-debate-main.toml --from-run # with a real transcript
+```
+
 ## Layout
 
 ```
 src/gedebate/   the library: data adapter, model wrapper, prompts, scoring, eval harness
 data/           the frozen dataset artifact (+ provenance meta)
 configs/        run configs (TOML)
-scripts/        entry points (build_dataset, show_results, debate_viewer, smoke)
+scripts/        entry points (build_dataset, show_results, show_prompts, debate_viewer, smoke)
 slurm/          batch-job scripts, specific to our compute setup
 results/        run outputs, JSON/CSV (gitignored)
 analysis/       derived tables and figures (gitignored)
