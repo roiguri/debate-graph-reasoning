@@ -142,6 +142,17 @@ higher.
 further 0.039 and 0.006. Unlike accuracy (section 4), the loop's contribution to fragility
 is at least consistently signed in the right direction on both tasks, but it is small.
 
+Per seed, independently (baseline spread → debate spread):
+
+| task            | seed 7        | seed 11       | seed 13       |
+|-----------------|---------------|---------------|---------------|
+| connected_nodes | 0.495 → 0.255 | 0.490 → 0.270 | 0.425 → 0.235 |
+| node_degree     | 0.225 → 0.110 | 0.260 → 0.110 | 0.225 → 0.100 |
+| edge_existence  | 0.110 → 0.155 | 0.105 → 0.260 | 0.125 → 0.255 |
+
+**The narrowing replicates 3 for 3 on both fragile tasks, and the widening replicates 3 for
+3 on `edge_existence`.** Both directions are stable, not seed artefacts.
+
 **Fragility is never eliminated.** Under debate all three Cochran Q statistics remain highly
 significant (164.3, 165.9, 46.1; all p < 1e-10) and `incident` > `friendship` still holds
 unanimously. The supported claim is that debate *reduces* encoding sensitivity on fragile
@@ -200,8 +211,8 @@ Every verdict cross-tabbed against whether the Proposer answer *it was judging* 
 
 |                      | AGREE | REVISE |                             |
 |----------------------|-------|--------|-----------------------------|
-| Proposer **correct** |  4137 |   630  | false-alarm rate **0.132**  |
-| Proposer **wrong**   |   528 |   530  | detection rate **0.502**    |
+| Proposer **correct** |  4141 |   627  | false-alarm rate **0.132**  |
+| Proposer **wrong**   |   526 |   531  | detection rate **0.502**    |
 
 chi2 = 747.1 (1 df, p ≈ 0), **phi = +0.358**, odds ratio 6.67. A REVISE moves P(the answer
 is wrong) from the base rate 0.181 to **0.459**. The verdict is a real signal — it is not
@@ -336,6 +347,17 @@ debate in **all nine cells** — it never loses one — and significantly better
 the full matrix it is +0.032 (p=2e-16); on the six cells excluding `edge_existence`, where
 section 4 showed the loop to be merely inert rather than harmful, it is still +0.010
 (p=0.035). Debate's 2.29 interacting responses are worth less than 3 independent ones.
+
+Per seed, independently:
+
+| seed | baseline | debate | MV(3) | MV − debate | 6-cell MV − debate |
+|------|----------|--------|-------|-------------|--------------------|
+| 7    |    0.797 |  0.854 | 0.882 | **+0.028**  | +0.017             |
+| 11   |    0.790 |  0.847 | 0.879 | **+0.033**  | +0.005             |
+| 13   |    0.793 |  0.828 | 0.863 | **+0.034**  | +0.008             |
+
+The vote beats debate in all three seeds on both scopes; the 9-cell margin is stable
+(+0.028 to +0.034) while the 6-cell margin is smaller and varies more (+0.005 to +0.017).
 
 **Voting also beats a single reasoned draw**, 0.875 against turn 1's 0.864 (9 cells) and
 0.853 against 0.846 (6 cells). So the ordering across the arm is
