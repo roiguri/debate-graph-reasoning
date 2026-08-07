@@ -318,5 +318,16 @@ def ensure_manifest(run_dir: str | Path, model: str, condition: str, **fields) -
     }
     p = manifest_path(run_dir)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    # Atomic replace, not write_text: a run is sharded across concurrent processes that
+    # each read-modify-write this file at startup, and `write_text` truncates before it
+    # writes. A reader landing in that window sees an empty file and dies with a
+    # JSONDecodeError -- which killed one shard of a 16,200-call run and silently left
+    # 225 instances unwritten. os.replace is atomic on POSIX, so a reader sees either the
+    # old complete manifest or the new one, never a partial one.
+    tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, indent=2)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, p)
     return manifest

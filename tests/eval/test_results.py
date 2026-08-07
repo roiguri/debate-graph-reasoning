@@ -206,3 +206,42 @@ def test_ensure_manifest_guards_dataset_sha256(tmp_path):
     # a different dataset (different hash), even under a new condition -> hard error
     with pytest.raises(ValueError):
         results.ensure_manifest(tmp_path, "m", "majority_vote", dataset_sha256="def")
+
+
+def test_ensure_manifest_write_is_atomic_under_concurrent_readers(tmp_path):
+    """A sharded run has N processes read-modify-writing the manifest at startup.
+
+    `write_text` truncates before writing, so a concurrent reader can see an empty file
+    and raise JSONDecodeError -- that killed a shard mid-run. The write must land via an
+    atomic replace, so a reader always sees a complete manifest.
+    """
+    import threading
+
+    run = tmp_path / "run"
+    results.ensure_manifest(run, "m", "baseline", dataset_sha256="h")
+
+    errors = []
+    stop = threading.Event()
+
+    def reader():
+        while not stop.is_set():
+            try:
+                m = results.read_manifest(run)
+                if m is not None:
+                    assert m["model"] == "m"
+            except Exception as exc:  # a torn read is the bug under test
+                errors.append(exc)
+
+    threads = [threading.Thread(target=reader) for _ in range(4)]
+    for t in threads:
+        t.start()
+    try:
+        for i in range(200):
+            results.ensure_manifest(run, "m", f"cond{i % 3}", dataset_sha256="h")
+    finally:
+        stop.set()
+        for t in threads:
+            t.join()
+
+    assert not errors, errors[:3]
+    assert results.read_manifest(run)["model"] == "m"  # still valid at the end
