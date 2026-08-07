@@ -291,24 +291,79 @@ should not be defended as such.
 The remaining parse failures are concentrated in `edge_existence/friendship` (turn-1 0.977)
 and `edge_existence/adjacency` (0.990); every other cell is at or above 0.990.
 
-## 7. The compute control (majority vote)
+## 7. The compute control: matched-compute majority vote beats debate
 
-Debate spends **2.29 responses and 1,554 tokens per instance against the baseline's 1.00 and
-364** — roughly 4.3x the tokens.
+A reasoned majority-vote arm (`condition = "majority_vote_cot"`) samples the **same v3
+Proposer prompt** N=3 times independently at the model's shipped decoding (temperature 0.6,
+top_p 0.9, no top_k) and takes the mode of the parsed answers. It differs from debate in
+exactly one thing: whether the attempts see each other. Configs
+`configs/llama70b-mvcot-{main,seed11,seed13}.toml`, 16,200 draws, same instances.
 
-A reasoned majority-vote arm (`condition = "majority_vote_cot"`, N=3 sampled draws of the
-same v3 Proposer prompt, voted) is **currently running**; configs
-`configs/llama70b-mvcot-{main,seed11,seed13}.toml`, writing into the same
-`results/llama70b-v3-*` dirs. N=3 is token-matched to debate on this model: debate spends
+**Compute is matched, not approximated.** N=3 was derived from debate's own token spend:
 1,395–1,659 tokens per instance against a turn-1 cost of 543–567, i.e. 2.57–2.93
-turn-1-equivalents per task.
+turn-1-equivalents. Realized cost is **1,664 tokens per instance for the vote against 1,554
+for debate — a ratio of 1.07**, with the vote spending 3 responses to debate's 2.29.
 
-This arm is what separates *debate* from *more compute spent any way at all*. Section 4
-makes a specific prediction for it: mean turn-1 accuracy is **0.846** on the 6-cell scope
-against debate's final **0.843**, so N independent reasoned draws voted should land at or
-above debate at matched cost. **Results to be filled in when the run completes.** Until then
-the claim this arm supports is "debate at 4.3x compute beats a single greedy answer", not
-"debate beats matched compute".
+| task/encoding              | baseline | turn 1 | **MV(3)** | debate | MV − debate | b/c   | p        |
+|----------------------------|----------|--------|-----------|--------|-------------|-------|----------|
+| edge_existence/adjacency   |    0.938 |  0.922 | **0.950** |  0.803 | **+0.147**  | 5/93  | 4e-20 ***|
+| edge_existence/friendship  |    0.867 |  0.800 | **0.822** |  0.752 | **+0.070**  | 9/51  | 8e-08 ***|
+| node_degree/adjacency      |    0.655 |  0.868 | **0.875** |  0.850 | **+0.025**  | 14/29 | 0.033 *  |
+| connected_nodes/incident   |    0.958 |  0.947 | **0.952** |  0.940 | +0.012      | 10/17 | 0.248 ns |
+| edge_existence/incident    |    0.980 |  0.978 | **0.985** |  0.975 | +0.010      | 2/8   | 0.109 ns |
+| node_degree/incident       |    0.873 |  0.942 | **0.943** |  0.935 | +0.008      | 5/10  | 0.302 ns |
+| node_degree/friendship     |    0.637 |  0.828 | **0.837** |  0.828 | +0.008      | 20/25 | 0.551 ns |
+| connected_nodes/adjacency  |    0.743 |  0.835 | **0.822** |  0.817 | +0.005      | 31/34 | 0.804 ns |
+| connected_nodes/friendship |    0.488 |  0.655 | **0.687** |  0.687 | +0.000      | 33/33 | 0.902 ns |
+
+| scope            | baseline | turn 1 | **MV(3)** | debate | MV − debate | p       |
+|------------------|----------|--------|-----------|--------|-------------|---------|
+| all 9 cells      |    0.793 |  0.864 | **0.875** |  0.843 | **+0.032**  | 2e-16 ***|
+| 6 cells, no `edge_existence` | 0.726 | 0.846 | **0.853** | 0.843 | **+0.010** | 0.035 * |
+
+**The compute control beats the treatment at matched cost.** MV is at least as accurate as
+debate in **all nine cells** — it never loses one — and significantly better in three. On
+the full matrix it is +0.032 (p=2e-16); on the six cells excluding `edge_existence`, where
+section 4 showed the loop to be merely inert rather than harmful, it is still +0.010
+(p=0.035). Debate's 2.29 interacting responses are worth less than 3 independent ones.
+
+**Voting also beats a single reasoned draw**, 0.875 against turn 1's 0.864 (9 cells) and
+0.853 against 0.846 (6 cells). So the ordering across the arm is
+
+> baseline **0.793** < debate **0.843** < single reasoned answer **0.864** < voted reasoned
+> answers **0.875**
+
+and debate is the *worst* of the three reasoning conditions despite costing more than a
+single draw.
+
+**Where the vote's advantage comes from.** Almost entirely `edge_existence`, where debate is
+actively destructive: +0.147 and +0.070 on adjacency and friendship. That is the expected
+shape — an independent redraw cannot be argued out of a correct answer, whereas a Critic
+can. On the six other cells the vote's edge is small but consistently signed (five of six
+positive, none negative).
+
+**Diversity, reported rather than tuned.** The decoding is the model's shipped default,
+chosen before seeing any result; realized diversity is a diagnostic, not a knob.
+
+| cell                       | unanimous | distinct answers / 3 draws |
+|----------------------------|-----------|----------------------------|
+| node_degree/incident       |     0.975 | 1.03 |
+| edge_existence/incident    |     0.968 | 1.02 |
+| connected_nodes/incident   |     0.947 | 1.06 |
+| edge_existence/adjacency   |     0.910 | 1.06 |
+| node_degree/adjacency      |     0.908 | 1.10 |
+| connected_nodes/adjacency  |     0.867 | 1.15 |
+| edge_existence/friendship  |     0.858 | 1.11 |
+| node_degree/friendship     |     0.853 | 1.15 |
+| connected_nodes/friendship |     0.740 | 1.30 |
+
+The draws agree unanimously 74–98% of the time, so the vote rarely has much to arbitrate —
+which makes it notable that it still beats debate. The gain is not the vote resolving
+disagreement; it is that three independent attempts cannot degrade each other.
+
+**Caveat on reproducibility.** Together documents no determinism guarantee, so the recorded
+per-draw seeds identify the request rather than reproduce it. This arm's exact draws will
+not replay; its statistics will.
 
 ## 8. Additional analysis: an earlier Proposer prompt (v2)
 
@@ -404,7 +459,10 @@ their manifest record what they actually are.
    `hallucinated` column does **not** show fabrication and is a null (section 5a).
 6. Format compliance is high and **no verdict failed to parse**, so no consensus in this arm
    was manufactured by the token cap (section 6).
-7. The compute control is running; until it lands the claim is bounded to "debate at 4.3x
-   compute beats a single greedy answer" (section 7).
+7. **A matched-compute majority vote beats debate.** Three independent draws of the same
+   Proposer prompt, at 1.07x debate's tokens, score **0.875 against debate's 0.843** over
+   nine cells (p=2e-16) and 0.853 against 0.843 over six (p=0.035), losing no cell. The
+   ordering is baseline 0.793 < debate 0.843 < one reasoned draw 0.864 < voted draws 0.875
+   (section 7).
 8. An earlier prompt, v2, scores **+0.041 higher** but produced 319 unparseable verdicts
    against v3's zero — more accurate, worse behaved (section 8).
