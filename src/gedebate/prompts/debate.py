@@ -293,8 +293,14 @@ def render_transcript(instance: "Instance", turns: list[dict]) -> str:
 
 # --- prompt builders ----------------------------------------------------------
 
-def proposer_prompt(instance: "Instance", version: str = DEFAULT_PROMPT_VERSION) -> str:
-    """Turn-1 Proposer prompt: numbered-claim trace + ANSWER, then the question verbatim."""
+def proposer_prompt(instance: "Instance", version: str) -> str:
+    """Turn-1 Proposer prompt: numbered-claim trace + ANSWER, then the question verbatim.
+
+    `version` is REQUIRED, as it is on the other two builders. It used to default, and a
+    caller that forgot it silently got the default version's wording -- which is exactly
+    how a run configured for v3 sent a v2 Critic prompt for 5,400 instances. A missing
+    version is now a TypeError at the call site instead of a wrong experiment.
+    """
     spec = _spec(version)
     _require_supported(instance.task, version)
     instruction = (spec["proposer_preamble"][instance.task]
@@ -303,7 +309,7 @@ def proposer_prompt(instance: "Instance", version: str = DEFAULT_PROMPT_VERSION)
 
 
 def critic_prompt(
-    instance: "Instance", turns: list[dict], version: str = DEFAULT_PROMPT_VERSION
+    instance: "Instance", turns: list[dict], version: str
 ) -> str:
     """Critic prompt: verify the latest Proposer answer given the full transcript."""
     _require_supported(instance.task, version)
@@ -313,7 +319,7 @@ def critic_prompt(
 
 
 def revision_prompt(
-    instance: "Instance", turns: list[dict], version: str = DEFAULT_PROMPT_VERSION
+    instance: "Instance", turns: list[dict], version: str
 ) -> str:
     """Proposer revision prompt: corrected answer given the full transcript."""
     spec = _spec(version)

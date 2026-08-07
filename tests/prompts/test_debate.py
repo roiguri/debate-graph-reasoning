@@ -110,13 +110,14 @@ def test_unknown_prompt_version_is_rejected():
 def test_proposer_and_revision_share_one_format_block():
     inst = _node_degree_instance()
     block = debate._format_block("node_degree")  # the single source of the claim+ANSWER format
-    assert block in debate.proposer_prompt(inst)
-    assert block in debate.revision_prompt(inst, [{"role": "proposer", "raw": "1. x\nANSWER: 2"}])
+    assert block in debate.proposer_prompt(inst, "v2")
+    assert block in debate.revision_prompt(
+        inst, [{"role": "proposer", "raw": "1. x\nANSWER: 2"}], "v2")
 
 
 def test_connected_nodes_shares_scaffold_differs_only_in_answer_line():
-    nd = debate.proposer_prompt(_node_degree_instance())
-    cn = debate.proposer_prompt(_instance("connected_nodes"))
+    nd = debate.proposer_prompt(_node_degree_instance(), "v2")
+    cn = debate.proposer_prompt(_instance("connected_nodes"), "v2")
     # identical scaffold up to the ANSWER line; only the ANSWER tail differs
     assert nd.split("ANSWER:")[0] == cn.split("ANSWER:")[0]
     assert "a single integer, the degree" in nd
@@ -128,7 +129,7 @@ def test_connected_nodes_shares_scaffold_differs_only_in_answer_line():
 
 def test_proposer_prompt_wraps_question_with_instruction():
     inst = _node_degree_instance()
-    p = debate.proposer_prompt(inst)
+    p = debate.proposer_prompt(inst, "v2")
     assert p.endswith(inst.question)          # question verbatim at the end
     assert "numbered list of\natomic claims" in p  # v2, the default
     assert "ANSWER: followed by a single integer, the degree" in p
@@ -148,8 +149,10 @@ def test_incident_tasks_share_one_critic_cue():
     # node_degree and connected_nodes must use the exact same Critic cue (no drift);
     # edge_existence uses a different, pair-oriented cue.
     cue = debate.PROMPT_VERSIONS["v2"]["critic_cue"]
-    nd = debate.critic_prompt(_node_degree_instance(), [{"role": "proposer", "raw": "1. x\nANSWER: 2"}])
-    ee = debate.critic_prompt(_instance("edge_existence"), [{"role": "proposer", "raw": "1. x\nANSWER: No"}])
+    nd = debate.critic_prompt(
+        _node_degree_instance(), [{"role": "proposer", "raw": "1. x\nANSWER: 2"}], "v2")
+    ee = debate.critic_prompt(
+        _instance("edge_existence"), [{"role": "proposer", "raw": "1. x\nANSWER: No"}], "v2")
     assert cue["node_degree"] == cue["connected_nodes"]
     assert cue["node_degree"] in nd
     assert cue["edge_existence"] in ee and cue["node_degree"] not in ee
@@ -183,10 +186,10 @@ def test_render_transcript_accumulates_turns():
 def test_critic_and_revision_prompts_carry_transcript():
     inst = _node_degree_instance()
     turns = [{"role": "proposer", "raw": "1. foo\nANSWER: 2"}]
-    cp = debate.critic_prompt(inst, turns)
+    cp = debate.critic_prompt(inst, turns, "v2")
     assert "VERDICT: AGREE" in cp and "VERDICT: REVISE" in cp
     assert "ANSWER: 2" in cp  # the transcript (Proposer's latest) is embedded
-    rp = debate.revision_prompt(inst, turns)
+    rp = debate.revision_prompt(inst, turns, "v2")
     assert "corrected answer" in rp and "ANSWER: followed by a single integer, the degree" in rp
     assert "ANSWER: 2" in rp
 

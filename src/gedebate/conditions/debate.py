@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING
 
 from gedebate.eval.scoring import score
 from gedebate.prompts.debate import (
-    DEFAULT_PROMPT_VERSION,
     critic_prompt,
     parse_critic,
     parse_proposer,
@@ -47,8 +46,8 @@ def _proposer_turn(model, instance, prompt, max_new_tokens) -> dict:
 
 def run_debate(
     model: "Model", instance: "Instance", *,
+    prompt_version: str,
     max_new_tokens: int = 256, max_responses: int = 10,
-    prompt_version: str = DEFAULT_PROMPT_VERSION,
 ) -> tuple[dict, list[dict]]:
     """Run the debate loop -> (attempt record, transcript turns).
 
@@ -56,9 +55,9 @@ def run_debate(
     summed `n_prompt_tokens`/`n_gen_tokens`, `n_responses` (= turns), and `critic_unparsed`
     (count of verdicts that defaulted to AGREE). `max_responses` is the response budget.
 
-    `prompt_version` selects the Proposer/revision wording. There is one frozen version,
-    v2, so it defaults to that; the argument stays because rows and manifests record the
-    version, which keeps a run self-describing if a second one is ever added.
+    `prompt_version` selects the wording for ALL THREE roles and is REQUIRED: it used to
+    default, which meant a caller that forgot it silently ran the default version. Rows and
+    manifests record it, so a wrong value here mislabels the run rather than failing it.
     """
     turns: list[dict] = [_proposer_turn(
         model, instance, proposer_prompt(instance, prompt_version), max_new_tokens)]
@@ -69,7 +68,12 @@ def run_debate(
     stopped_on_unparsed_verdict = False
 
     while len(turns) < max_responses:
-        cg = model.generate(critic_prompt(instance, turns), max_new_tokens=max_new_tokens)
+        # `prompt_version` is NOT optional here: omitting it silently fell back to the
+        # module default, so a run configured for one version used that version's Proposer
+        # and revision prompts with the DEFAULT version's Critic. Harmless while one
+        # version existed; a silent hybrid the moment a second one did.
+        cg = model.generate(critic_prompt(instance, turns, prompt_version),
+                            max_new_tokens=max_new_tokens)
         verdict, problems, parsed_ok = parse_critic(cg.text)
         turns.append({"role": "critic", "raw": cg.text, "verdict": verdict,
                       "problems": problems, "critic_verdict_parsed": parsed_ok,

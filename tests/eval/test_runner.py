@@ -14,6 +14,7 @@ from gedebate.data.store import dump_dataset
 from gedebate.eval import results
 from gedebate.eval.config import RunConfig
 from gedebate.eval.runner import (
+    _verify_sample,
     build_instances,
     manifest_record,
     parse_shard,
@@ -292,3 +293,24 @@ def test_manifest_records_the_vote_arms_budget_and_wording(tmp_path):
         "c.toml")
     assert cot["n_samples"] == 3 and cot["prompt_version"] == "v2"
     assert cot["decoding"].startswith("temperature=")
+
+
+def test_verify_sample_only_reads_its_own_conditions_rows(tmp_path):
+    """A run dir holds every condition side by side, and verify_sample re-runs each row
+    as a greedy BASELINE answer -- so feeding it debate or vote rows would report a
+    different condition's answer as a reproducibility failure."""
+    cfg = _cfg(tmp_path, condition="debate", n_samples=4, prompt_version="v2")
+    run_instances(_StubModel("1. a\nANSWER: 1"), build_instances(cfg), cfg, MANIFEST)
+
+    # same out_dir, baseline config: the debate rows sitting there must not be verified
+    base = _cfg(tmp_path, condition="baseline", dataset=cfg.dataset, out_dir=cfg.out_dir)
+    cfg_path = tmp_path / "base.toml"
+    cfg_path.write_text(
+        "\n".join(f'{k} = {v!r}' if isinstance(v, str) else f"{k} = {list(v) if isinstance(v, tuple) else v}"
+                  for k, v in [("model", base.model), ("out_dir", base.out_dir),
+                               ("dataset", base.dataset), ("condition", "baseline"),
+                               ("tasks", base.tasks), ("encodings", base.encodings)]),
+        encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="no persisted baseline rows"):
+        _verify_sample(str(cfg_path), 5)

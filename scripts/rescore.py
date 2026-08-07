@@ -51,11 +51,12 @@ def _node_ids(run_dir: str, override: str | None) -> dict[str, list]:
 def _reparse(raw: str, row: dict, node_ids: list | None):
     """Re-derive (value, parse_ok, correct) under the parser this row's condition uses.
 
-    Debate output carries the claim + `ANSWER:` scaffold, so it goes through
-    `parse_proposer`; baseline and majority-vote output is already a bare answer and goes
-    straight to `scoring.parse`, which is what those conditions called when they ran.
+    Output carrying the claim + `ANSWER:` scaffold goes through `parse_proposer`; a bare
+    answer goes straight to `scoring.parse`, which is what those conditions called when
+    they ran. The split is by PROMPT FORMAT, not by condition name -- `majority_vote_cot`
+    samples the Proposer prompt, so it reads like debate, not like the terse vote arm.
     """
-    if row["condition"] == "debate":
+    if row["condition"] in results.PROPOSER_FORMAT_CONDITIONS:
         value, ok, _ = parse_proposer(
             raw, row["task"], encoding=row["encoding"], node_ids=node_ids)
     else:

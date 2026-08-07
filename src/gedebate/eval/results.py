@@ -36,6 +36,14 @@ SCHEMA_VERSION = 1
 # never leaves a resume check silently treating N rows as N finished instances.
 VOTE_CONDITIONS = ("majority_vote", "majority_vote_cot")
 
+# Conditions whose `raw_output` is a numbered-claim trace ending in an `ANSWER:` line,
+# i.e. that prompted with the debate Proposer wording. They must be read by
+# `prompts.debate.parse_proposer`, never by the shared `scoring.parse`, which scans the
+# whole text and would harvest labels out of the reasoning ("not connected to 3" -> 3).
+# Named here so anything re-deriving an answer from stored text picks the parser by fact
+# rather than by guessing from the condition name.
+PROPOSER_FORMAT_CONDITIONS = ("debate", "majority_vote_cot")
+
 # Fields persisted per attempt, in order. Identical across all three conditions.
 ROW_FIELDS = (
     "schema_version",

@@ -104,11 +104,12 @@ def _compare_to_csv(cmp: dict, a_name: str) -> str:
 
 
 def _select_prompt_version(debate_rows: list[dict], requested: str | None) -> list[dict]:
-    """Keep one Proposer wording's debate rows; refuse to silently pool two.
+    """Keep one Proposer wording's rows; refuse to silently pool two.
 
-    Different prompt versions live in different run dirs but share
-    `condition == "debate"`, so pooling them would average two experiments into one
-    accuracy. Mixed input is an error, not a warning.
+    Applies to every condition that prompts with the Proposer wording (debate and
+    `majority_vote_cot`). Different versions live in different run dirs but share a
+    condition name, so pooling them would average two experiments into one accuracy.
+    Mixed input is an error, not a warning.
     """
     present = sorted({results.row_prompt_version(r) for r in debate_rows})
     if requested is None:
@@ -165,6 +166,10 @@ def main() -> None:
     # silently pool them into the baseline table.
     base_rows = [r for r in rows if r["condition"] == "baseline"]
     mv_rows = [r for r in rows if r["condition"] == args.vote_condition]
+    if args.vote_condition == "majority_vote_cot":
+        # This arm samples the Proposer prompt, so its rows carry a prompt_version and
+        # two wordings must no more be pooled here than they may be for debate.
+        mv_rows = _select_prompt_version(mv_rows, args.prompt_version)
     # Tag saved filenames with the arm, so the two never overwrite each other in one dir.
     mv_tag = "mv" if args.vote_condition == "majority_vote" else "mvcot"
 

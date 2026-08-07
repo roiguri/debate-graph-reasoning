@@ -268,9 +268,14 @@ def _verify_sample(config_path: str, k: int) -> None:
         # majority-vote's sampled draws.
         raise SystemExit("--verify-sample supports the baseline condition only")
     by_id = {i.instance_id: i for i in build_instances(cfg)}
-    rows = [r for f in results.result_files(cfg.out_dir) for r in results.read_rows(f)]
+    # Filter to THIS condition. A run dir holds every condition side by side, and
+    # `verify_sample` re-runs each row through `run_instance` (a greedy baseline answer),
+    # so handing it debate or vote rows would compare a baseline generation against a
+    # different condition's answer and report the difference as a reproducibility failure.
+    rows = [r for f in results.result_files(cfg.out_dir) for r in results.read_rows(f)
+            if r["condition"] == cfg.condition]
     if not rows:
-        raise SystemExit(f"no persisted rows in {cfg.out_dir} to verify")
+        raise SystemExit(f"no persisted {cfg.condition} rows in {cfg.out_dir} to verify")
 
     model = load_provider_model(cfg.provider, cfg.model)
     res = verify_sample(model, by_id, rows, k, max_new_tokens=cfg.max_new_tokens)
