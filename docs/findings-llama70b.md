@@ -204,6 +204,62 @@ is to talk a correct Proposer out of a correct answer.
 The honest one-line statement of this arm is therefore **"asking the model to reason helps;
 having a Critic argue about the reasoning does not"** — not "debate helps".
 
+### 4a. Counterfactual stopping rules
+
+The traces support replaying alternative stopping rules without new generations. `turn1_only`
+keeps the Proposer's first answer; `at_most_one_revision` allows a single revision;
+`gate_hallucinated` and `gate_must_cite` veto a REVISE whose citation is not a real edge / is
+absent. Delta is against the run as it happened:
+
+| task/encoding              | actual | turn1_only        | at_most_one_revision | gate_hallucinated  | gate_must_cite     |
+|----------------------------|--------|-------------------|----------------------|--------------------|--------------------|
+| connected_nodes/adjacency  |  0.817 | 0.835 (+0.018) ns | 0.805 (−0.012) *     | 0.822 (+0.005) ns  | 0.817 (+0.000) ns  |
+| connected_nodes/friendship |  0.687 | 0.655 (−0.032) ** | 0.687 (+0.000) ns    | 0.662 (−0.025) *** | 0.665 (−0.022) **  |
+| connected_nodes/incident   |  0.940 | 0.947 (+0.007) ns | 0.938 (−0.002) ns    | 0.947 (+0.007) ns  | 0.943 (+0.003) ns  |
+| edge_existence/adjacency   |  0.803 | 0.922 (**+0.118**) *** | 0.790 (−0.013) * | 0.928 (**+0.125**) *** | 0.928 (**+0.125**) *** |
+| edge_existence/friendship  |  0.752 | 0.800 (+0.048) ***| 0.745 (−0.007) ns    | 0.800 (+0.048) *** | 0.800 (+0.048) *** |
+| edge_existence/incident    |  0.975 | 0.978 (+0.003) ns | 0.972 (−0.003) ns    | 0.977 (+0.002) ns  | 0.977 (+0.002) ns  |
+| node_degree/adjacency      |  0.850 | 0.868 (+0.018) ns | 0.845 (−0.005) ns    | 0.857 (+0.007) ns  | 0.853 (+0.003) ns  |
+| node_degree/friendship     |  0.828 | 0.828 (+0.000) ns | 0.830 (+0.002) ns    | 0.827 (−0.002) ns  | 0.822 (−0.007) ns  |
+| node_degree/incident       |  0.935 | 0.942 (+0.007) ns | 0.932 (−0.003) ns    | 0.930 (−0.005) ns  | 0.930 (−0.005) ns  |
+
+**Not running the loop at all is the single best rule on `edge_existence`** (+0.118, +0.048),
+and does no significant harm anywhere except `connected_nodes/friendship` (−0.032) — the one
+cell where section 4 found a significant positive loop effect. The two citation gates buy
+almost exactly what `turn1_only` buys on `edge_existence` and nothing elsewhere.
+
+**The gates' gains are not evidence about grounding.** Per section 5a, on `edge_existence`
+a correct "this edge is absent" critique cites a pair that is legitimately not an edge, so
+the gates mostly veto *valid* negative critiques there. Their +0.125 is the gate switching
+off a loop that is harmful on that task anyway, not a finding that ungrounded critiques hurt.
+
+### 4b. The turn-1 error shape: the model over-includes
+
+How a turn-1 answer is wrong, in each task's own terms:
+
+| task/encoding              | metrics |
+|----------------------------|---------|
+| connected_nodes/adjacency  | jaccard 0.945 · has-extra **0.138** · has-missing 0.035 |
+| connected_nodes/friendship | jaccard 0.906 · has-extra **0.330** · has-missing 0.033 |
+| connected_nodes/incident   | jaccard 0.971 · has-extra **0.050** · has-missing 0.003 |
+| node_degree/adjacency      | mean signed error **+0.085** · overcount 0.078 · undercount 0.053 · off-by-one 0.088 |
+| node_degree/friendship     | mean signed error **+0.192** · overcount 0.135 · undercount 0.037 · off-by-one 0.107 |
+| node_degree/incident       | mean signed error **+0.120** · overcount 0.045 · undercount 0.013 · off-by-one 0.025 |
+| edge_existence/adjacency   | predicted-yes 0.547 vs gold 0.508 · **yes-bias +0.039** |
+| edge_existence/friendship  | predicted-yes 0.689 vs gold 0.509 · **yes-bias +0.181** |
+| edge_existence/incident    | predicted-yes 0.524 vs gold 0.511 · **yes-bias +0.013** |
+
+**Every task's errors point the same way: the model asserts edges that are not there.** It
+adds nodes far more often than it drops them (0.138/0.330/0.050 extra against
+0.035/0.033/0.003 missing), over-counts degree in every encoding (signed error always
+positive), and over-predicts Yes on `edge_existence`. The bias is worst under `friendship`
+in all three tasks, which is the same encoding that is worst on accuracy — consistent with
+named nodes making a spurious relation easier to assert than integer pairs do.
+
+This is what a Critic on these tasks would need to catch: an over-inclusion error, checkable
+by looking each asserted edge up in the list. Section 5 shows it detects roughly half of
+them and pays for that with a 0.132 false-alarm rate.
+
 ## 5. The Critic carries signal, but its revisions cost accuracy
 
 Every verdict cross-tabbed against whether the Proposer answer *it was judging* was correct
