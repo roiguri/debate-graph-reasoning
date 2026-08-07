@@ -43,12 +43,22 @@ python -m gedebate.eval.runner --config configs/matrix.toml       # run the base
 python scripts/show_results.py results/main --fragility           # per-encoding accuracy + spread
 ```
 
-To read the prompts a config actually sends -- the Proposer, Critic and revision text
-assembled whole, not the pieces they are stored as -- run:
+The prompts are stored as small pieces that only meet inside the builders, so the text
+sent to the model is assembled, never written down anywhere. `scripts/show_prompts.py`
+assembles it from a run config and prints it whole:
 
 ```bash
 python scripts/show_prompts.py configs/llama70b-debate-main.toml            # every cell
 python scripts/show_prompts.py configs/llama70b-debate-main.toml --from-run # with a real transcript
+```
+
+`analysis/prompts/` holds committed snapshots of that output -- the one place the
+Proposer, Critic and revision wording is readable whole, and what makes a prompt edit
+show up as a diff. **Regenerate them in the same commit as any prompt change:**
+
+```bash
+python scripts/show_prompts.py configs/llama70b-debate-main.toml   --out analysis/prompts/debate.txt
+python scripts/show_prompts.py configs/llama70b-baseline-main.toml --out analysis/prompts/baseline.txt
 ```
 
 ## Layout

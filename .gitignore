@@ -14,6 +14,13 @@ results/*
 # a whole-dir ignore (analysis/) can't be overridden for a file underneath it.
 analysis/*
 !analysis/README.md
+# EXCEPT the prompt snapshots. They are a pure function of the prompt code + the run
+# config (the transcript in them is placeholder text, not model output), so committing
+# them turns a prompt edit into a readable diff of the assembled prompts -- which is the
+# only place the wording is visible whole. Regenerate with scripts/show_prompts.py after
+# ANY prompt change; a stale snapshot is worse than none. Re-including the directory (not
+# just its contents) is what lets git descend into it at all.
+!analysis/prompts/
 
 # LaTeX build artifacts (the .tex/.bib/.sty and the built PDF are committed)
 docs/paper/*.aux

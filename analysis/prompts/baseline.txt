@@ -1,0 +1,156 @@
+========================================================================================
+ PROMPTS FOR configs/llama70b-baseline-main.toml
+========================================================================================
+model            meta-llama/Llama-3.3-70B-Instruct-Turbo   (provider: together)
+condition        baseline
+dataset          data/main.jsonl
+matrix           tasks=['edge_existence', 'node_degree', 'connected_nodes']  encodings=['adjacency', 'incident', 'friendship']
+max_new_tokens   256
+
+Each prompt below is sent as a SINGLE user message with no system prompt; the
+model's chat template wraps it (locally under provider 'hf', server-side under
+'together'), so the wrapper tokens are not shown here.
+
+
+
+######## edge_existence / adjacency (7/0/edge_existence/adjacency) ########
+
+========================================================================================
+ BASELINE PROMPT  [274 chars, 6 lines]
+========================================================================================
+Answer with exactly "Yes" or "No" and nothing else.
+
+In an undirected graph, (i,j) means that node i and node j are connected with an undirected edge. G describes a graph among nodes 0, 1, 2, 3, and 4.
+The edges in G are: (0, 1) (2, 3).
+Q: Is node 4 connected to node 0?
+A: 
+
+
+
+######## edge_existence / incident (7/0/edge_existence/incident) ########
+
+========================================================================================
+ BASELINE PROMPT  [280 chars, 10 lines]
+========================================================================================
+Answer with exactly "Yes" or "No" and nothing else.
+
+G describes a graph among nodes 0, 1, 2, 3, and 4.
+In this graph:
+Node 0 is connected to node 1.
+Node 1 is connected to node 0.
+Node 2 is connected to node 3.
+Node 3 is connected to node 2.
+Q: Is node 4 connected to node 0?
+A: 
+
+
+
+######## edge_existence / friendship (7/0/edge_existence/friendship) ########
+
+========================================================================================
+ BASELINE PROMPT  [276 chars, 8 lines]
+========================================================================================
+Answer with exactly "Yes" or "No" and nothing else.
+
+G describes a friendship graph among nodes James, Robert, John, Michael, and David.
+We have the following edges in G:
+James and Robert are friends.
+John and Michael are friends.
+Q: Is node David connected to node James?
+A: 
+
+
+
+######## node_degree / adjacency (7/0/node_degree/adjacency) ########
+
+========================================================================================
+ BASELINE PROMPT  [281 chars, 6 lines]
+========================================================================================
+Answer with a single integer (the degree) and nothing else.
+
+In an undirected graph, (i,j) means that node i and node j are connected with an undirected edge. G describes a graph among nodes 0, 1, 2, 3, and 4.
+The edges in G are: (0, 1) (2, 3).
+Q: What is the degree of node 1?
+A: 
+
+
+
+######## node_degree / incident (7/0/node_degree/incident) ########
+
+========================================================================================
+ BASELINE PROMPT  [287 chars, 10 lines]
+========================================================================================
+Answer with a single integer (the degree) and nothing else.
+
+G describes a graph among nodes 0, 1, 2, 3, and 4.
+In this graph:
+Node 0 is connected to node 1.
+Node 1 is connected to node 0.
+Node 2 is connected to node 3.
+Node 3 is connected to node 2.
+Q: What is the degree of node 1?
+A: 
+
+
+
+######## node_degree / friendship (7/0/node_degree/friendship) ########
+
+========================================================================================
+ BASELINE PROMPT  [280 chars, 8 lines]
+========================================================================================
+Answer with a single integer (the degree) and nothing else.
+
+G describes a friendship graph among nodes James, Robert, John, Michael, and David.
+We have the following edges in G:
+James and Robert are friends.
+John and Michael are friends.
+Q: What is the degree of node Robert?
+A: 
+
+
+
+######## connected_nodes / adjacency (7/0/connected_nodes/adjacency) ########
+
+========================================================================================
+ BASELINE PROMPT  [354 chars, 6 lines]
+========================================================================================
+Answer with the connected nodes as a comma-separated list (or "none" if there are none) and nothing else.
+
+In an undirected graph, (i,j) means that node i and node j are connected with an undirected edge. G describes a graph among nodes 0, 1, 2, 3, and 4.
+The edges in G are: (0, 1) (2, 3).
+Q: List all the nodes connected to 1 in alphabetical order.
+A: 
+
+
+
+######## connected_nodes / incident (7/0/connected_nodes/incident) ########
+
+========================================================================================
+ BASELINE PROMPT  [360 chars, 10 lines]
+========================================================================================
+Answer with the connected nodes as a comma-separated list (or "none" if there are none) and nothing else.
+
+G describes a graph among nodes 0, 1, 2, 3, and 4.
+In this graph:
+Node 0 is connected to node 1.
+Node 1 is connected to node 0.
+Node 2 is connected to node 3.
+Node 3 is connected to node 2.
+Q: List all the nodes connected to 1 in alphabetical order.
+A: 
+
+
+
+######## connected_nodes / friendship (7/0/connected_nodes/friendship) ########
+
+========================================================================================
+ BASELINE PROMPT  [353 chars, 8 lines]
+========================================================================================
+Answer with the connected nodes as a comma-separated list (or "none" if there are none) and nothing else.
+
+G describes a friendship graph among nodes James, Robert, John, Michael, and David.
+We have the following edges in G:
+James and Robert are friends.
+John and Michael are friends.
+Q: List all the nodes connected to Robert in alphabetical order.
+A: 
