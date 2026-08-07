@@ -2,35 +2,50 @@
 
 Empirical results for the Llama-3.3-70B-Instruct arm. **This file is self-contained**: every
 number in it comes from the runs in `results/llama70b-*`, and nothing here depends on, or
-refers to, any other model's results. It is the results log for this arm — what the runs
-showed, with the number and the test behind it.
+refers to, any other model's results.
+
+**The result of this arm is the Proposer prompt v3 run.** Sections 1–7 are v3 throughout.
+An earlier prompt, v2, was also run over the identical instances; it is reported separately
+in section 8 as a prompt ablation, and nothing in sections 1–7 depends on it.
 
 Every number regenerates from committed code over committed run outputs:
 
 ```bash
 # baseline + debate accuracy, per-encoding spread, paired significance
 python scripts/show_results.py results/llama70b-main results/llama70b-seed11 \
-    results/llama70b-seed13 --fragility --by-seed --save analysis/llama70b
+    results/llama70b-seed13 results/llama70b-v3-main results/llama70b-v3-seed11 \
+    results/llama70b-v3-seed13 --prompt-version v3 --fragility --by-seed \
+    --save analysis/llama70b-v3
 # turn split, Critic behaviour, compliance, stopping rules
 python scripts/debate_diagnostics.py results/llama70b-main results/llama70b-seed11 \
-    results/llama70b-seed13 --save analysis/llama70b
+    results/llama70b-seed13 results/llama70b-v3-main results/llama70b-v3-seed11 \
+    results/llama70b-v3-seed13 --prompt-version v3 --save analysis/llama70b-v3
 ```
 
+`--prompt-version v3` is **required**, not optional: the run dirs hold debate rows under two
+prompt versions and the analysis refuses to pool them (see section 9).
+
 **Setup.** `meta-llama/Llama-3.3-70B-Instruct-Turbo` served by Together.ai (`provider =
-"together"`, FP8 endpoint), greedy decoding, Proposer prompt v2. Three independent
+"together"`, FP8 endpoint), greedy decoding, Proposer prompt **v3**. Three independent
 200-graph draws (seeds 7/11/13) over the frozen dataset artifacts, 3 tasks x 3 encodings,
-**n=600 per cell**, 10,800 rows total. Encodings are applied to the same graphs, so all
-tests are paired (McNemar, Cochran's Q). Baseline generation cap 256 tokens, debate cap
-512. Configs: `configs/llama70b-{baseline,debate}-{main,seed11,seed13}.toml`.
+**n=600 per cell**, 5,400 debate instances against 5,400 baseline instances. Encodings are
+applied to the same graphs, so all tests are paired (McNemar, Cochran's Q). Baseline
+generation cap 256 tokens, debate cap 512. Configs:
+`configs/llama70b-baseline-{main,seed11,seed13}.toml` and
+`configs/llama70b-debate-v3-{main,seed11,seed13}.toml`.
 
 **Conditions.** *Baseline* is one zero-shot answer-only response. *Debate* is a
 Proposer–Critic loop: the Proposer emits a numbered claim trace plus a final answer, the
-Critic verifies it against the encoding and returns AGREE/REVISE, the Proposer revises.
-Debate turn 1 is a single-turn chain-of-thought answer at the same decoding settings,
-which lets the scaffold effect and the loop effect be separated with no extra runs.
+Critic reviews it against the encoding and returns AGREE/REVISE, the Proposer revises.
+Debate turn 1 is a single-turn chain-of-thought answer at the same decoding settings, which
+lets the scaffold effect and the loop effect be separated with no extra runs. The baseline
+prompt is untouched by the prompt versioning, so the same baseline rows serve every section.
 
-**Not yet run: majority vote.** There is no compute control in this arm. See section 7 —
-this is the single largest gap in what follows.
+**A note on `edge_existence`.** It is a single-pair lookup: the Proposer's trace reduces to
+one atomic claim, so a claim-by-claim critique has nothing to work on. It also starts near
+ceiling (0.867–0.980 at baseline). It behaves as a control rather than as a third fragile
+task, and sections 2–5 report both the full 9-cell scope and the 6-cell scope excluding it.
+Both are given everywhere; the exclusion is never applied silently.
 
 ---
 
@@ -48,151 +63,177 @@ Baseline accuracy swings sharply with the serialization on all three tasks:
 the project rests on holds with room to spare: a `connected_nodes` question answered at
 0.958 under one serialization drops to 0.488 under another, on the same graphs.
 
-Unlike the other two, `edge_existence` starts near ceiling (0.867–0.980), so its 0.113
-spread is compressed by the top of the scale. Its fragility is significant but has the
-least room to move in either direction; keep that in mind reading sections 3 and 4.
+Unlike the other two, `edge_existence` starts near ceiling, so its 0.113 spread is
+compressed by the top of the scale.
 
 ## 2. Debate raises accuracy, and it replicates 3 for 3
 
-Each seed is an independent 200-graph draw, so this separates a stable effect from a
-pooled artefact:
+Each seed is an independent 200-graph draw, so this separates a stable effect from a pooled
+artefact:
 
-| seed | baseline | debate | delta      |
-|------|----------|--------|------------|
-| 7    |    0.797 |  0.883 | **+0.086** |
-| 11   |    0.790 |  0.884 | **+0.094** |
-| 13   |    0.793 |  0.884 | **+0.091** |
+| seed | baseline | debate | delta      | 6-cell baseline | 6-cell debate | 6-cell delta |
+|------|----------|--------|------------|-----------------|---------------|--------------|
+| 7    |    0.797 |  0.854 | +0.057     |           0.732 |         0.843 | **+0.112**   |
+| 11   |    0.790 |  0.847 | +0.057     |           0.714 |         0.854 | **+0.140**   |
+| 13   |    0.793 |  0.828 | +0.035     |           0.732 |         0.831 | **+0.099**   |
 
-The mean delta is **+0.090** and its three independent estimates agree to within 0.008.
-This is not a pooling artefact and not a seed accident.
+Pooled: **0.793 → 0.843, +0.050** over all nine cells (b/c = 351/619, p = 1e-17), and
+**0.726 → 0.843, +0.117** over the six cells excluding `edge_existence` (b/c = 155/576,
+p = 2e-54). The sign replicates 3 for 3 on both scopes; the magnitude varies more on the
+9-cell scope (0.035–0.057) than the 6-cell one (0.099–0.140) because `edge_existence`'s
+losses vary by seed.
 
 Per cell (paired McNemar over n=600, b = baseline right/debate wrong, c = the reverse):
 
-| task/encoding              | baseline | debate | delta      | b/c     | p       |
-|----------------------------|----------|--------|------------|---------|---------|
-| connected_nodes/friendship |    0.488 |  0.787 | **+0.298** | 29/208  | 6e-31 ***|
-| node_degree/friendship     |    0.637 |  0.898 | **+0.262** | 8/165   | 2e-32 ***|
-| node_degree/adjacency      |    0.655 |  0.870 | **+0.215** | 8/137   | 2e-26 ***|
-| connected_nodes/adjacency  |    0.743 |  0.857 | **+0.113** | 45/113  | 1e-07 ***|
-| node_degree/incident       |    0.873 |  0.925 | **+0.052** | 15/46   | 1e-04 ***|
-| edge_existence/incident    |    0.980 |  1.000 | +0.020     | 0/12    | 5e-04 ***|
-| connected_nodes/incident   |    0.958 |  0.937 | −0.022     | 25/12   | 0.049 * |
-| edge_existence/friendship  |    0.867 |  0.808 | **−0.058** | 60/25   | 2e-04 ***|
-| edge_existence/adjacency   |    0.938 |  0.872 | **−0.067** | 58/18   | 8e-06 ***|
+| task/encoding              | baseline | debate | delta      | b/c     | p        |
+|----------------------------|----------|--------|------------|---------|----------|
+| connected_nodes/friendship |    0.488 |  0.687 | **+0.198** | 38/157  | 1e-17 ***|
+| node_degree/adjacency      |    0.655 |  0.850 | **+0.195** | 19/136  | 3e-21 ***|
+| node_degree/friendship     |    0.637 |  0.828 | **+0.192** | 16/131  | 2e-21 ***|
+| connected_nodes/adjacency  |    0.743 |  0.817 | **+0.073** | 43/87   | 2e-04 ***|
+| node_degree/incident       |    0.873 |  0.935 | **+0.062** | 13/50   | 8e-07 ***|
+| edge_existence/incident    |    0.980 |  0.975 | −0.005     | 13/10   | 0.678 ns |
+| connected_nodes/incident   |    0.958 |  0.940 | −0.018     | 26/15   | 0.118 ns |
+| edge_existence/friendship  |    0.867 |  0.752 | **−0.115** | 84/15   | 3e-12 ***|
+| edge_existence/adjacency   |    0.938 |  0.803 | **−0.135** | 99/18   | 4e-14 ***|
 
-**Debate is not uniformly good.** It wins on six cells and loses on three, and the losses
-are concentrated entirely in `edge_existence` — the task that was already near ceiling and
-whose atomic check the Critic's own verification reduces to. The gains are concentrated in
-the cells that started worst.
+**Debate is not uniformly good.** Five cells gain significantly, two lose significantly, two
+are null — and **every significant loss is `edge_existence`**. The gains are concentrated in
+the cells that started worst: the three largest gains are on the three lowest baseline cells.
 
-## 3. Debate reduces encoding fragility on both genuinely fragile tasks
+## 3. Debate reduces encoding fragility on the fragile tasks
 
-This is the project's central question, and the answer differs by task.
+This is the project's central question. Reporting the spread at each stage separates the
+scaffold's contribution from the loop's:
 
-| task            | baseline max−min | debate max−min | debate Q (df=2)  |
-|-----------------|------------------|----------------|------------------|
-| connected_nodes |            0.470 | **0.150**      | 84.5, p=4e-19    |
-| node_degree     |            0.237 | **0.055**      | 16.0, p=3e-04    |
-| edge_existence  |            0.113 | *0.192*        | 143.0, p=9e-32   |
+| task            | stage    | adjacency | incident | friendship | max−min | vs baseline |
+|-----------------|----------|-----------|----------|------------|---------|-------------|
+| connected_nodes | baseline |     0.743 |    0.958 |      0.488 |   0.470 |             |
+|                 | turn 1   |     0.835 |    0.947 |      0.655 |   0.292 | −0.178      |
+|                 | final    |     0.817 |    0.940 |      0.687 | **0.253** | **−0.217** |
+| node_degree     | baseline |     0.655 |    0.873 |      0.637 |   0.237 |             |
+|                 | turn 1   |     0.868 |    0.942 |      0.828 |   0.113 | −0.123      |
+|                 | final    |     0.850 |    0.935 |      0.828 | **0.107** | **−0.130** |
+| edge_existence  | baseline |     0.938 |    0.980 |      0.867 |   0.113 |             |
+|                 | turn 1   |     0.922 |    0.978 |      0.800 |   0.178 | +0.065      |
+|                 | final    |     0.803 |    0.975 |      0.752 | *0.223* | *+0.110*    |
 
-Per seed, independently:
+**The narrowing is large on both genuinely fragile tasks and the widening is confined to
+`edge_existence`**, which had the least fragility to remove and is not a debate-shaped task.
 
-| task            | seed 7        | seed 11       | seed 13       |
-|-----------------|---------------|---------------|---------------|
-| connected_nodes | 0.495 → 0.195 | 0.490 → 0.140 | 0.425 → 0.115 |
-| node_degree     | 0.225 → 0.065 | 0.260 → 0.085 | 0.225 → 0.030 |
-| edge_existence  | 0.110 → 0.180 | 0.105 → 0.215 | 0.125 → 0.180 |
-
-**The narrowing replicates 3 for 3 on `connected_nodes` and `node_degree`; the widening
-replicates 3 for 3 on `edge_existence`.** Both directions are stable.
-
-**The mechanism is that gains land where accuracy was worst.** `friendship`, the worst
-encoding on every task, gains +0.298 and +0.262 on the two fragile tasks, while `incident`,
-the best, moves −0.022 and +0.052. Debate pulls the floor up rather than the ceiling
+**The mechanism is that gains land where accuracy was worst.** On `connected_nodes` the
+spread closes almost entirely by lifting `friendship` (0.488 → 0.687) while `incident`
+drifts slightly down (0.958 → 0.940); on `node_degree`, `friendship` rises 0.637 → 0.828
+against `incident`'s 0.873 → 0.935. Debate pulls the floor up rather than the ceiling
 higher.
 
-**How much of this is a ceiling effect.** Some. `connected_nodes/incident` (0.958) and
-`edge_existence/incident` (0.980) have almost no room to rise, so part of any gap-closing
-is arithmetic rather than the intervention. Two observations argue the effect is not only
-that. First, `node_degree` narrows from 0.237 to 0.055 while its best cell (0.873) is not
-at ceiling and still gains +0.052. Second, the direction of the *residual* fragility
-changes: under debate, `node_degree`'s worst encoding is no longer `friendship` but
-`adjacency` (0.870 vs 0.898), so the ordering that held unanimously at baseline is broken
-rather than merely compressed. **Separating ceiling from mechanism properly needs a harder
-dataset**; it is not settled here.
+**Most of the narrowing is already present at turn 1** — 0.178 of 0.217 on
+`connected_nodes` and 0.123 of 0.130 on `node_degree`, i.e. 82% and 95%. The loop adds a
+further 0.039 and 0.006. Unlike accuracy (section 4), the loop's contribution to fragility
+is at least consistently signed in the right direction on both tasks, but it is small.
 
-**Fragility is never eliminated.** All three debate Q statistics remain highly significant.
-The claim supported by these numbers is that debate *reduces* encoding sensitivity on
-fragile tasks, not that it confers encoding invariance.
+**Fragility is never eliminated.** Under debate all three Cochran Q statistics remain highly
+significant (164.3, 165.9, 46.1; all p < 1e-10) and `incident` > `friendship` still holds
+unanimously. The supported claim is that debate *reduces* encoding sensitivity on fragile
+tasks, not that it confers encoding invariance.
 
-## 4. Both halves of the procedure contribute, in opposite directions per task
+**How much is a ceiling effect.** Some. `connected_nodes/incident` (0.958) and
+`edge_existence/incident` (0.980) have almost no room to rise, so part of any gap-closing is
+arithmetic. `node_degree` argues against it being only that: it narrows 0.237 → 0.107 while
+its best cell (0.873) is not at ceiling and still gains +0.062. **Separating ceiling from
+mechanism properly needs a harder dataset**; it is not settled here.
+
+## 4. The reasoning scaffold does the work; the loop does not
 
 Debate turn 1 is a chain-of-thought answer under the same decoding, so the baseline →
 turn-1 → final split separates the reasoning scaffold from the verify-and-revise loop:
 
-| task/encoding              | baseline | turn-1 | final | CoT delta (p)        | loop delta (p)       |
-|----------------------------|----------|--------|-------|----------------------|----------------------|
-| node_degree/friendship     |    0.637 |  0.875 | 0.898 | **+0.238** (0.0000)  | **+0.023** (0.0001)  |
-| connected_nodes/friendship |    0.488 |  0.717 | 0.787 | **+0.228** (0.0000)  | **+0.070** (0.0000)  |
-| node_degree/adjacency      |    0.655 |  0.845 | 0.870 | **+0.190** (0.0000)  | **+0.025** (0.0119)  |
-| node_degree/incident       |    0.873 |  0.938 | 0.925 | **+0.065** (0.0000)  | −0.013 (0.0386)      |
-| connected_nodes/adjacency  |    0.743 |  0.807 | 0.857 | **+0.063** (0.0039)  | **+0.050** (0.0000)  |
-| edge_existence/incident    |    0.980 |  1.000 | 1.000 | **+0.020** (0.0005)  | +0.000 (1.0000)      |
-| connected_nodes/incident   |    0.958 |  0.940 | 0.937 | −0.018 (0.1093)      | −0.003 (0.7539)      |
-| edge_existence/adjacency   |    0.938 |  0.913 | 0.872 | −0.025 (0.0499)      | **−0.042** (0.0003)  |
-| edge_existence/friendship  |    0.867 |  0.833 | 0.808 | −0.033 (0.0272)      | **−0.025** (0.0026)  |
+| task/encoding              | baseline | turn-1 | final | CoT delta (p)        | loop delta (p)       | turns |
+|----------------------------|----------|--------|-------|----------------------|----------------------|-------|
+| node_degree/adjacency      |    0.655 |  0.868 | 0.850 | **+0.213** (0.0000)  | −0.018 (0.0543)      | 2.22  |
+| node_degree/friendship     |    0.637 |  0.828 | 0.828 | **+0.192** (0.0000)  | +0.000 (1.0000)      | 2.14  |
+| connected_nodes/friendship |    0.488 |  0.655 | 0.687 | **+0.167** (0.0000)  | **+0.032** (0.0017)  | 2.29  |
+| connected_nodes/adjacency  |    0.743 |  0.835 | 0.817 | **+0.092** (0.0000)  | −0.018 (0.1696)      | 2.43  |
+| node_degree/incident       |    0.873 |  0.942 | 0.935 | **+0.068** (0.0000)  | −0.007 (0.4240)      | 2.12  |
+| edge_existence/incident    |    0.980 |  0.978 | 0.975 | −0.002 (1.0000)      | −0.003 (0.6875)      | 2.15  |
+| connected_nodes/incident   |    0.958 |  0.947 | 0.940 | −0.012 (0.3105)      | −0.007 (0.5235)      | 2.17  |
+| edge_existence/adjacency   |    0.938 |  0.922 | 0.803 | −0.017 (0.1649)      | **−0.118** (0.0000)  | 2.66  |
+| edge_existence/friendship  |    0.867 |  0.800 | 0.752 | **−0.067** (0.0000)  | **−0.048** (0.0000)  | 2.46  |
 
-**The scaffold carries most of the effect.** The CoT step is worth +0.190 to +0.238 on the
-three worst cells; the loop adds a further +0.023 to +0.070 there. Both are significant and
-both point the same way on the fragile tasks.
+Aggregated:
 
-**The loop is genuinely load-bearing, not decoration.** Replaying the traces under a
-"stop at turn 1" rule costs −0.050 and −0.070 on the two `connected_nodes` cells that gain
-most (both p<0.001) and −0.023 to −0.025 on the two `node_degree` gainers. Conversely, on
-`edge_existence/adjacency` and `/friendship` stopping at turn 1 *gains* +0.042 and +0.025.
-The loop helps where the task is hard and hurts where it is nearly solved.
+| scope            | baseline | turn 1 | final | total | **CoT** | **loop** |
+|------------------|----------|--------|-------|-------|---------|----------|
+| all 9 cells      |    0.793 |  0.864 | 0.843 | +0.050| **+0.071** | **−0.021** |
+| 6 cells, no `edge_existence` | 0.726 | 0.846 | 0.843 | +0.117| **+0.120** | **−0.003** |
 
-**On `edge_existence`, both halves are harmful.** Every step of the procedure — writing a
-claim trace, then verifying it — costs accuracy on a task the model already answers at
-0.867–0.980 zero-shot. This is the clearest limit on the method found here.
+**This is the central negative result of the arm.** The entire improvement over the baseline
+is the reasoning scaffold. The verify-and-revise loop contributes −0.021 across all nine
+cells and −0.003 across the six that exclude `edge_existence`. Excluding `edge_existence`
+does not rescue the loop; it moves it from *harmful* to *inert*.
 
-## 5. The Critic carries real signal
+Per cell, the loop is significantly positive **once** (`connected_nodes/friendship`, +0.032)
+and significantly negative twice, both on `edge_existence`. The remaining six are null.
 
-Every verdict cross-tabbed against whether the Proposer answer *it was judging* was
-correct (pooled, 5,677 verdicts):
+**On `edge_existence` the loop is destructive.** It costs −0.118 on adjacency, turning a
+0.938 baseline into 0.803, while the scaffold there is roughly neutral (−0.017, ns). This is
+the predicted behaviour for a task with nothing to debate: the Critic's only available move
+is to talk a correct Proposer out of a correct answer.
+
+The honest one-line statement of this arm is therefore **"asking the model to reason helps;
+having a Critic argue about the reasoning does not"** — not "debate helps".
+
+## 5. The Critic carries signal, but its revisions cost accuracy
+
+Every verdict cross-tabbed against whether the Proposer answer *it was judging* was correct
+(pooled, 5,825 verdicts):
 
 |                      | AGREE | REVISE |                             |
 |----------------------|-------|--------|-----------------------------|
-| Proposer **correct** |  4618 |   243  | false-alarm rate **0.050**  |
-| Proposer **wrong**   |   461 |   355  | detection rate **0.435**    |
+| Proposer **correct** |  4137 |   630  | false-alarm rate **0.132**  |
+| Proposer **wrong**   |   528 |   530  | detection rate **0.502**    |
 
-chi2 = 1099.3 (1 df, p = 5e-241), **phi = +0.440**, odds ratio 14.6. A REVISE moves P(the
-answer is wrong) from the base rate 0.144 to **0.594** — a fourfold shift in the posterior.
-The verdict is a usable signal, and the loop's gains in section 4 are what that signal buys.
+chi2 = 747.1 (1 df, p ≈ 0), **phi = +0.358**, odds ratio 6.67. A REVISE moves P(the answer
+is wrong) from the base rate 0.181 to **0.459**. The verdict is a real signal — it is not
+noise, and it is not rubber-stamping.
 
-Per cell, the discrimination is strongest where the check is atomic:
+Per cell:
 
 | task/encoding              | verdicts | FA\|ok | det\|bad | phi    | unparsed |
 |----------------------------|----------|--------|----------|--------|----------|
-| edge_existence/adjacency   |      649 |  0.143 |    0.922 | +0.621 |        0 |
-| edge_existence/friendship  |      624 |  0.107 |    0.733 | +0.589 |        0 |
-| connected_nodes/adjacency  |      654 |  0.033 |    0.386 | +0.465 |       17 |
-| node_degree/adjacency      |      642 |  0.023 |    0.339 | +0.448 |       15 |
-| connected_nodes/friendship |      667 |  0.030 |    0.351 | +0.444 |       37 |
-| node_degree/friendship     |      616 |  0.002 |    0.208 | +0.416 |       19 |
-| connected_nodes/incident   |      612 |  0.032 |    0.163 | +0.169 |       62 |
-| edge_existence/incident    |      601 |  0.057 |    1.000 | +0.164 |        0 |
-| node_degree/incident       |      612 |  0.023 |    0.064 | +0.068 |  **169** |
+| edge_existence/friendship  |      647 |  0.161 |    0.926 | +0.694 |        0 |
+| edge_existence/adjacency   |      701 |  0.290 |    0.957 | +0.537 |        0 |
+| edge_existence/incident    |      611 |  0.105 |    0.857 | +0.406 |        0 |
+| connected_nodes/friendship |      662 |  0.085 |    0.308 | +0.288 |        0 |
+| node_degree/adjacency      |      643 |  0.102 |    0.298 | +0.218 |        0 |
+| connected_nodes/adjacency  |      685 |  0.201 |    0.423 | +0.217 |        0 |
+| node_degree/friendship     |      629 |  0.059 |    0.208 | +0.208 |        0 |
+| connected_nodes/incident   |      627 |  0.102 |    0.327 | +0.186 |        0 |
+| node_degree/incident       |      620 |  0.070 |    0.260 | +0.185 |        0 |
 
-The Critic is **conservative rather than trigger-happy**: false-alarm rates run 0.002–0.143.
-That conservatism is why a REVISE is informative, and also why detection is only 0.435 —
-it misses more than half of wrong answers rather than flagging everything.
+Discrimination is by far the strongest on `edge_existence` (phi +0.406 to +0.694), where the
+check is atomic — which makes the loop's failure there more striking, not less: **the Critic
+knows when the answer is wrong on that task and still makes it worse.**
 
-**A REVISE improves the answer where the task is hard.** Net effect of a revision
-(bad→ok minus ok→bad): `connected_nodes/friendship` **+42**, `/adjacency` **+30**,
-`node_degree/adjacency` **+15**, `/friendship` **+14**. It is negative on
-`edge_existence/adjacency` (**−25**) and `/friendship` (**−15**), which is the mechanism
-behind those cells' negative loop deltas in section 4.
+**The resolution is what a REVISE *does*.** Net effect of a revision (bad→ok minus ok→bad):
+
+| task/encoding              | revisions | ok→bad | bad→ok | **net** |
+|----------------------------|-----------|--------|--------|---------|
+| connected_nodes/friendship |       110 |     11 |     30 | **+19** |
+| node_degree/friendship     |        55 |     12 |     12 |     ±0  |
+| edge_existence/incident    |        80 |      8 |      6 |    −2   |
+| connected_nodes/incident   |        75 |     16 |     12 |    −4   |
+| node_degree/incident       |        53 |     10 |      6 |    −4   |
+| connected_nodes/adjacency  |       173 |     37 |     26 |   −11   |
+| node_degree/adjacency      |        88 |     22 |     11 |   −11   |
+| edge_existence/friendship  |       228 |     38 |      9 |   −29   |
+| edge_existence/adjacency   |       295 |     89 |     18 | **−71** |
+
+**Net −113 revisions across the arm, positive in exactly one cell.** The Critic detects
+errors at 0.502 but revises correct answers at 0.132, and because correct answers vastly
+outnumber wrong ones, that false-alarm rate converts into more damage than the detections
+repair. This is the mechanism behind section 4's loop deltas, and it is a **precision**
+problem, not a detection problem.
 
 ### 5a. The grounding audit does not measure what its column names claim
 
@@ -200,117 +241,170 @@ The Critic is instructed to quote an edge from the graph. `diagnostics._classify
 resolves every cited label pair back to node ids and bins it as *real* (the pair is an edge),
 *hallucinated* (it is not), or *no pair*:
 
-| task/encoding              | REVISEs | real edge | hallucinated | no pair |
-|----------------------------|---------|-----------|--------------|---------|
-| connected_nodes/incident   |      25 | 181 (0.79)|    26 (0.11) |      21 |
-| node_degree/incident       |      16 |  39 (0.72)|     2 (0.04) |      13 |
-| node_degree/adjacency      |      50 |  59 (0.67)|    13 (0.15) |      16 |
-| connected_nodes/adjacency  |      68 |  67 (0.48)|    28 (0.20) |      45 |
-| connected_nodes/friendship |      82 | 105 (0.45)|    47 (0.20) |      80 |
-| node_degree/friendship     |      17 |   7 (0.33)|     9 (0.43) |       5 |
-| edge_existence/incident    |      35 |   5 (0.15)|    26 (0.76) |       3 |
-| edge_existence/adjacency   |     163 |  16 (0.10)|   144 (0.89) |       1 |
-| edge_existence/friendship  |     142 |   6 (0.04)|   134 (0.96) |       0 |
+| task/encoding              | REVISEs | real edge  | hallucinated | no pair |
+|----------------------------|---------|------------|--------------|---------|
+| node_degree/adjacency      |      88 | 140 (0.68) |    47 (0.23) |      18 |
+| connected_nodes/adjacency  |     174 | 231 (0.64) |    96 (0.27) |      32 |
+| connected_nodes/incident   |      75 |  59 (0.62) |    25 (0.26) |      11 |
+| node_degree/incident       |      53 |  53 (0.61) |    30 (0.34) |       4 |
+| node_degree/friendship     |      55 |  44 (0.49) |    34 (0.38) |      12 |
+| connected_nodes/friendship |     110 | 108 (0.44) |   107 (0.44) |      28 |
+| edge_existence/incident    |      80 |  11 (0.14) |    64 (0.80) |       5 |
+| edge_existence/friendship  |     228 |  24 (0.11) |   202 (0.89) |       2 |
+| edge_existence/adjacency   |     295 |  28 (0.09) |   267 (0.91) |       0 |
 
 **The `hallucinated` column does not mean fabrication, and must not be read as it.** The
 classifier asks only whether a cited pair is an edge; it never asks whether the Critic
 claimed it *was* one. A critique asserting a **non**-relationship — "no such edge as (5,13)
 appears in the list" — cites a pair that is correctly not in the edge set, and is binned as
-hallucinated. That is valid negative evidence being scored as invention.
+hallucinated. That is valid negative evidence being scored as invention, and it is why
+`edge_existence` tops the column: a correct "this edge is absent" critique can cite nothing
+else.
 
-Checking which flagged citations involve a node the question actually asked about, pooled
-over all three seeds:
+**This audit is a null, not a finding.** It cannot separate invention from correct negative
+evidence, so it says nothing either way about whether the Critic fabricates. Measuring
+fabrication properly requires parsing the polarity of each cited claim (asserted present vs
+asserted absent), which the current classifier does not do.
 
-| task/encoding              | flagged | involving the queried node(s) |
-|----------------------------|---------|-------------------------------|
-| edge_existence/adjacency   |     144 | 144 (100%)                    |
-| edge_existence/friendship  |     134 | 134 (100%)                    |
-| edge_existence/incident    |      26 |  26 (100%)                    |
-| connected_nodes/friendship |      47 |  46 (98%)                     |
-| connected_nodes/adjacency  |      28 |  28 (100%)                    |
-| connected_nodes/incident   |      26 |  26 (100%)                    |
-| node_degree/adjacency      |      13 |  12 (92%)                     |
-| node_degree/friendship     |       9 |   9 (100%)                    |
-| node_degree/incident       |       2 |   2 (100%)                    |
+## 6. Format compliance is high and no consensus is manufactured
 
-**Only 2 of 429 flagged citations across the whole arm do not involve the queried node.**
-On `edge_existence` the flagged pair is the queried pair itself in 100 percent of cases —
-necessarily so, since a correct "this edge is absent" critique can cite nothing else.
+| metric | v3 |
+|---|---|
+| turn-1 Proposer output parses | 0.995 (5,375 of 5,400) |
+| final answer parses | 0.997 |
+| Critic verdicts emitted | 5,825 |
+| **unparseable verdicts** | **0 (0.000)** |
+| Critic turns hitting the 512 cap | 161 (0.028) |
+| Proposer turns hitting the cap | 54 (0.009) |
 
-The honest conclusion is therefore the opposite of what the column name suggests: **there is
-no evidence in this arm that the Critic fabricates supporting edges.** What the audit
-establishes is a null — it cannot separate invention from correct negative evidence, so it
-says nothing either way. Measuring fabrication properly requires parsing the polarity of
-each cited claim (asserted present vs asserted absent), which the current classifier does
-not do.
+**No verdict in the entire arm failed to parse.** This matters because the loop defaults an
+unparseable verdict to AGREE and terminates, so any such verdict is a consensus manufactured
+by the token cap rather than reached by the Critic — it would inflate the Critic's apparent
+precision and cut the loop short mechanically.
 
-This also reinterprets the stopping-rule result. `gate_hallucinated`, which vetoes REVISEs
-whose citation is not a real edge, is on this data mostly vetoing *correct* negative
-critiques. Its +0.048 on `edge_existence/adjacency` is not evidence that ungrounded
-critiques are harmful; it is the gate switching off a loop that section 4 already showed to
-be harmful on that task.
+Truncation still occurs on 161 Critic turns, but it no longer destroys the verdict: in every
+one of those turns the `VERDICT:` line was emitted before the cap was reached. The cap's
+rationale and the open questions around it are recorded in
+[llama70b-cap-decision.md](llama70b-cap-decision.md); the choice of 512 is not principled and
+should not be defended as such.
 
-## 6. Format compliance is good, with one cell that is not trustworthy
+The remaining parse failures are concentrated in `edge_existence/friendship` (turn-1 0.977)
+and `edge_existence/adjacency` (0.990); every other cell is at or above 0.990.
 
-Turn-1 Proposer output parses in **5,387 of 5,400** instances (13 unparsed, all but one on
-`edge_existence`), and Proposer truncation at the 512-token cap is at or below 1.6 percent
-in every cell (worst: `edge_existence/adjacency`, 12 of 763 turns).
+## 7. The compute control (majority vote)
 
-**The exception is Critic truncation on `node_degree/incident`: 157 of 612 turns (0.257),
-producing 169 unparsed verdicts.** An unparseable verdict is defaulted to AGREE and
-**terminates the loop**, so roughly a quarter of that cell's instances end in a consensus
-manufactured by the token cap rather than reached by the Critic. That contaminates two
-numbers, and they should not be used:
+Debate spends **2.29 responses and 1,554 tokens per instance against the baseline's 1.00 and
+364** — roughly 4.3x the tokens.
 
-- its Critic statistics (phi = +0.068, p = 0.092), because defaulted verdicts are counted
-  as AGREE in the confusion matrix;
-- its loop delta (−0.013, p = 0.039), because the loop was cut short mechanically.
+A reasoned majority-vote arm (`condition = "majority_vote_cot"`, N=3 sampled draws of the
+same v3 Proposer prompt, voted) is **currently running**; configs
+`configs/llama70b-mvcot-{main,seed11,seed13}.toml`, writing into the same
+`results/llama70b-v3-*` dirs. N=3 is token-matched to debate on this model: debate spends
+1,395–1,659 tokens per instance against a turn-1 cost of 543–567, i.e. 2.57–2.93
+turn-1-equivalents per task.
 
-`connected_nodes/incident` has a milder form of the same problem (62 unparsed of 612, 0.10).
-**Fixing this needs a rerun of those cells at a higher Critic cap**; it is not repairable
-from the stored traces. Nothing else in this file depends on those two numbers — the
-section 2 accuracy for `node_degree/incident` is unaffected, since the final answer is
-scored whether or not the loop ended early.
+This arm is what separates *debate* from *more compute spent any way at all*. Section 4
+makes a specific prediction for it: mean turn-1 accuracy is **0.846** on the 6-cell scope
+against debate's final **0.843**, so N independent reasoned draws voted should land at or
+above debate at matched cost. **Results to be filled in when the run completes.** Until then
+the claim this arm supports is "debate at 4.3x compute beats a single greedy answer", not
+"debate beats matched compute".
 
-Recomputing that cell over the 443 parsed verdicts alone gives phi = +0.106 (p=0.026) and a
-loop delta of +0.030 (p=0.061) — both moving as expected once the artefact is removed, and
-both **selection-biased**, since the excluded turns are the long high-degree instances.
-Treat those as a sensitivity check, not a correction. The cap's rationale, the two distinct
-kinds of truncation behind it, the full option/cost table and the open questions are
-recorded in [llama70b-cap-decision.md](llama70b-cap-decision.md); the choice of 512 is not
-principled and should not be defended as such.
+## 8. Additional analysis: an earlier Proposer prompt (v2)
 
-## 7. What is missing: the compute control
+A second prompt version, **v2**, was run over the identical instances and is retained as an
+ablation. Its rows are in `results/llama70b-{main,seed11,seed13}`, tagged
+`prompt_version: "v2"`; configs `configs/llama70b-debate-{main,seed11,seed13}.toml`.
 
-Debate spends **2.16 responses and 1,663 tokens per instance against the baseline's 1.00
-and 364** — roughly 4.6x the tokens. A majority-vote arm (N sampled answers aggregated by
-vote) has **not been run** for this model.
+**What differs.** v3 (a) consolidates v2's two per-task claim-kind wordings into one generic
+statement, (b) strips from the Critic's framing four instructions that both task cues already
+restated, and (c) removes from the incident cue the instruction to *derive the answer
+independently before checking*, so the Critic reviews the Proposer's claims rather than
+working the problem out first. The revision role is byte-identical in both versions.
 
-Without it, the results in sections 2–4 cannot distinguish *debate* from *more compute
-spent any way at all*. This is the first objection any reader will raise, and it is
-currently unanswered. Self-consistency has a plausible structural reason to do nothing here
-— the baseline emits a terse direct answer, so there are few diverse reasoning paths to
-marginalize over — but that is an argument, not a measurement.
+**v2 scores higher.** Paired over all 5,400 instances:
 
-**This is the highest-priority remaining run.** Until it exists, the honest claim is
-"debate at 4.6x compute beats a single greedy answer", not "debate beats matched compute."
+| task/encoding              |    v2 |    v3 | delta   | b/c   | p        |
+|----------------------------|-------|-------|---------|-------|----------|
+| connected_nodes/incident   | 0.937 | 0.940 | +0.003  | 19/21 | 0.874 ns |
+| node_degree/incident       | 0.925 | 0.935 | +0.010  | 6/12  | 0.238 ns |
+| node_degree/adjacency      | 0.870 | 0.850 | −0.020  | 40/28 | 0.182 ns |
+| edge_existence/incident    | 1.000 | 0.975 | −0.025  | 15/0  | 1e-04 ***|
+| connected_nodes/adjacency  | 0.857 | 0.817 | −0.040  | 61/37 | 0.020 *  |
+| edge_existence/friendship  | 0.808 | 0.752 | −0.057  | 52/18 | 1e-04 ***|
+| edge_existence/adjacency   | 0.872 | 0.803 | −0.068  | 71/30 | 1e-04 ***|
+| node_degree/friendship     | 0.898 | 0.828 | −0.070  | 56/14 | 4e-06 ***|
+| connected_nodes/friendship | 0.787 | 0.687 | −0.100  | 82/22 | 2e-09 ***|
+| **MEAN**                   | **0.884** | **0.843** | **−0.041** | | |
 
-## 8. Summary
+Per seed, v2 is 0.883/0.884/0.884 against v3's 0.854/0.847/0.828 — stable in both arms, so
+this is not a seed artefact. On the 6-cell scope v2 is 0.879 against v3's 0.843.
+
+**Why v3 is worse, mechanically.** v2's Critic was markedly more conservative: false-alarm
+rate **0.050** against v3's 0.132, detection 0.435 against 0.502, phi **+0.440** against
++0.358. Removing the "derive the answer yourself first" instruction made the Critic flag
+more answers in both directions, and since correct answers outnumber wrong ones, the extra
+false alarms cost more than the extra detections gain. v2's revisions are net **positive**
+on the four fragile cells (+42, +30, +15, +14) where v3's are net −11 to +19.
+
+**What v3 fixed.** v2 produced **319 unparseable verdicts of 5,677 (0.056)**, concentrated
+in `node_degree/incident` (169 of 612, 0.257) — each one a cap-manufactured AGREE that ended
+the loop early and contaminated that cell's Critic statistics. v3 produces **zero**, because
+its cue no longer asks the Critic to enumerate the full edge list before deciding, so it
+never runs out of tokens before writing `VERDICT:`.
+
+**The trade is therefore real in both directions**: v2 is more accurate, v3 is
+better-behaved. A version keeping v2's derivation instruction while avoiding its truncation
+— a larger cap, or requiring `VERDICT:` before the supporting detail — is untested and would
+plausibly beat both. That is a one-cell experiment, not a full matrix.
+
+Note that v2's loop is *also* not a clear win over its own turn 1; the difference is one of
+degree. The section 4 conclusion is not an artefact of v3.
+
+## 9. Provenance: how the two prompt versions are kept apart
+
+Both versions are defined in `src/gedebate/prompts/debate.py` as fully separate constant
+sets — no piece is shared between them even where the text is identical — so an edit to one
+cannot alter the other. Every debate row carries its `prompt_version`, and
+`scripts/show_results.py` and `scripts/debate_diagnostics.py` **refuse to run** on a mix of
+versions unless one is named explicitly.
+
+**A superseded run exists and must not be used.** `results/llama70b-v3prop-v2crit-*` holds
+5,400 rows tagged `prompt_version: "v3"` that are in fact a hybrid: v3 Proposer and revision
+prompts with a **v2 Critic** prompt. The cause was `conditions/debate.py` calling
+`critic_prompt()` without threading `prompt_version`, so it fell back to the module default
+(`"v2"`); fixed in commit `e9746444`, which also made the argument mandatory on all three
+prompt builders. The diagnosis was confirmed three ways: the code at the run's recorded
+commit, re-executing that code against a recording stub, and re-tokenizing stored prompts
+against the served model (proposer 20/20 match v3, critic 20/20 match v2).
+
+Those rows remain valid as a clean isolation of the **Proposer preamble change alone**
+(v3 preamble + v2 Critic scores 0.879 against v2-throughout's 0.884, n=5,400 — i.e. the
+preamble change is a wash, and section 8's −0.041 is attributable to the Critic changes).
+Their `prompt_version` field cannot be trusted; the directory name and the `note` field in
+their manifest record what they actually are.
+
+## 10. Summary
 
 1. Encoding fragility is large and significant on all three tasks; `incident` best and
    `friendship` worst, unanimously (section 1).
-2. Debate improves mean accuracy by +0.090, replicating across three independent seeds
-   with near-identical magnitude (section 2).
-3. Debate **reduces** encoding fragility on both genuinely fragile tasks, 3 for 3, by
-   lifting the worst encoding rather than the best — and **increases** it on
-   `edge_existence`, 3 for 3 (section 3).
-4. Most of the gain is the reasoning scaffold; the verify-and-revise loop adds a smaller
-   but significant increment, and is actively harmful on `edge_existence` (section 4).
-5. The Critic carries real signal (phi = +0.440): conservative (false alarm 0.050), catching
-   under half of wrong answers (detection 0.435), and a REVISE quadruples P(wrong) from
-   0.144 to 0.594 (section 5). The grounding audit's `hallucinated` column does **not**
-   show fabrication — 427 of its 429 flags involve the queried node and are consistent with
-   valid negative evidence, so that audit is a null, not a finding (section 5a).
-6. One cell, `node_degree/incident`, has Critic truncation at 0.257 and its loop and Critic
-   numbers must not be used (section 6).
-7. No compute control has been run, which bounds what can be claimed (section 7).
+2. Debate improves mean accuracy by **+0.050** over nine cells and **+0.117** over the six
+   excluding `edge_existence`, replicating in sign across three independent seeds
+   (section 2).
+3. Debate **reduces** encoding fragility on both genuinely fragile tasks — 0.470 → 0.253 and
+   0.237 → 0.107 — by lifting the worst encoding rather than the best, and **increases** it
+   on `edge_existence` (section 3).
+4. **The gain is the reasoning scaffold, not the debate.** Turn 1 alone accounts for +0.071
+   of the +0.050 (9 cells) and +0.120 of the +0.117 (6 cells); the verify-and-revise loop
+   contributes −0.021 and −0.003 respectively. Excluding `edge_existence` moves the loop
+   from harmful to inert, not to useful (section 4).
+5. The Critic carries real signal (phi = +0.358, a REVISE moves P(wrong) from 0.181 to
+   0.459), but its revisions are net **−113** across the arm and positive in one cell of
+   nine. The failure is precision, not detection (section 5). The grounding audit's
+   `hallucinated` column does **not** show fabrication and is a null (section 5a).
+6. Format compliance is high and **no verdict failed to parse**, so no consensus in this arm
+   was manufactured by the token cap (section 6).
+7. The compute control is running; until it lands the claim is bounded to "debate at 4.3x
+   compute beats a single greedy answer" (section 7).
+8. An earlier prompt, v2, scores **+0.041 higher** but produced 319 unparseable verdicts
+   against v3's zero — more accurate, worse behaved (section 8).
