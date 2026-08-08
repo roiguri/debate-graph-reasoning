@@ -512,7 +512,7 @@ cannot alter the other. Every debate row carries its `prompt_version`, and
 `scripts/show_results.py` and `scripts/debate_diagnostics.py` **refuse to run** on a mix of
 versions unless one is named explicitly.
 
-**A superseded run exists and must not be used.** `results/llama70b-v3prop-v2crit-*` holds
+**A superseded run exists and must not be used.** `results/_archive/llama70b-v3prop-v2crit-*` holds
 5,400 rows tagged `prompt_version: "v3"` that are in fact a hybrid: v3 Proposer and revision
 prompts with a **v2 Critic** prompt. The cause was `conditions/debate.py` calling
 `critic_prompt()` without threading `prompt_version`, so it fell back to the module default
@@ -521,7 +521,9 @@ prompt builders. The diagnosis was confirmed three ways: the code at the run's r
 commit, re-executing that code against a recording stub, and re-tokenizing stored prompts
 against the served model (proposer 20/20 match v3, critic 20/20 match v2).
 
-Those rows remain valid as a clean isolation of the **Proposer preamble change alone**
+It is archived rather than left in `results/` precisely because `results/llama70b-v3*`
+matches both it and the real v3 run. Those rows remain valid as a clean isolation of the
+**Proposer preamble change alone**
 (v3 preamble + v2 Critic scores 0.879 against v2-throughout's 0.884, n=5,400 — i.e. the
 preamble change is a wash, and section 8's −0.041 is attributable to the Critic changes).
 Their `prompt_version` field cannot be trusted; the directory name and the `note` field in
