@@ -1,6 +1,6 @@
 \documentclass[11pt]{article}
 
-\usepackage[review]{acl}
+\usepackage[preprint]{acl}
 
 \usepackage{times}
 \usepackage{latexsym}
@@ -13,6 +13,7 @@
 \usepackage{booktabs}
 \usepackage{enumitem}
 \usepackage{pgfplots}
+\usepackage{tikz}
 \pgfplotsset{compat=1.16}
 \definecolor{seriesA}{HTML}{2A78D6}
 \definecolor{seriesB}{HTML}{EB6834}
@@ -21,66 +22,61 @@
 \title{Reasoning, Not Debate, Repairs Encoding-Fragile Graph Reasoning in LLMs}
 
 \author{Itai Paperno \\
-  School of Computer Science \\
-  \texttt{itaipaperno19@gmail.com} \\}
+  \texttt{itaipaperno@mail.tau.ac.il} \\\And
+  Roi Guri \\
+  \texttt{roiguri@mail.tau.ac.il} \\\And
+  Shahar Cohen \\
+  \texttt{shaharc6@mail.tau.ac.il} \\}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
 Large language models answer the same graph question with sharply different
-accuracy depending only on how the graph is serialized into text---a robustness
-gap we confirm at up to $0.47$ on Llama-3.3-70B. A natural remedy is multi-agent
-\emph{debate}: a Critic checks a Proposer's reasoning before it is committed.
-Debate rests on a \emph{verification asymmetry}---checking a claim should be
-cheaper than producing one---and graph reasoning is an unusually clean place to
+accuracy depending only on how the graph is serialized into text - a robustness
+gap we confirm on Llama-3.3-70B. A natural remedy is multi-agent
+debate: a Critic checks a Proposer's reasoning before it is committed.
+Debate rests on a verification asymmetry - checking a claim should be
+cheaper than producing one - and graph reasoning is an unusually clean place to
 test it, because an edge claim is objectively present in the serialization or it
-is not. Across three tasks, three encodings, and three seeds
-($5{,}400$ instances per condition), we find that debate does raise accuracy
-($+0.05$) and does narrow the encoding gap. However, decomposing the debate into
-its reasoning scaffold and its verify-and-revise loop shows that the entire gain
-comes from asking the model to reason: the loop itself contributes $-0.02$. A
-compute-matched majority vote over independent reasoned answers beats debate on
-every cell at $1.07\times$ its token cost. The Critic genuinely detects errors
-($\phi=+0.36$), but because correct answers outnumber wrong ones roughly five to
-one, its false alarms cost more accuracy than its detections repair. Encoding
-fragility is real and reasoning reduces it---but the multi-agent structure is not
-why.
+is not. Across three tasks, three encodings, and three seeds, we find that debate
+does raise accuracy and does narrow the encoding gap. However, decomposing the
+debate into its reasoning scaffold and its verify-and-revise loop shows that the
+entire gain comes from asking the model to reason: the loop itself contributes
+nothing. A compute-matched majority vote over independent reasoned answers beats
+debate on every cell at comparable token cost. Encoding fragility is real and
+reasoning reduces it - but the multi-agent structure is not why.
 \end{abstract}
 
 \section{Introduction}
 
 Large language models (LLMs) are increasingly asked to reason over graph-structured
-data---social networks, knowledge graphs, dependency structures---presented as
+data - social networks, knowledge graphs, dependency structures - presented as
 text. A recurring and uncomfortable finding is that their accuracy is highly
-sensitive to \emph{how} the graph is written down: the same graph and the same
+sensitive to how the graph is written down: the same graph and the same
 question, serialized under a different but equally faithful convention, can move
 accuracy by tens of points \citep{fatemi2024talk}. We reproduce this
-\emph{encoding fragility} on Llama-3.3-70B at a striking magnitude: a
+encoding fragility on Llama-3.3-70B: a
 \texttt{connected\_nodes} query answered correctly $95.8\%$ of the time under one
-serialization drops to $48.8\%$ under another, on the same graphs. A model whose
-answer depends this much on a cosmetic choice of notation is not reasoning about
-the graph so much as about its surface form.
+serialization drops to $48.8\%$ under another, on the same graphs. A strong dependence on notation indicates that the phrasing of the input, not the
+graph's structure, is driving the model's answers.
 
-A natural remedy is to make the model check its own work. Multi-agent
-\emph{debate}, in which a Proposer produces an answer and a Critic scrutinizes it
-before it is committed, has been reported to improve factuality and reasoning
-\citep{du2023debate, irving2018debate}. Debate rests on an implicit
-\emph{verification asymmetry}: recognizing that a claim is wrong is assumed to be
-cheaper than producing the right claim in the first place. Yet the evidence is
-mixed---LLMs often cannot reliably self-correct \citep{huang2024selfcorrect}, and
-when debate is placed head-to-head against simple aggregation it does not always
-win \citep{choi2025debateorvote}. A difficulty in adjudicating these results is
-that in most reasoning domains the intermediate steps a Critic must check are not
-\emph{objectively} verifiable, so a failure of debate cannot be separated from a
-failure of checking.
+A natural remedy is multi-agent debate: a Proposer produces an answer and a
+Critic scrutinizes it before it is committed, a procedure reported to improve
+factuality and reasoning \citep{du2023debate}. Debate rests on an implicit
+verification asymmetry: recognizing that a claim is wrong is assumed to be
+cheaper than producing the right claim in the first place \citep{irving2018debate}.
+Yet the evidence is mixed - when debate is placed head-to-head against simple
+aggregation it does not always win \citep{choi2025debateorvote}. These results are hard to
+interpret because in most reasoning domains the steps a Critic checks are not
+objectively verifiable.
 
 Graph reasoning removes that obstacle. An atomic claim in a Proposer's
-trace---``node $5$ is adjacent to node $13$''---either appears in the serialized
-graph or it does not, so a Critic's job is objectively well-posed and its behavior
-can be measured exactly. This makes graphs an ideal testbed for the question we
-ask: \textbf{does debate reduce encoding fragility, and if it helps at all, is the
-multi-agent structure the reason?}
+trace - ``node $5$ is adjacent to node $13$'' - either appears in the serialized
+graph or it does not, so a Critic's job is objectively unambiguous and its behavior
+can be measured exactly. This makes graphs an ideal setting for the question we
+ask: does debate reduce encoding fragility, and if it helps at all, is the
+multi-agent structure the reason?
 
 We run three graph tasks (\texttt{edge\_existence}, \texttt{node\_degree},
 \texttt{connected\_nodes}) under three encodings (\texttt{adjacency},
@@ -92,70 +88,70 @@ Our findings are:
   \item \textbf{Encoding fragility is large and significant} on all three tasks,
     unanimously worst under \texttt{friendship} and best under \texttt{incident}
     (\S\ref{sec:results}).
-  \item \textbf{Debate raises accuracy and narrows the encoding gap}, replicating
-    across all three seeds---the result one would report by stopping here.
-  \item \textbf{The gain is the reasoning scaffold, not the debate.} Decomposing
+  \item \textbf{Debate raises accuracy and narrows the encoding gap.}
+  \item \textbf{The gain is the reasoning, not the debate.} Decomposing
     debate into its first-turn chain-of-thought and its verify-and-revise loop,
-    the loop contributes $-0.02$: asking the model to reason helps, having a Critic
+    the loop contributes nothing: asking the model to reason helps, having a Critic
     argue about the reasoning does not.
   \item \textbf{A compute-matched majority vote beats debate} on every cell at
-    $1.07\times$ its token cost. The Critic does carry real signal, but its
-    revisions are net negative because of a precision, not a detection, problem.
+    $1.07\times$ its token cost. The Critic detects real errors, but acting on
+    its verdicts hurts more than it helps.
 \end{itemize}
 
-\noindent The upshot is a positive result wrapped around a negative one: encoding
+\noindent The takeaway is a positive result wrapped around a negative one: encoding
 fragility is real and reasoning genuinely reduces it, but the multi-agent debate
-structure---the part that is expensive and elaborate---is not what does the work.
+structure - the part that is expensive and elaborate - is not what does the work.
 
 \section{Related Work}
 \label{sec:related}
 
 \paragraph{LLM reasoning over serialized graphs.}
 A body of recent work studies how well LLMs answer questions about graphs given as
-text, and consistently finds that the choice of \emph{encoding}---how nodes,
-edges, and structure are rendered into a string---is a first-order determinant of
+text, and consistently finds that the choice of encoding - how nodes,
+edges, and structure are rendered into a string - is a primary factor in
 accuracy. \citet{fatemi2024talk} systematically vary graph encodings and show that
 model performance swings widely across them, with no single encoding dominant
-across tasks; \citet{perozzi2024graphtoken} pursue the complementary direction of
-learning structured encodings rather than fixing a textual one. This
-\emph{encoding fragility} is the phenomenon our work takes as its starting point:
-we treat cross-encoding accuracy spread as a robustness metric and ask whether a
-reasoning procedure can shrink it. % ADD: a GraphQA / LLM-graph-reasoning survey or benchmark citation
+across tasks. Building on that work, \citet{perozzi2024graphtoken} learn a
+structured encoding fed directly to the LLM - an alternative to our method, which
+leaves the text input unchanged and instead has the model reason more at inference
+time. We take this fragility as our starting point, measuring the accuracy gap
+across encodings and asking whether reasoning can shrink it. % ADD: a GraphQA / LLM-graph-reasoning survey or benchmark citation
 
 \paragraph{Multi-agent debate.}
 Debate frames inference as an interaction between models that argue toward a
-better answer. \citet{irving2018debate} propose debate as a mechanism for
-supervising systems whose reasoning is hard to check directly, and
-\citet{du2023debate} report that having multiple LLM instances propose and
-critique across rounds improves factuality and commonsense and arithmetic
-reasoning. Our Proposer--Critic setup is a deliberately minimal, two-role instance
-of this family: a single model produces one answer, then critiques and revises it.
-Mechanically this is a form of \emph{self-correction}, whose reliability is itself
-contested---\citet{huang2024selfcorrect} find that LLMs largely cannot self-correct
-reasoning without an external signal. Crucially, that prior work cannot say whether
-the failure is one of \emph{checking} or of \emph{acting on} a correct check,
-because its intermediate claims are not objectively verifiable. The verification
-asymmetry underlying debate predicts that an objectively checkable domain is exactly
-where the loop should finally help; our graph setting makes the claims checkable, so
-we can run that test and measure the Critic's detection and false-alarm rates
-directly rather than only observing an outcome.
+better answer. \citet{irving2018debate} introduce debate as a scalable-oversight
+mechanism: two agents argue over a question and a weaker judge rules between them,
+the hope being that a limited judge can supervise stronger agents because exposing
+a flaw is easier than committing one. \citet{du2023debate} realize this empirically
+for LLMs, having several instances propose answers and critique one another over
+multiple rounds until they converge, which improves factuality, commonsense, and
+arithmetic reasoning. The mechanism rests entirely on this verification asymmetry,
+and the assumption is not guaranteed: \citet{barnes2020obfuscated} identify an
+obfuscated-arguments problem, in which a debater constructs an argument whose flaw
+neither side can efficiently locate, so refuting a wrong claim is no cheaper than
+producing a right one. Our Proposer--Critic setup is a deliberately minimal,
+two-role instance of this family: a single model produces one answer, then
+critiques and revises it. We expect graphs to avoid the obfuscated-arguments
+problem, since every claim is verifiable and any flaw can be caught.
 
 \paragraph{Aggregation as the alternative.}
 A simpler way to spend extra inference compute is to sample several answers
-independently and aggregate them. Self-consistency \citep{wang2023selfconsistency}
-marginalizes over multiple chain-of-thought \citep{wei2022cot} samples by majority
-vote and reliably improves reasoning accuracy. This makes voting the natural
+independently and aggregate them. Chain-of-thought prompting \citep{wei2022cot}
+has the model produce intermediate reasoning steps before its answer, improving
+accuracy on multi-step problems; this is the same reasoning we isolate as debate's
+first turn. Self-consistency \citep{wang2023selfconsistency} samples several such
+reasoning paths independently and returns the majority answer, reliably improving
+accuracy - which is exactly our majority-vote arm. This makes voting the natural
 control for debate: both spend more compute than a single answer, but debate lets
-the attempts \emph{interact} while voting keeps them independent.
+the attempts interact while voting keeps them independent.
 \citet{choi2025debateorvote} compare the two and find voting competitive with or
 better than debate in several settings. We sharpen this comparison in two ways:
-we \emph{match compute} between the two arms by measured token cost rather than by
-response count, and we run it on a task where fragility gives debate its best
-chance---an objectively checkable domain in which the Critic provably discriminates
-right from wrong.
+we match compute between the two arms by measured token cost rather than response
+count, and we run it where debate should do best - a fragile, checkable task with
+real errors for the Critic to catch.
 
 % ============================================================
-% TODO sections below --- stubbed so the document compiles.
+% TODO sections below  -  stubbed so the document compiles.
 % ============================================================
 
 \section{Setup}
@@ -167,18 +163,13 @@ We generate undirected Erd\H{o}s--R\'enyi graphs with NetworkX
 graph, giving a wide spread of densities. For each of three seeds
 ($7$, $11$, $13$) we draw an independent set of $200$ graphs, and every graph is
 rendered under all three encodings, so a per-encoding accuracy difference reflects
-the encoding alone and all comparisons across encodings are \emph{paired} by graph.
+the encoding alone and all comparisons across encodings are paired by graph.
 
 \paragraph{Tasks and encodings.}
-Three tasks span three answer types: \texttt{edge\_existence} (is there an edge
-between two given nodes? --- boolean), \texttt{node\_degree} (how many neighbors
-does a node have? --- integer), and \texttt{connected\_nodes} (which nodes is a
-given node adjacent to? --- a set). Each graph is serialized under three encodings
-from \citet{fatemi2024talk}: \texttt{adjacency}, an edge list; \texttt{incident},
-per-node neighbor lists; and \texttt{friendship}, natural-language statements. The
-first two label nodes with integers, \texttt{friendship} with popular names;
-Table~\ref{tab:example} shows one graph under all three, together with the three
-tasks. The encodings preserve the graph exactly and differ only in surface form.
+We study three tasks, spanning boolean, integer, and set answers, and three
+encodings from \citet{fatemi2024talk}; Table~\ref{tab:example} defines each with an
+example. The encodings preserve the graph exactly and differ only in surface form,
+labeling nodes with integers except \texttt{friendship}, which uses popular names.
 Crossing $3$ tasks $\times$ $3$ encodings $\times$ $3$ seeds $\times$ $200$ graphs
 gives $9$ cells of $n=600$ each, $5{,}400$ instances per condition.
 
@@ -187,80 +178,81 @@ gives $9$ cells of $n=600$ each, $5{,}400$ instances per condition.
   \small
   \begin{tabular}{@{}p{0.29\columnwidth}p{0.63\columnwidth}@{}}
     \toprule
-    \multicolumn{2}{@{}p{0.95\columnwidth}}{\textbf{Graph} $G$: nodes $0$--$6$;
-      edges $(0,1)(0,2)(2,4)(2,6)(4,5)(5,6)$; node $3$ isolated.}\\
+    \multicolumn{2}{@{}c@{}}{\textbf{Graph}}\\
+    \addlinespace
+    \multicolumn{2}{@{}c@{}}{%
+      \begin{tikzpicture}[baseline,
+          every node/.style={circle,draw,fill=white,inner sep=0pt,
+            minimum size=15pt,font=\scriptsize}]
+        \node (n0) at (-2.0,0.7)  {0};
+        \node (n1) at (-3.2,1.3)  {1};
+        \node (n2) at (0,0)       {2};
+        \node (n6) at (1.5,0)     {6};
+        \node (n4) at (0,-1.5)    {4};
+        \node (n5) at (1.5,-1.5)  {5};
+        \node (n3) at (0.75,1.2)  {3};
+        \draw (n0)--(n1); \draw (n0)--(n2);
+        \draw (n2)--(n4); \draw (n2)--(n6);
+        \draw (n4)--(n5); \draw (n5)--(n6);
+      \end{tikzpicture}}\\
     \midrule
-    \texttt{adjacency} & The edges in G are: (0, 1) (0, 2) (2, 4) (2, 6) (4, 5)
-      (5, 6). \\
+    \multicolumn{2}{@{}c@{}}{\textbf{Encodings}}\\
     \addlinespace
-    \texttt{incident} & Node 0 is connected to nodes 1, 2. Node 2 to 0, 4, 6.
-      Node 4 to 2, 5. Node 5 to 4, 6. Node 6 to 2, 5. \\
+    \texttt{adjacency} & The edges in G are: (0, 1) (0, 2) (2, 4)
+      (2, 6) (4, 5) (5, 6). \\
     \addlinespace
-    \texttt{friendship} & James and Robert are friends. James and John are friends.
-      John and David are friends. John and Patricia are friends. David and Mary are
-      friends. Mary and Patricia are friends. \\
+    \texttt{incident} & Node 0 is connected to nodes
+      1, 2. Node 2 to 0, 4, 6. Node 4 to 2, 5. Node 5 to 4, 6. Node 6 to 2, 5. \\
+    \addlinespace
+    \texttt{friendship} & James and Robert are
+      friends. James and John are friends. John and David are friends. John and
+      Patricia are friends. David and Mary are friends. Mary and Patricia are
+      friends. \\
     \midrule
-    \multicolumn{2}{@{}p{0.95\columnwidth}}{\textbf{Tasks} (query shown under
-      \texttt{adjacency}; gold answer in \emph{italics}):}\\
+    \multicolumn{2}{@{}c@{}}{\textbf{Tasks}}\\
     \addlinespace
-    \texttt{edge\_existence} & Is node 6 connected to node 1? \emph{No.} \\
-    \texttt{node\_degree} & What is the degree of node 5? \emph{2.} \\
-    \texttt{connected\_nodes} & List all nodes connected to 2. \emph{0, 4, 6.} \\
+    \texttt{edge\_existence} & Is node 6 connected to node 1? \newline No. \\
+    \addlinespace
+    \texttt{node\_degree} & What is the degree of node 5? \newline 2. \\
+    \addlinespace
+    \texttt{connected\_nodes} & List all nodes connected to 2. \newline
+      0, 4, 6. \\
     \bottomrule
   \end{tabular}
-  \caption{One graph under the three encodings, and the three tasks. The encodings
-  are information-preserving re-serializations of the same graph;
-  \texttt{friendship} maps nodes $0$--$6$ to James, Robert, John, Michael, David,
-  Mary, Patricia. A shared preamble naming the nodes precedes each encoding and is
-  omitted here.}
+  \caption{One graph under the three encodings and the three tasks. All encodings
+  are information-preserving re-serializations of the same graph.}
   \label{tab:example}
 \end{table}
 
 \paragraph{Model and conditions.}
-All conditions use \texttt{Llama-3.3-70B-Instruct-Turbo} (FP8) served by
-Together.ai. We compare three (Table~\ref{tab:conditions}). The \emph{baseline} is a
-single zero-shot answer-only response. \emph{Debate} is a Proposer--Critic loop:
+All conditions use \texttt{Llama-3.3-70B-Instruct-Turbo} (FP8). We compare three
+conditions. The baseline is a
+single zero-shot answer-only response. Debate is a Proposer--Critic loop:
 the Proposer emits a numbered claim trace and a final answer, the Critic reviews it
 against the encoding and returns \textsc{agree} or \textsc{revise}, and the Proposer
 revises until agreement or a turn budget is reached; the Proposer and Critic are the
-\emph{same} model in different roles. Its first turn is a single-turn
+same model in different roles. Its first turn is a single-turn
 chain-of-thought answer under the same decoding, which lets us separate the
-reasoning \emph{scaffold} (baseline\,$\rightarrow$\,turn~1) from the
-verify-and-revise \emph{loop} (turn~1\,$\rightarrow$\,final) with no extra runs.
-\emph{Majority vote} draws the same Proposer prompt $N{=}3$ times independently at
-the model's shipped sampling defaults and takes the mode of the parsed answers; it
-differs from debate in exactly one thing---whether the attempts see each other.
+reasoning (baseline\,$\rightarrow$\,turn~1) from the
+verify-and-revise loop (turn~1\,$\rightarrow$\,final) with no extra runs.
+Majority vote draws the same Proposer prompt $N{=}3$ times independently at
+the model's shipped sampling defaults and returns the majority answer across the
+three; it differs from debate in exactly one thing - whether the attempts see each
+other.
 
 \paragraph{Matched compute.}
-$N{=}3$ was fixed \emph{before} the run by matching debate's measured token spend
+$N{=}3$ was fixed before the run by matching debate's measured token spend
 (debate buys $2.6$--$2.9$ turn-1-equivalents per instance). The realized cost is
-$1{,}664$ tokens per instance for the vote against $1{,}554$ for debate, a ratio of
-$1.07\times$, so the vote is if anything the cheaper arm and any advantage it shows
-is not bought with extra compute. The sampling temperature is Llama's shipped
-default, chosen before seeing any result; realized answer diversity is reported as a
-diagnostic, never tuned.
-
-\begin{table}[t]
-  \centering
-  \small
-  \begin{tabular}{@{}lccc@{}}
-    \toprule
-    \textbf{Condition} & \textbf{Decoding} & \textbf{Cap} & \textbf{Cost/inst.} \\
-    \midrule
-    Baseline      & greedy        & 256 & $1$ resp / $364$ tok \\
-    Debate        & greedy        & 512 & $2.3$ resp / $1{,}554$ tok \\
-    Majority vote & $T{=}0.6$     & 512 & $3$ resp / $1{,}664$ tok \\
-    \bottomrule
-  \end{tabular}
-  \caption{The three conditions. Compute is matched by measured token cost, not by
-  response count: the vote spends $1.07\times$ debate's tokens.}
-  \label{tab:conditions}
-\end{table}
+$1{,}664$ tokens per instance for the vote against $1{,}554$ for debate, so the two
+arms are compute-matched to within $7\%$ and any advantage the vote shows is not an
+artifact of the budget. The sampling temperature is Llama's shipped
+default, fixed before any result; we report how often the three samples disagreed as
+a diagnostic, but never tuned the temperature to change it.
 
 \paragraph{Metrics and statistics.}
-The primary metric is accuracy; the secondary is \emph{encoding fragility}, the
+The primary metric is accuracy; the secondary is encoding fragility, the
 cross-encoding accuracy spread (max\,$-$\,min) within a task. Because encodings are
-paired by graph, significance uses paired tests: Cochran's $Q$ as an omnibus across
+paired by graph, significance uses paired tests: Cochran's $Q$ as an overall test across
 a task's three encodings, and McNemar's test for pairwise gaps and for
 condition-vs-condition accuracy differences; cell accuracies carry Wilson intervals.
 The Critic diagnostic (does a \textsc{revise} track the answer actually being
@@ -269,26 +261,40 @@ test reported with the signed $\phi$. We report the fragility spread descriptive
 supported by replication across the three independent seeds rather than by a test of
 the spread itself. Finally, \texttt{edge\_existence} is a single-pair lookup whose
 trace reduces to one atomic claim, so a claim-by-claim critique has nothing to work
-on and its baseline sits near ceiling; it behaves as a \emph{control} rather than a
+on and its baseline sits near ceiling; it behaves as a control rather than a
 third fragile task, and we report every result both over all $9$ cells and over the
-$6$ cells that exclude it, never dropping it silently.
+$6$ cells that exclude it.
 
 \section{Results and Analysis}
 \label{sec:results}
 
 \subsection{Encoding fragility is large}
 \label{sec:frag}
-Baseline accuracy swings sharply with the serialization on all three tasks. On
-\texttt{connected\_nodes} it runs from $0.958$ under \texttt{incident} to $0.488$
-under \texttt{friendship}---a $0.470$ gap on the same graphs; \texttt{node\_degree}
-spans $0.237$ and even the near-ceiling \texttt{edge\_existence} control spans
-$0.113$. The effect is highly significant under the paired omnibus (Cochran's
-$Q=377$, $148$, $81$ for the three tasks; all $p<10^{-17}$), and its shape is
-unanimous: \texttt{incident} is the best encoding and \texttt{friendship} the worst
-on every task. \texttt{friendship} is the one encoding that names nodes rather than
-numbering them, which is consistent with named entities making a spurious relation
-easier to assert. This fragility is the phenomenon the rest of the paper asks a
-reasoning procedure to repair.
+Baseline accuracy swings sharply with the serialization on all three tasks
+(Table~\ref{tab:fragility}), reaching a $0.470$ gap on \texttt{connected\_nodes}
+between the same graphs. The effect is highly significant on every task under the
+paired Cochran's $Q$ test (all $p<0.001$), and its shape is unanimous:
+\texttt{incident} is the best encoding and \texttt{friendship}, the one encoding
+that names nodes rather than numbering them, the worst on all three. This fragility
+is the phenomenon the rest of the paper asks a reasoning procedure to repair.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    \textbf{Task} & \texttt{incident} & \texttt{adjacency} & \texttt{friendship} &
+      \textbf{Spread (max$-$min)} & \textbf{Cochran $Q$} \\
+    \midrule
+    \texttt{connected\_nodes} & 0.958 & 0.743 & 0.488 & 0.470 & 377 \\
+    \texttt{node\_degree}     & 0.873 & 0.655 & 0.637 & 0.237 & 148 \\
+    \texttt{edge\_existence}  & 0.980 & 0.938 & 0.867 & 0.113 &  81 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Baseline accuracy per encoding, with the cross-encoding spread and
+  Cochran's $Q$. \texttt{edge\_existence} is the near-ceiling control.}
+  \label{tab:fragility}
+\end{table*}
 
 \begin{figure}[t]
   \centering
@@ -324,100 +330,111 @@ reasoning procedure to repair.
     \addlegendentry{\texttt{edge\_existence} (control)}
     \end{axis}
   \end{tikzpicture}
-  \caption{Cross-encoding accuracy spread (fragility) by stage; lower is less
-  fragile. Reasoning (baseline\,$\rightarrow$\,turn~1) collapses the spread on the
-  two fragile tasks, and the verify-and-revise loop and the vote add little beyond
-  it. On the \texttt{edge\_existence} control the spread instead \emph{rises}, as the
-  loop degrades a near-ceiling task.}
+  \caption{Cross-encoding accuracy spread (max$-$min) by stage for each task; lower
+  is less fragile.}
   \label{fig:fragility}
 \end{figure}
 
-\subsection{Debate helps---if you stop here}
+\subsection{Debate raises accuracy and narrows the gap}
 \label{sec:apparent}
-Read at the top line, debate looks like a success. It raises mean accuracy from
-$0.793$ to $0.843$ over all nine cells ($+0.050$; McNemar $b/c=351/619$,
-$p=10^{-17}$) and from $0.726$ to $0.843$ over the six cells excluding the
-\texttt{edge\_existence} control ($+0.117$; $p=10^{-54}$), and the gain replicates
-in sign across all three independent seeds. It also narrows the encoding gap
+Debate raises mean accuracy over the baseline by $+0.050$ over all nine cells
+(McNemar $b/c=351/619$, $p<0.001$; Table~\ref{tab:main}), replicating in
+sign across all three independent seeds. It also narrows the encoding gap
 (Figure~\ref{fig:fragility}): the \texttt{connected\_nodes} spread falls
-$0.470\rightarrow0.253$ and \texttt{node\_degree} $0.237\rightarrow0.107$, with the
-narrowing reproducing $3/3$ on both fragile tasks. The gains concentrate exactly where accuracy was
-worst---the three largest per-cell gains are the three lowest baseline cells---so
-debate works by lifting the floor, which is what narrows the spread. A paper that
-reported only this would conclude that debate improves encoding-fragile graph
-reasoning.
+$0.470\rightarrow0.253$ and \texttt{node\_degree} $0.237\rightarrow0.107$, reproducing
+$3/3$ on both fragile tasks. The gains concentrate exactly where accuracy was
+worst - the three largest per-cell gains are the three lowest baseline cells - so
+debate works by lifting the floor, which is what narrows the spread.
 
-\subsection{The gain is the reasoning scaffold, not the loop}
+\subsection{The gain is the reasoning, not the loop}
 \label{sec:decomp}
 Debate's first turn is a single-turn chain-of-thought answer under identical
 decoding, so the split baseline\,$\rightarrow$\,turn~1\,$\rightarrow$\,final
-separates the reasoning \emph{scaffold} from the verify-and-revise \emph{loop}
-(Table~\ref{tab:main}). The scaffold accounts for the entire improvement: it is
-worth $+0.071$ over nine cells and $+0.120$ over six. The loop then gives back
-$-0.021$ and $-0.003$. Excluding the \texttt{edge\_existence} control does not
-rescue the loop; it moves it from \emph{harmful} to merely \emph{inert}. The loop
-helps in just one cell of nine and hurts in two. Both losses are on the
-\texttt{edge\_existence} control, where the Critic drags accuracy from $0.922$ to
-$0.803$. That task has a single atomic claim: there is nothing to critique, so the
-Critic only talks a correct answer down. The one-line reading is that \emph{asking
-the model to reason helps; having a Critic argue about the reasoning does not}.
+separates the reasoning from the verify-and-revise loop
+(Table~\ref{tab:main}). The reasoning accounts for the entire improvement, worth
+$+0.071$ over the baseline, while the loop then reduces accuracy by $0.021$. That
+damage falls on the \texttt{edge\_existence} control, where the Critic drags accuracy
+from $0.922$ to $0.803$. That task has a single atomic claim: there is nothing to critique, so the
+Critic only talks a correct answer down. The main takeaway is that asking
+the model to reason helps; having a Critic argue about the reasoning does not.
 
-\subsection{A compute-matched vote beats debate}
-\label{sec:vote}
-If the loop is not paying for its compute, the natural comparison is against
-spending that compute on independent attempts instead. Majority vote scores
-$0.875$ over nine cells against debate's $0.843$ ($+0.032$; $p=2\times10^{-16}$)
-and $0.853$ against $0.843$ over six ($+0.010$; $p=0.035$), at $1.07\times$ debate's
-tokens, and it \emph{loses no cell}---it is at least as accurate as debate in all
-nine and significantly better in three. It beats debate in all three seeds. The full
-ordering across the arm is baseline $0.793 <$ debate $0.843 <$ turn~1 $0.864 <$ vote
-$0.875$, so debate is the \emph{worst} of the three reasoning conditions and is
-beaten even by its own single first turn. The vote's advantage is largest on
-\texttt{edge\_existence} ($+0.147$ on \texttt{adjacency}), exactly where debate is
-destructive: an independent redraw cannot be argued out of a correct answer, whereas
-a Critic can. Because debate and the vote differ in only one thing---whether the
-extra attempts interact---this isolates \emph{interaction} as the ingredient that is
-not paying off.
-
-\subsection{Why the loop fails: precision, not detection}
-\label{sec:mechanism}
-The loop's failure is not that the Critic cannot tell right from wrong. Cross-tabbing
-every verdict against whether the answer it judged was actually correct, a
-\textsc{revise} is strongly associated with a wrong answer ($\chi^2$ on $5{,}825$
-verdicts, $\phi=+0.358$; a \textsc{revise} moves the probability the answer is wrong
-from the base rate $0.181$ to $0.459$), and the discrimination is strongest
-($\phi=+0.69$) precisely on \texttt{edge\_existence}, where the check is a single
-lookup. The Critic detects $50.2\%$ of wrong answers. The problem is what it costs:
-it also raises a false alarm on $13.2\%$ of \emph{correct} answers, and because
-correct answers outnumber wrong ones roughly five to one, those false alarms convert
-into more damage than the detections repair. Net across the arm, revisions move
-$113$ more answers from right to wrong than the reverse, and are net-positive in only
-one cell of nine. The loop fails on \textbf{precision}, not detection---the Critic
-knows the answer is wrong on \texttt{edge\_existence} and still, by revising too many
-correct answers, makes that task worse.
-
-\begin{table}[t]
+\begin{table}[h!]
   \centering
   \small
   \begin{tabular}{@{}lcc@{}}
     \toprule
-    \textbf{Condition} & \textbf{All 9 cells} & \textbf{6 (no \texttt{edge\_ex.})} \\
+    \textbf{Condition} & \textbf{With control} & \textbf{Without control} \\
     \midrule
     Baseline                & 0.793 & 0.726 \\
     Turn 1 (CoT)            & 0.864 & 0.846 \\
     Debate (final)          & 0.843 & 0.843 \\
     Majority vote ($N{=}3$)  & \textbf{0.875} & \textbf{0.853} \\
     \midrule
-    Scaffold (base$\to$T1)  & $+0.071$ & $+0.120$ \\
+    Reasoning (base$\to$T1) & $+0.071$ & $+0.120$ \\
     Loop (T1$\to$final)     & $-0.021$ & $-0.003$ \\
     Vote $-$ debate         & $+0.032$ & $+0.010$ \\
     \bottomrule
   \end{tabular}
-  \caption{Mean accuracy by condition, over all nine cells and the six excluding the
-  \texttt{edge\_existence} control. The scaffold (turn~1) carries the entire gain
-  over the baseline; the verify-and-revise loop is negative-to-inert; the
-  compute-matched vote is best on both scopes.}
+  \caption{Mean accuracy by condition, with and without the \texttt{edge\_existence}
+  control. The lower block reports the reasoning, loop, and vote$-$debate
+  differences.}
   \label{tab:main}
+\end{table}
+
+Excluding the \texttt{edge\_existence} control leaves every conclusion intact
+(Table~\ref{tab:main}): without the near-ceiling control, the reasoning gain grows to
+$+0.120$, the loop is close to neutral ($-0.003$), and the compute-matched vote
+(\S\ref{sec:vote}) still beats debate ($+0.010$).
+
+\subsection{A compute-matched vote beats debate}
+\label{sec:vote}
+If the loop is not paying for its compute, the natural comparison is against
+spending that compute on independent attempts instead. Majority vote scores
+$0.875$ over nine cells against debate's $0.843$ ($+0.032$; $p<0.001$), at
+matched compute, and it loses no cell - it is at least as
+accurate as debate in all nine and better in three. The full
+ordering across the arm is baseline $0.793 <$ debate $0.843 <$ turn~1 $0.864 <$ vote
+$0.875$, so debate is the worst of the three reasoning conditions and is
+beaten even by its own single first turn. The vote's advantage is largest on
+\texttt{edge\_existence}, exactly where debate is
+destructive. Because debate and the vote differ in only one thing - whether the
+extra attempts interact - this isolates interaction as the ingredient that is
+not paying off.
+
+\subsection{Why the loop fails: precision, not detection}
+\label{sec:mechanism}
+The loop's failure is not that the Critic cannot tell right from wrong. Cross-tabbing
+every verdict against whether the judged answer was actually correct, a
+\textsc{revise} is strongly associated with a wrong answer (Table~\ref{tab:critic}),
+and this discrimination is strongest ($\phi=+0.69$) precisely on
+\texttt{edge\_existence}, where the check is a single lookup. The problem is what
+detection costs: because correct answers outnumber wrong ones roughly five to one,
+the Critic's false alarms on correct answers convert into more damage than its
+detections repair, and revisions are net-positive in only one cell of nine. The loop
+fails on \textbf{precision}, not detection - the Critic knows the answer is wrong on
+\texttt{edge\_existence} and still, by revising too many correct answers, makes that
+task worse.
+
+\begin{table}[t]
+  \centering
+  \small
+  \begin{tabular}{@{}lc@{}}
+    \toprule
+    \textbf{Critic diagnostic} (pooled, $5{,}825$ verdicts) & \\
+    \midrule
+    Base rate of wrong answers          & $0.181$ \\
+    Detection rate (recall)             & $0.502$ \\
+    False-alarm rate on correct answers & $0.132$ \\
+    $P(\text{wrong}\mid\textsc{revise})$ & $0.459$ \\
+    Association $\phi$                   & $+0.358$ \\
+    Net answers flipped right\,$\to$\,wrong & $+113$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{The Critic detects half of wrong answers and a \textsc{revise} is strongly
+  associated with a wrong answer ($\phi=+0.358$), but its false alarms on the far
+  more numerous correct answers dominate: revisions flip $113$ more answers from right
+  to wrong than the reverse. The failure is one of precision, not detection.}
+  \label{tab:critic}
 \end{table}
 
 \section{Discussion}
@@ -429,18 +446,18 @@ the single-turn reasoning scaffold produces essentially all of the narrowing, an
 compute-matched vote reproduces it (Table~\ref{tab:main}). What reduces a model's
 sensitivity to how a graph is written down is being asked to reason about it, not the
 multi-agent apparatus around that reasoning. We report the spread reduction
-descriptively---it replicates across all three seeds, but we do not test the spread
-itself---so the claim is that reasoning narrows the gap, not that debate confers
+descriptively - it replicates across all three seeds, but we do not test the spread
+itself - so the claim is that reasoning narrows the gap, not that debate confers
 encoding-invariance: fragility stays highly significant under every condition.
 
 \paragraph{The asymmetry can hold and debate still lose.}
-Debate's premise---that recognizing a wrong claim is cheaper than producing a right
-one---was satisfied here: the Critic discriminates right from wrong ($\phi=+0.36$,
+Debate's premise - that recognizing a wrong claim is cheaper than producing a right
+one - was satisfied here: the Critic discriminates right from wrong ($\phi=+0.36$,
 and $+0.69$ where the check is a single lookup). Yet the loop still lost accuracy,
 for a reason that is general. A verify-and-revise step changes accuracy by its
 detection rate times the fraction of answers that are wrong, minus its false-alarm
-rate times the fraction that are right. When a model is already mostly correct---as
-Llama-3.3-70B is here, roughly five right for every one wrong---this balance tips
+rate times the fraction that are right. When a model is already mostly correct - as
+Llama-3.3-70B is here, roughly five right for every one wrong - this balance tips
 negative unless the Critic's precision is very high, however well it detects.
 Objective checkability, the ingredient prior self-correction studies lacked, was not
 enough: it sharpened detection, which was never the bottleneck, and left precision
@@ -454,9 +471,9 @@ comparison is a clean test of the two ways to spend inference compute, and
 independence wins: three independent draws cannot argue each other out of a correct
 answer, whereas a Critic can. Given a fixed budget and a task the model already
 handles reasonably, sampling and voting is the safer use of it than a self-critique
-loop. This does not refute debate in general---it may still help where the base error
+loop. This does not refute debate in general - it may still help where the base error
 rate is high, or where an external, reliable verifier replaces the model's own
-Critic---but on encoding-fragile graph reasoning, at matched cost, it is dominated.
+Critic - but on encoding-fragile graph reasoning, at matched cost, it is dominated.
 
 \section{Limitations and future work}
 \label{sec:future}
@@ -470,8 +487,8 @@ Critic---but on encoding-fragile graph reasoning, at matched cost, it is dominat
     precision may depend heavily on it; varying the prompts would separate a property
     of the method from one of the formulation.
   \item \textbf{Debate structure.} We tested one minimal two-role loop; richer
-    structures---more agents, independent proposers that then interact, or multiple
-    rounds---may recover value over voting.
+    structures - more agents, independent proposers that then interact, or multiple
+    rounds - may recover value over voting.
 \end{itemize}
 
 \section{Conclusion}
@@ -481,9 +498,148 @@ reduces that fragility. A Proposer--Critic debate appears to help, but the gain 
 entirely the reasoning it elicits: the verify-and-revise loop is inert-to-harmful,
 and a compute-matched majority vote beats debate on every cell. The Critic genuinely
 detects errors; it loses because, against a mostly-correct model, its false alarms
-cost more than its detections repair. On this task, reasoning helps---and debate is
+cost more than its detections repair. On this task, reasoning helps - and debate is
 not why.
 
 \bibliography{custom}
+
+\clearpage
+\appendix
+
+\section{Prompts}
+\label{sec:prompts}
+Every prompt is sent as a single user message with no system prompt; the model's
+chat template supplies the wrapper tokens. The question block -- the encoded graph
+followed by \texttt{Q:\ \ldots} and a trailing \texttt{A:} -- is GraphQA's
+\citep{fatemi2024talk} verbatim (examples in Table~\ref{tab:example}); we show the
+instruction scaffolding wrapped around it, with \texttt{\{slots\}} for the
+question, the running transcript, and per-task text.
+
+\paragraph{Baseline.}
+The task instruction, then the question:
+
+{\footnotesize
+\begin{verbatim}
+{task instruction}
+
+{question}
+\end{verbatim}}
+
+\noindent where \texttt{\{task instruction\}} is one of:
+
+{\footnotesize
+\begin{verbatim}
+edge_existence:   Answer with exactly "Yes" or "No"
+                  and nothing else.
+node_degree:      Answer with a single integer (the
+                  degree) and nothing else.
+connected_nodes:  Answer with the connected nodes as a
+                  comma-separated list (or "none" if
+                  there are none) and nothing else.
+\end{verbatim}}
+
+\paragraph{Proposer (turn 1).}
+Also used for each of the three majority-vote draws.
+
+{\footnotesize
+\begin{verbatim}
+Answer the question below using the graph. Build the
+answer as a numbered list of concise, atomic claims
+-- each stating exactly one simple, verifiable fact
+about the graph's nodes or edges -- then give the
+final answer.
+Number your claims 1., 2., 3., and so on, one claim
+per line. Then write a final line that begins with
+ANSWER: followed by {answer}. Write nothing after
+that line.
+
+{question}
+\end{verbatim}}
+
+\noindent \texttt{\{answer\}} is \texttt{Yes or No} (edge\_existence), \texttt{a
+single integer, the degree} (node\_degree), or \texttt{the connected nodes,
+comma-separated, written exactly as the graph writes them, or none}
+(connected\_nodes).
+
+\paragraph{Critic.}
+The transcript is the question, the Proposer's turn-1 answer, and any later turns.
+
+{\footnotesize
+\begin{verbatim}
+Another model is answering the graph question below
+by writing numbered atomic claims (each about one
+edge or node) and a final answer. You are the
+checker; the debate so far is shown.
+
+{transcript}
+
+{critic cue}
+\end{verbatim}}
+
+\noindent For \texttt{node\_degree} and \texttt{connected\_nodes} the
+\texttt{\{critic cue\}} is:
+
+{\footnotesize
+\begin{verbatim}
+Work only from the graph text. Review the Proposer's
+claims and final answer, in both directions:
+- did the Proposer MISS an edge that is in the graph?
+- did the Proposer INCLUDE an edge not in the graph?
+AGREE only if the Proposer's supporting edges are
+exactly the ones in the graph and the answer follows.
+Otherwise REVISE and name each wrong edge, quoting it
+from the graph's edge list. Every problem you raise
+must cite an edge that actually appears in the list;
+do not repeat a problem the Proposer has already
+fixed. Respond in exactly this format and nothing
+else:
+VERDICT: AGREE
+or
+VERDICT: REVISE
+- <an edge the Proposer missed or wrongly included,
+  quoted from the graph's edge list>
+\end{verbatim}}
+
+\noindent For \texttt{edge\_existence} it is:
+
+{\footnotesize
+\begin{verbatim}
+Work only from the graph text. Look in the graph's
+edge list for the exact pair the question asks about,
+in either order. If that pair appears, the answer is
+Yes; if it does not, the answer is No -- decide this
+yourself from the list. Then check the Proposer's
+answer.
+AGREE if the Proposer's Yes/No matches the edge list.
+Otherwise REVISE and ground it: quote the queried
+edge from the list if it is there, or state that no
+such edge appears. Every problem you raise must be
+grounded in the edge list; never invent an edge.
+Respond in exactly this format and nothing else:
+VERDICT: AGREE
+or
+VERDICT: REVISE
+- <the queried edge quoted from the list, or a note
+  that it does not appear>
+\end{verbatim}}
+
+\paragraph{Revision.}
+The Proposer's corrected answer, given the Critic's verdict.
+
+{\footnotesize
+\begin{verbatim}
+You are the Proposer in the debate below. A checker
+verified your latest claims against the graph and
+found problems. Produce a corrected answer that fixes
+them, using the whole exchange.
+
+{transcript}
+
+Give your corrected answer.
+Number your claims 1., 2., 3., and so on, one claim
+per line. Then write a final line that begins with
+ANSWER: followed by {answer}. Write nothing after
+that line.
+\end{verbatim}}
 
 \end{document}
