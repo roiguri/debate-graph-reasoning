@@ -681,33 +681,31 @@ VERDICT: REVISE
 
   \vspace{1em}
 
-  \begin{tabular}{@{}llcccccc@{}}
+  \begin{tabular}{@{}llcccc@{}}
     \toprule
     \textbf{Task} & \textbf{Encoding} & \textbf{Baseline} & \textbf{Turn 1} &
-      \textbf{Debate} & \textbf{Vote} & $p$(deb$-$base) & $p$(vote$-$deb) \\
+      \textbf{Debate} & \textbf{Vote} \\
     \midrule
-    \texttt{connected\_nodes} & \texttt{incident}   & 0.958 & 0.947 & 0.940 & 0.952 & 0.118 & 0.248 \\
-    \texttt{connected\_nodes} & \texttt{adjacency}  & 0.743 & 0.835 & 0.817 & 0.822 & $<$0.001 & 0.804 \\
-    \texttt{connected\_nodes} & \texttt{friendship} & 0.488 & 0.655 & 0.687 & 0.687 & $<$0.001 & 0.902 \\
+    \texttt{connected\_nodes} & \texttt{incident}   & 0.958 & 0.947 & 0.940 & 0.952 \\
+    \texttt{connected\_nodes} & \texttt{adjacency}  & 0.743 & 0.835 & 0.817 & 0.822 \\
+    \texttt{connected\_nodes} & \texttt{friendship} & 0.488 & 0.655 & 0.687 & 0.687 \\
     \addlinespace
-    \texttt{node\_degree} & \texttt{incident}   & 0.873 & 0.942 & 0.935 & 0.943 & $<$0.001 & 0.302 \\
-    \texttt{node\_degree} & \texttt{adjacency}  & 0.655 & 0.868 & 0.850 & 0.875 & $<$0.001 & 0.033 \\
-    \texttt{node\_degree} & \texttt{friendship} & 0.637 & 0.828 & 0.828 & 0.837 & $<$0.001 & 0.551 \\
+    \texttt{node\_degree} & \texttt{incident}   & 0.873 & 0.942 & 0.935 & 0.943 \\
+    \texttt{node\_degree} & \texttt{adjacency}  & 0.655 & 0.868 & 0.850 & 0.875 \\
+    \texttt{node\_degree} & \texttt{friendship} & 0.637 & 0.828 & 0.828 & 0.837 \\
     \addlinespace
-    \texttt{edge\_existence} & \texttt{incident}   & 0.980 & 0.978 & 0.975 & 0.985 & 0.678 & 0.109 \\
-    \texttt{edge\_existence} & \texttt{adjacency}  & 0.938 & 0.922 & 0.803 & 0.950 & $<$0.001 & $<$0.001 \\
-    \texttt{edge\_existence} & \texttt{friendship} & 0.867 & 0.800 & 0.752 & 0.822 & $<$0.001 & $<$0.001 \\
+    \texttt{edge\_existence} & \texttt{incident}   & 0.980 & 0.978 & 0.975 & 0.985 \\
+    \texttt{edge\_existence} & \texttt{adjacency}  & 0.938 & 0.922 & 0.803 & 0.950 \\
+    \texttt{edge\_existence} & \texttt{friendship} & 0.867 & 0.800 & 0.752 & 0.822 \\
     \bottomrule
   \end{tabular}
-  \caption{Per-cell accuracy under each condition, with paired McNemar $p$-values for
-  debate vs.\ baseline and vote vs.\ debate. Turn~1 is debate's first-turn
+  \caption{Per-cell accuracy under each condition. Turn~1 is debate's first-turn
   chain-of-thought (also each majority-vote draw's prompt).}
   \label{tab:percell-acc}
 \end{table*}
 
 Tables~\ref{tab:percell-critic} and~\ref{tab:percell-acc} report every cell's numbers
-behind the pooled figures in \S\ref{sec:results}. $p$-values are paired McNemar tests
-(cells share graphs); values below $0.001$ are shown as \texttt{<0.001}. Detection
+behind the pooled figures in \S\ref{sec:results}. Detection
 counts whether the Critic flagged a wrong answer, not whether the revision then
 repaired it: a flagged answer can be revised into another wrong answer, so detection
 bounds what the loop can rescue rather than measuring it.
