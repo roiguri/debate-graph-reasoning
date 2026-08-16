@@ -322,8 +322,11 @@ is the phenomenon the rest of the paper asks a reasoning procedure to repair.
       axis lines=left,
       axis line style={gray!55},
       tick style={gray!55},
-      legend style={draw=none, fill=none, font=\small, at={(0.99,0.99)},
-        anchor=north east, cells={anchor=west}, row sep=1pt},
+      legend style={draw=none, fill=none, font=\scriptsize, at={(0.5,-0.17)},
+        anchor=north, legend columns=-1, cells={anchor=west}, inner sep=1pt,
+        /tikz/every even column/.append style={column sep=0.5ex}},
+      legend image code/.code={\draw[#1, mark repeat=2, mark phase=2]
+        plot coordinates {(0cm,0cm) (0.13cm,0cm) (0.26cm,0cm)};},
       mark options={solid},
     ]
     \addplot[seriesA, line width=1pt, mark=*, mark size=2pt]
@@ -334,7 +337,7 @@ is the phenomenon the rest of the paper asks a reasoning procedure to repair.
     \addlegendentry{\texttt{node\_degree}}
     \addplot[seriesC, line width=1pt, dashed, mark=triangle*, mark size=2.6pt]
       coordinates {(0,0.113)(1,0.178)(2,0.223)(3,0.163)};
-    \addlegendentry{\texttt{edge\_existence} (control)}
+    \addlegendentry{\texttt{edge\_existence}}
     \end{axis}
   \end{tikzpicture}
   \caption{Cross-encoding accuracy spread (max$-$min) by stage for each task; lower
@@ -447,16 +450,6 @@ revising breaks more than it fixes and lowers accuracy overall (Figure~\ref{fig:
     % crossing-band counts
     \node[font=\sffamily\small, text=black!75] at (0.30*\W,1.55) {209 broken};
     \node[font=\sffamily\small, text=black!75] at (0.70*\W,1.55) {96 fixed};
-    % bottom summary row
-    \def\yL{-1.35}\def\yV{-2.1}
-    \draw[black!25] (4.9,-0.9) -- (4.9,-2.35);
-    \draw[black!25] (9.1,-0.9) -- (9.1,-2.35);
-    \node[text=black!55, font=\sffamily\small] at (2.3,\yL) {INITIAL ERROR RATE};
-    \node[font=\sffamily\Large] at (2.3,\yV) {13.6\%};
-    \node[text=black!55, font=\sffamily\small] at (7.0,\yL) {FINAL ERROR RATE};
-    \node[font=\sffamily\Large] at (7.0,\yV) {15.7\%};
-    \node[text=black!55, font=\sffamily\small] at (11.7,\yL) {NET CHANGE};
-    \node[font=\sffamily\Large, text=cFinalW!80!black] at (11.7,\yV) {+2.1\%};
   \end{tikzpicture}}
   \caption{How the Proposer's first answer maps to the final answer after the debate
   loop, over $5{,}400$ instances. The crossing bands are the answers the loop changed:
@@ -478,7 +471,7 @@ Debate's premise - that recognizing a wrong claim is cheaper than producing a ri
 one - was satisfied here: the Critic's \textsc{revise} verdicts land on genuinely
 wrong answers far more often than on correct ones. Yet the loop still lost accuracy,
 for a reason that is general. When a model is already mostly correct - as
-Llama-3.3-70B is here, five right for every one wrong - revision puts more correct
+Llama-3.3-70B is here, six right for every one wrong - revision puts more correct
 answers at risk than it can rescue wrong ones, so it does more harm than good.
 
 \paragraph{Reasoning does the work; neither extra structure earns its compute.}
@@ -514,7 +507,7 @@ cost, reasoning once does the work and neither extra structure adds much.
 \label{sec:conclusion}
 LLM graph reasoning is highly encoding-fragile, and asking the model to reason
 reduces that fragility. A Proposer--Critic debate appears to help, but the gain is
-entirely the reasoning it introdduces: in most of our testing the verify-and-revise loop was harmful,
+entirely the reasoning it introduces: in most of our testing the verify-and-revise loop was harmful,
 and a compute-matched majority vote beats it on every cell. The Critic genuinely
 detects errors, it loses because, against a mostly-correct model, its false alarms
 cost more than its detections repair. On this task, reasoning helps - and debate is
@@ -669,7 +662,10 @@ Tables~\ref{tab:percell-critic} and~\ref{tab:percell-acc} report every cell's nu
 behind the pooled figures in \S\ref{sec:results}. $p$-values are paired McNemar tests
 (cells share graphs); values below $0.001$ are shown as \texttt{<0.001}. ``Net fixed
 $-$ broken'' is the number of answers a revision moved wrong$\to$right minus
-right$\to$wrong, so a positive value means the loop helped that cell.
+right$\to$wrong, so a positive value means the loop helped that cell. Detection
+counts whether the Critic flagged a wrong answer, not whether the revision then
+repaired it: a flagged answer can be revised into another wrong answer, so detection
+bounds what the loop can rescue rather than measuring it.
 
 \begin{table*}[t]
   \centering
