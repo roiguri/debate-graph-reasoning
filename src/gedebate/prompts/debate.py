@@ -10,7 +10,6 @@ debate-specific framing -- the numbered-claim trace, the `ANSWER:` line, the Cri
 The three prompts are: turn-1 Proposer, Critic (verify the latest answer given the full
 transcript), and Proposer revision. All three tasks are approved; an unapproved task
 raises. The wording is FROZEN -- see the comment below.
-See docs/plan/p5-debate.md.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ if TYPE_CHECKING:
 #
 #   * an early version's connected_nodes answer hint said "node ids" for every encoding,
 #     so under friendship the model answered in integers and 64 of 600 answers were
-#     unparseable (docs/findings.md 3c);
+#     unparseable;
 #   * a later revision was significantly WORSE on five of nine cells over 5,400 paired
 #     instances, 0.450 mean against 0.496, and drove Proposer capitulation from 0.63 to
 #     0.96.
@@ -66,8 +65,7 @@ _PROPOSER_PREAMBLE = {task: _PREAMBLE for task in _ANSWER_FORMAT}
 # revision, so their format is identical by construction rather than by copy. It states
 # the numbering explicitly and carries no fill-in template: an early "1. <one atomic
 # claim>" placeholder was echoed verbatim to the token cap, and a draft that dropped the
-# scaffold entirely made the model stop numbering and cost 0.085 turn-1 accuracy
-# (docs/findings.md 3d, 3f).
+# scaffold entirely made the model stop numbering and cost 0.085 turn-1 accuracy.
 _FORMAT_BLOCK = (
     "Number your claims 1., 2., 3., and so on, one claim per line. Then write a\n"
     "final line that begins with ANSWER: followed by {answer}. Write nothing after\n"
@@ -248,7 +246,7 @@ def parse_proposer(
     Susan in the answer. Last-line matches what `_parse_int`/`_parse_bool` already do
     ("the answer is the last thing stated") and what the label-free baseline relies on,
     and it costs nothing: on seed 7 it scores 0.210 / 0.460 against the old whole-text
-    harvest's 0.210 / 0.455 (docs/findings.md 3g).
+    harvest's 0.210 / 0.455.
 
     Two shapes the raw text takes that the answer parser must not see:
 

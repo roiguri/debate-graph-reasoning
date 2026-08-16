@@ -1,7 +1,6 @@
 """Persistence contract: attempt-level JSONL rows, resume, and a run manifest.
 
-The keystone the whole harness (all conditions) inherits. Design and rationale are in
-docs/notes.md -> "Persistence contract". In short:
+The keystone the whole harness (all conditions) inherits. In short:
 
 - **One row per completed attempt**, written atomically at attempt end. Baseline
   = 1 row/instance; majority-vote = N rows (one per `sample_index`); debate = 1 row

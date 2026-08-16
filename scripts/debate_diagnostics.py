@@ -1,8 +1,7 @@
 """Open up the debate loop: where does the answer actually go, and is the Critic real?
 
 `show_results.py` reports whether debate beat baseline. It did not, and the tables here
-say why, from the committed trace sidecars only (no GPU time). See
-docs/plan/p5-followup-diagnosis.md for the findings these regenerate.
+say why, from the committed trace sidecars only (no GPU time).
 
 Shell-agnostic (the cluster login shell is tcsh):
 

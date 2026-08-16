@@ -1,6 +1,6 @@
 """Summarize persisted results: per (task, encoding) accuracy, parse rate, tokens.
 
-The primary metric is exact-match accuracy (see docs/notes.md). `parse_ok_rate` is
+The primary metric is exact-match accuracy. `parse_ok_rate` is
 reported alongside it deliberately -- a low rate means "wrong" answers are really
 parse failures, a confound to catch rather than a result. Token totals feed the
 matched-compute comparison in later phases.

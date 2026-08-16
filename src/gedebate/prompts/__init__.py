@@ -3,8 +3,7 @@
 Faithful to Fatemi 2024's zero-shot setting -- the question block (encoded graph +
 "Q: ...\\nA: ") is unchanged. We only *prefix* a minimal instruction that nudges an
 instruct-*chat* model to emit the same short answer a raw-completion model produced
-after "A: ". Templates live here (data, not logic) per the workplan. See
-docs/notes.md -> "Baseline prompt" decision.
+after "A: ". Templates live here (data, not logic).
 
 Templates cover all three tasks: edge_existence, node_degree, connected_nodes.
 """

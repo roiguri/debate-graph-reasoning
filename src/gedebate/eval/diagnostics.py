@@ -1,7 +1,7 @@
 """Debate-trace diagnostics: *why* the debate condition did or did not move accuracy.
 
-`report.py` answers "did debate beat baseline". It did not (see
-docs/plan/p5-followup-diagnosis.md), and a null delta on its own is not a finding. The
+`report.py` answers "did debate beat baseline". It did not, and a null delta on its
+own is not a finding. The
 tables here open the loop up and ask where the answer actually goes, using only the
 committed trace sidecars, so every number regenerates with no GPU time:
 

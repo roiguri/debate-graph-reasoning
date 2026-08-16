@@ -65,8 +65,7 @@ def _git_commit() -> str:
     Falls back to a `.git_commit` file because runs happen on the cluster, where the
     tree is an rsync copy with no `.git` -- which is why every existing manifest records
     "unknown". The prompts are frozen but not immutable, so the commit is the only thing
-    that says which wording produced a row. Write the file as part of the sync (see
-    docs/cluster-runbook.md).
+    that says which wording produced a row. Write the file as part of the sync.
     """
     try:
         return subprocess.check_output(

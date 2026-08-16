@@ -9,7 +9,7 @@ trace sidecars, so correctness is re-derivable exactly.
 **Every condition is re-scored**, because the shared `scoring.parse` can change and not
 just the debate-only `parse_proposer`. Scoring one condition under a new rule and leaving
 another on the old one would silently bias the comparison between them -- the exact
-unequal-standards trap docs/findings.md 3g warns about -- so this walks every row it
+unequal-standards trap -- so this walks every row it
 finds. Majority vote needs no special handling: the vote is derived from the parsed
 answers at report time, never stored, so re-scoring its sample rows re-derives it.
 

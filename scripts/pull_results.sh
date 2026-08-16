@@ -6,7 +6,7 @@
 #   NETAPP=/home/yandex/MLWG2026/<your-username> bash scripts/pull_results.sh
 #   NETAPP=... bash scripts/pull_results.sh main   # just one run subdir
 #
-# Requires the TAU VPN up and an ssh host alias `slurm-client` (see cluster-runbook.md).
+# Requires the TAU VPN up and an ssh host alias `slurm-client`.
 set -eo pipefail
 cd "$(dirname "$0")/.."
 

@@ -68,8 +68,7 @@ python -m gedebate.eval.runner --config configs/debate-pilot.toml   # -> results
   (`pip install -e .[inference]`). The debate loop writes one summed row per instance
   plus a trace sidecar; it is resumable.
 - On our TAU SLURM setup the loop is: develop locally, sync to the cluster, run there,
-  pull results back for local viewing. See [cluster-runbook.md](cluster-runbook.md).
-  Then point the viewer at the pulled run dir.
+  pull results back for local viewing, then point the viewer at the pulled run dir.
 
 For the broader dataset -> run -> analysis pipeline (not viewer specific), see the
 repo README.
