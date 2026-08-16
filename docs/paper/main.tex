@@ -272,7 +272,7 @@ $6$ cells that exclude it.
 
 \section{Results and Analysis}
 \label{sec:results}
-Per-cell accuracies, significance, and Critic diagnostics for all nine cells are in
+Per-cell accuracies and Critic diagnostics for all nine cells are in
 \ref{sec:percell}.
 
 \subsection{Encoding fragility is large}
@@ -353,7 +353,8 @@ sign across all three independent seeds. It also narrows the encoding gap
 (Figure~\ref{fig:fragility}): the \texttt{connected\_nodes} spread falls
 $0.470\rightarrow0.253$ and \texttt{node\_degree} $0.237\rightarrow0.107$, reproducing
 $3/3$ on both fragile tasks. The gains concentrate exactly where accuracy was
-worst - the three largest per-cell gains are the three lowest baseline cells - so
+worst - the three largest per-cell gains are the three lowest baseline cells
+(Table~\ref{tab:percell-acc}) - so
 debate works by lifting the floor, which is what narrows the spread.
 
 \subsection{The gain is the reasoning, not the loop}
@@ -364,7 +365,7 @@ separates the reasoning from the verify-and-revise loop
 (Table~\ref{tab:main}). The reasoning accounts for the entire improvement, worth
 $+0.071$ over the baseline, while the loop then reduces accuracy by $0.021$. That
 damage falls on the \texttt{edge\_existence} control, where the Critic drags accuracy
-from $0.922$ to $0.803$. That task has a single atomic claim: there is nothing to critique, so the
+from $0.922$ to $0.803$ (Table~\ref{tab:percell-acc}). That task has a single atomic claim: there is nothing to critique, so the
 Critic only talks a correct answer down. The main takeaway is that asking
 the model to reason helps; having a Critic argue about the reasoning does not.
 
@@ -401,8 +402,8 @@ $+0.120$, the loop is close to neutral ($-0.003$), and the compute-matched vote
 The debate loop requires more compute without adding accuracy, so the natural comparison is
 against spending that same compute on independent attempts that never interact. Majority vote
 scores $0.875$ against debate's $0.843$ overall ($+0.032$; $p<0.001$) at matched
-compute. The vote is at least as accurate as debate on every task and encoding,
-and more accurate on three. The full
+compute. The vote is at least as accurate as debate on every task and encoding
+(Table~\ref{tab:percell-acc}), and more accurate on three. The full
 ordering across the arm is baseline $0.793 <$ debate $0.843 <$ turn~1 $0.864 <$ vote
 $0.875$, so debate is the worst of the three reasoning conditions and is
 beaten even by its own single first turn. The vote's advantage is largest on
@@ -412,7 +413,9 @@ debate to help. This comparison shows that the interaction between the models is
 
 \subsection{Why the debate fails: precision, not detection}
 \label{sec:mechanism}
-The debate's failure is not that the Critic cannot tell right from wrong. Split the
+The debate's failure is not that the Critic cannot tell right from wrong: a
+\textsc{revise} tracks a wrong answer in every cell (Table~\ref{tab:percell-critic}).
+Split the
 Proposer's answers by whether they were correct: revision rescued $13\%$ of the wrong
 answers but broke $4\%$ of the correct ones. Since correct answers outnumber wrong
 ones six to one, that $4\%$ ($209$ answers) is more than the $13\%$ ($96$), so
@@ -469,7 +472,7 @@ debate framework around that reasoning.
 \paragraph{The asymmetry holds - the debate still loses.}
 Debate's premise - that recognizing a wrong claim is cheaper than producing a right
 one - was satisfied here: the Critic's \textsc{revise} verdicts land on genuinely
-wrong answers far more often than on correct ones. Yet the loop still lost accuracy,
+wrong answers far more often than on correct ones (Table~\ref{tab:percell-critic}). Yet the loop still lost accuracy,
 for a reason that is general. When a model is already mostly correct - as
 Llama-3.3-70B is here, six right for every one wrong - revision puts more correct
 answers at risk than it can rescue wrong ones, so it does more harm than good.
