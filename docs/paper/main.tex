@@ -531,9 +531,9 @@ datasets, and snapshots of the assembled prompt text are at
 generator \citep{fatemi2024talk}: $200$ Erd\H{o}s--R\'enyi graphs crossed with $3$ tasks
 and $3$ encodings, giving $1{,}800$ instances. Runs load these files and never
 regenerate them. \texttt{build\_dataset.py --verify} rebuilds each from its recorded
-spec and asserts its SHA-256 (seed $7$: \texttt{7030fa5d}, seed $11$:
-\texttt{f6a648eb}, seed $13$: \texttt{c462c051}); the check is deterministic and needs
-no GPU or API key.
+spec and checks it against the recorded checksum, so a reader can confirm their copy is
+the one these results were produced on (seed $7$: \texttt{7030fa5d}, seed $11$:
+\texttt{f6a648eb}, seed $13$: \texttt{c462c051}).
 
 \paragraph{Model and decoding.} Every condition uses
 \texttt{Llama-3.3-70B-Instruct-Turbo}, served in FP8 through the Together API.
@@ -549,7 +549,7 @@ wording is used throughout; it is reproduced in full in \ref{sec:prompts}.
     \midrule
     Baseline & greedy & $256$ & $1$ response \\
     Debate   & greedy & $512$ & $10$ responses \\
-    Vote     & $T{=}0.6$, top-$p$ $0.9$ & $512$ & $N{=}3$ draws \\
+    Vote     & $T = 0.6$, top-$p$ $= 0.9$ & $512$ & $N = 3$ draws \\
     \bottomrule
   \end{tabular}
   \caption{Decoding and budgets per arm, as set in the run configs. \textbf{Cap} is
@@ -558,17 +558,16 @@ wording is used throughout; it is reproduced in full in \ref{sec:prompts}.
   \label{tab:runconfig}
 \end{table}
 
-\paragraph{Run records.} Each run writes a manifest recording the model, the dataset
-path and hash, the decoding, the token cap, and the code commit, and one row per
-instance carrying the parsed answer, correctness, and token counts; debate additionally
-stores every turn of its transcript. Resuming a run against a different model or dataset
-is refused. Because the model is served over an API, a re-run is checked at the level of
-parsed answers (\texttt{--verify-sample}) rather than byte-identical text.
+\paragraph{What a run records.} Every run stores one row per instance, carrying the
+model's answer, whether it was correct, and its token counts; debate also stores every
+turn of its transcript. Alongside them a manifest records the model, the dataset, the
+decoding, and the token cap that produced those rows. The per-cell tables in this paper
+are computed from those rows, and the repository ships the code that computes them.
 
-\paragraph{Statistics.} Wilson intervals, McNemar (continuity-corrected, with the exact
-binomial below $25$ discordant pairs), Cochran's $Q$, and the $2{\times}2$ $\chi^2$ are
-implemented in the repository on the Python standard library, so no external statistics
-package version can move the reported numbers.
+\paragraph{Software.} Graph generation uses \texttt{networkx} \citep{hagberg2008networkx};
+all three datasets reproduce under Python $3.13.9$, \texttt{networkx} $3.6.1$ and
+\texttt{numpy} $2.5.1$. The model is reached over HTTP, so no local inference stack is
+involved.
 
 % A prompt template: indented a little, but keeping the full column measure so the
 % reflowed prompt prose does not hyphenate every other line.
