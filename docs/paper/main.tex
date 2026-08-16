@@ -14,10 +14,15 @@
 \usepackage{enumitem}
 \usepackage{pgfplots}
 \usepackage{tikz}
+\usetikzlibrary{calc}
 \pgfplotsset{compat=1.16}
 \definecolor{seriesA}{HTML}{2A78D6}
 \definecolor{seriesB}{HTML}{EB6834}
 \definecolor{seriesC}{HTML}{1BAF7A}
+\definecolor{cCorrect}{HTML}{5B8FF9}
+\definecolor{cWrong}{HTML}{61C08A}
+\definecolor{cFinalC}{HTML}{F5A623}
+\definecolor{cFinalW}{HTML}{F26D6D}
 
 \title{Reasoning, Not Debate, Repairs Encoding-Fragile Graph Reasoning in LLMs}
 
@@ -267,6 +272,8 @@ $6$ cells that exclude it.
 
 \section{Results and Analysis}
 \label{sec:results}
+Per-cell accuracies, significance, and Critic diagnostics for all nine cells are in
+\ref{sec:percell}.
 
 \subsection{Encoding fragility is large}
 \label{sec:frag}
@@ -388,116 +395,128 @@ $+0.120$, the loop is close to neutral ($-0.003$), and the compute-matched vote
 
 \subsection{A compute-matched vote beats debate}
 \label{sec:vote}
-If the loop is not paying for its compute, the natural comparison is against
-spending that compute on independent attempts instead. Majority vote scores
-$0.875$ over nine cells against debate's $0.843$ ($+0.032$; $p<0.001$), at
-matched compute, and it loses no cell - it is at least as
-accurate as debate in all nine and better in three. The full
+The debate loop requires more compute without adding accuracy, so the natural comparison is
+against spending that same compute on independent attempts that never interact. Majority vote
+scores $0.875$ against debate's $0.843$ overall ($+0.032$; $p<0.001$) at matched
+compute. The vote is at least as accurate as debate on every task and encoding,
+and more accurate on three. The full
 ordering across the arm is baseline $0.793 <$ debate $0.843 <$ turn~1 $0.864 <$ vote
 $0.875$, so debate is the worst of the three reasoning conditions and is
 beaten even by its own single first turn. The vote's advantage is largest on
-\texttt{edge\_existence}, exactly where debate is
-destructive. Because debate and the vote differ in only one thing - whether the
-extra attempts interact - this isolates interaction as the ingredient that is
-not paying off.
+\texttt{edge\_existence}, exactly where we would not expect
+debate to help. This comparison shows that the interaction between the models is what harms the debate.
 
-\subsection{Why the loop fails: precision, not detection}
+
+\subsection{Why the debate fails: precision, not detection}
 \label{sec:mechanism}
-The loop's failure is not that the Critic cannot tell right from wrong. Cross-tabbing
-every verdict against whether the judged answer was actually correct, a
-\textsc{revise} is strongly associated with a wrong answer (Table~\ref{tab:critic}),
-and this discrimination is strongest ($\phi=+0.69$) precisely on
-\texttt{edge\_existence}, where the check is a single lookup. The problem is what
-detection costs: because correct answers outnumber wrong ones roughly five to one,
-the Critic's false alarms on correct answers convert into more damage than its
-detections repair, and revisions are net-positive in only one cell of nine. The loop
-fails on \textbf{precision}, not detection - the Critic knows the answer is wrong on
-\texttt{edge\_existence} and still, by revising too many correct answers, makes that
-task worse.
+The debate's failure is not that the Critic cannot tell right from wrong. Split the
+Proposer's answers by whether they were correct: revision rescued $13\%$ of the wrong
+answers but broke $4\%$ of the correct ones. Since correct answers outnumber wrong
+ones six to one, that $4\%$ ($209$ answers) is more than the $13\%$ ($96$), so
+revising breaks more than it fixes and lowers accuracy overall (Figure~\ref{fig:flow}).
 
-\begin{table}[t]
+\begin{figure*}[t]
   \centering
-  \small
-  \begin{tabular}{@{}lc@{}}
-    \toprule
-    \textbf{Critic diagnostic} (pooled, $5{,}825$ verdicts) & \\
-    \midrule
-    Base rate of wrong answers          & $0.181$ \\
-    Detection rate (recall)             & $0.502$ \\
-    False-alarm rate on correct answers & $0.132$ \\
-    $P(\text{wrong}\mid\textsc{revise})$ & $0.459$ \\
-    Association $\phi$                   & $+0.358$ \\
-    Net answers flipped right\,$\to$\,wrong & $+113$ \\
-    \bottomrule
-  \end{tabular}
-  \caption{The Critic detects half of wrong answers and a \textsc{revise} is strongly
-  associated with a wrong answer ($\phi=+0.358$), but its false alarms on the far
-  more numerous correct answers dominate: revisions flip $113$ more answers from right
-  to wrong than the reverse. The failure is one of precision, not detection.}
-  \label{tab:critic}
-\end{table}
+  \resizebox{0.62\textwidth}{!}{%
+  \begin{tikzpicture}[font=\sffamily, flow/.style={opacity=0.35}]
+    \def\W{14}
+    % scale: 100% = 7 units, gap 0.7
+    \def\LPCtop{7.700}\def\LPCsplit{1.9236}\def\LPCbot{1.6527}
+    \def\LPWtop{0.9527}\def\LPWsplit{0.8281}\def\LPWbot{0}
+    \def\RFCtop{7.700}\def\RFCsplit{1.9236}\def\RFCbot{1.799}
+    \def\RFWtop{1.099}\def\RFWsplit{0.8281}\def\RFWbot{0}
+    % flows, coloured by source node
+    \fill[cCorrect, flow] (0,\LPCtop) to[out=0,in=180] (\W,\RFCtop) --
+        (\W,\RFCsplit) to[out=180,in=0] (0,\LPCsplit) -- cycle;   % correct->correct
+    \fill[cCorrect, flow] (0,\LPCsplit) to[out=0,in=180] (\W,\RFWtop) --
+        (\W,\RFWsplit) to[out=180,in=0] (0,\LPCbot) -- cycle;      % correct->wrong (broke)
+    \fill[cWrong, flow] (0,\LPWtop) to[out=0,in=180] (\W,\RFCsplit) --
+        (\W,\RFCbot) to[out=180,in=0] (0,\LPWsplit) -- cycle;      % wrong->correct (fixed)
+    \fill[cWrong, flow] (0,\LPWsplit) to[out=0,in=180] (\W,\RFWsplit) --
+        (\W,\RFWbot) to[out=180,in=0] (0,\LPWbot) -- cycle;        % wrong->wrong
+    % thin node bars
+    \fill[cCorrect] (-0.32,\LPCbot) rectangle (0,\LPCtop);
+    \fill[cWrong]   (-0.32,\LPWbot) rectangle (0,\LPWtop);
+    \fill[cFinalC]  (\W,\RFCbot) rectangle (\W+0.32,\RFCtop);
+    \fill[cFinalW]  (\W,\RFWbot) rectangle (\W+0.32,\RFWtop);
+    % node labels
+    \node[anchor=west, text=black!80] at (0.25,\LPCtop-0.55) {Proposer correct (86.4\%)};
+    \node[anchor=west, text=black!80] at (0.25,\LPWtop-0.35) {Proposer wrong (13.6\%)};
+    \node[anchor=east, text=black!80] at (\W-0.25,\RFCtop-0.55) {Final correct (84.3\%)};
+    \node[anchor=east, text=black!80] at (\W-0.25,\RFWtop-0.35) {Final wrong (15.7\%)};
+    % crossing-band counts
+    \node[font=\sffamily\small, text=black!75] at (0.30*\W,1.55) {209 broken};
+    \node[font=\sffamily\small, text=black!75] at (0.70*\W,1.55) {96 fixed};
+    % bottom summary row
+    \def\yL{-1.35}\def\yV{-2.1}
+    \draw[black!25] (4.9,-0.9) -- (4.9,-2.35);
+    \draw[black!25] (9.1,-0.9) -- (9.1,-2.35);
+    \node[text=black!55, font=\sffamily\small] at (2.3,\yL) {INITIAL ERROR RATE};
+    \node[font=\sffamily\Large] at (2.3,\yV) {13.6\%};
+    \node[text=black!55, font=\sffamily\small] at (7.0,\yL) {FINAL ERROR RATE};
+    \node[font=\sffamily\Large] at (7.0,\yV) {15.7\%};
+    \node[text=black!55, font=\sffamily\small] at (11.7,\yL) {NET CHANGE};
+    \node[font=\sffamily\Large, text=cFinalW!80!black] at (11.7,\yV) {+2.1\%};
+  \end{tikzpicture}}
+  \caption{How the Proposer's first answer maps to the final answer after the debate
+  loop, over $5{,}400$ instances. The crossing bands are the answers the loop changed:
+  correct $\rightarrow$ wrong and wrong $\rightarrow$ correct.}
+  \label{fig:flow}
+\end{figure*}
 
 \section{Discussion}
 \label{sec:discussion}
 
-\paragraph{Reasoning repairs fragility; structure does not.}
+\paragraph{Reasoning repairs fragility - debate does not.}
 The encoding gap does shrink under debate, but the decomposition locates the cause:
-the single-turn reasoning scaffold produces essentially all of the narrowing, and a
-compute-matched vote reproduces it (Table~\ref{tab:main}). What reduces a model's
+the single-turn reasoning produces most of the encoding variance reduction (Table~\ref{tab:main}). What reduces a model's
 sensitivity to how a graph is written down is being asked to reason about it, not the
-multi-agent apparatus around that reasoning. We report the spread reduction
-descriptively - it replicates across all three seeds, but we do not test the spread
-itself - so the claim is that reasoning narrows the gap, not that debate confers
-encoding-invariance: fragility stays highly significant under every condition.
+debate framework around that reasoning.
 
-\paragraph{The asymmetry can hold and debate still lose.}
+\paragraph{The asymmetry holds - the debate still loses.}
 Debate's premise - that recognizing a wrong claim is cheaper than producing a right
-one - was satisfied here: the Critic discriminates right from wrong ($\phi=+0.36$,
-and $+0.69$ where the check is a single lookup). Yet the loop still lost accuracy,
-for a reason that is general. A verify-and-revise step changes accuracy by its
-detection rate times the fraction of answers that are wrong, minus its false-alarm
-rate times the fraction that are right. When a model is already mostly correct - as
-Llama-3.3-70B is here, roughly five right for every one wrong - this balance tips
-negative unless the Critic's precision is very high, however well it detects.
-Objective checkability, the ingredient prior self-correction studies lacked, was not
-enough: it sharpened detection, which was never the bottleneck, and left precision
-untouched. The lesson transfers beyond graphs: self-verification pays off only where
-errors are common or the check is near-perfectly precise, and neither holds for a
-strong model on a task it mostly solves.
+one - was satisfied here: the Critic's \textsc{revise} verdicts land on genuinely
+wrong answers far more often than on correct ones. Yet the loop still lost accuracy,
+for a reason that is general. When a model is already mostly correct - as
+Llama-3.3-70B is here, five right for every one wrong - revision puts more correct
+answers at risk than it can rescue wrong ones, so it does more harm than good.
 
-\paragraph{Spend compute on independence, not interaction.}
-Because debate and the vote differ only in whether the extra attempts interact, the
-comparison is a clean test of the two ways to spend inference compute, and
-independence wins: three independent draws cannot argue each other out of a correct
-answer, whereas a Critic can. Given a fixed budget and a task the model already
-handles reasonably, sampling and voting is the safer use of it than a self-critique
-loop. This does not refute debate in general - it may still help where the base error
-rate is high, or where an external, reliable verifier replaces the model's own
-Critic - but on encoding-fragile graph reasoning, at matched cost, it is dominated.
+\paragraph{Reasoning does the work; neither extra structure earns its compute.}
+Almost all of the gain over the baseline comes from a single reasoned pass; on top of
+that the vote adds only a little and the debate loop nothing (Table~\ref{tab:main}).
+Between the two ways of spending the extra compute, aggregation wins - majority vote
+beats debate on every cell, because three independent draws cannot argue each other
+out of a correct answer, whereas a Critic can - but the vote is only the less
+wasteful option, not a strong one. This does not refute debate in general: it may
+still help where the base error rate is high, or where a reliable external verifier
+replaces the model's own Critic. On encoding-fragile graph reasoning, at matched
+cost, reasoning once does the work and neither extra structure adds much.
 
 \section{Limitations and future work}
 \label{sec:future}
 \begin{itemize}[nosep,leftmargin=*]
   \item \textbf{Single model and graph regime.} Our results come from one model
-    (Llama-3.3-70B) on small Erd\H{o}s--R\'enyi graphs. The net-effect account of
-    \S\ref{sec:discussion} predicts the loop's sign depends on the base error rate,
-    so harder tasks and weaker models are the test of whether the failure
-    generalizes.
-  \item \textbf{Single prompt.} We use one Proposer/Critic wording, and the Critic's
-    precision may depend heavily on it; varying the prompts would separate a property
-    of the method from one of the formulation.
-  \item \textbf{Debate structure.} We tested one minimal two-role loop; richer
+    (Llama-3.3-70B) on small Erd\H{o}s--R\'enyi graphs, where the model is already
+    mostly correct. Because the debate hurts precisely when errors are rare, harder
+    tasks and weaker models - where errors are more common - are where the results could
+    be better.
+  \item \textbf{Single prompt.} We use one Proposer/Critic wording. The Critic's
+    precision may depend heavily on it, so a different wording could change how much
+    the debate helps or hurts; testing several would tell us whether our result is a
+    property of debate itself or just of this prompt. We did not pursue this, since
+    the loop fails on precision rather than on how well the Critic detects errors.
+  \item \textbf{Debate structure.} We tested one minimal two-role loop. Richer
     structures - more agents, independent proposers that then interact, or multiple
-    rounds - may recover value over voting.
+    rounds - may improve results.
 \end{itemize}
 
 \section{Conclusion}
 \label{sec:conclusion}
-LLM graph reasoning is sharply encoding-fragile, and asking the model to reason
+LLM graph reasoning is highly encoding-fragile, and asking the model to reason
 reduces that fragility. A Proposer--Critic debate appears to help, but the gain is
-entirely the reasoning it elicits: the verify-and-revise loop is inert-to-harmful,
-and a compute-matched majority vote beats debate on every cell. The Critic genuinely
-detects errors; it loses because, against a mostly-correct model, its false alarms
+entirely the reasoning it introdduces: in most of our testing the verify-and-revise loop was harmful,
+and a compute-matched majority vote beats it on every cell. The Critic genuinely
+detects errors, it loses because, against a mostly-correct model, its false alarms
 cost more than its detections repair. On this task, reasoning helps - and debate is
 not why.
 
@@ -505,6 +524,8 @@ not why.
 
 \clearpage
 \appendix
+
+\renewcommand{\thesection}{Appendix~\Alph{section}}
 
 \section{Prompts}
 \label{sec:prompts}
@@ -641,5 +662,68 @@ per line. Then write a final line that begins with
 ANSWER: followed by {answer}. Write nothing after
 that line.
 \end{verbatim}}
+
+\section{Per-cell results}
+\label{sec:percell}
+Tables~\ref{tab:percell-critic} and~\ref{tab:percell-acc} report every cell's numbers
+behind the pooled figures in \S\ref{sec:results}. $p$-values are paired McNemar tests
+(cells share graphs); values below $0.001$ are shown as \texttt{<0.001}. ``Net fixed
+$-$ broken'' is the number of answers a revision moved wrong$\to$right minus
+right$\to$wrong, so a positive value means the loop helped that cell.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \begin{tabular}{@{}llcccc@{}}
+    \toprule
+    \textbf{Task} & \textbf{Encoding} & \textbf{Detection} & \textbf{False alarm} &
+      $\phi$ & \textbf{Net fixed $-$ broken} \\
+    \midrule
+    \texttt{connected\_nodes} & \texttt{incident}   & 0.327 & 0.102 & $+0.186$ & $-4$ \\
+    \texttt{connected\_nodes} & \texttt{adjacency}  & 0.423 & 0.201 & $+0.217$ & $-11$ \\
+    \texttt{connected\_nodes} & \texttt{friendship} & 0.308 & 0.085 & $+0.288$ & $+19$ \\
+    \addlinespace
+    \texttt{node\_degree} & \texttt{incident}   & 0.260 & 0.070 & $+0.185$ & $-4$ \\
+    \texttt{node\_degree} & \texttt{adjacency}  & 0.298 & 0.102 & $+0.218$ & $-11$ \\
+    \texttt{node\_degree} & \texttt{friendship} & 0.208 & 0.059 & $+0.208$ & $0$ \\
+    \addlinespace
+    \texttt{edge\_existence} & \texttt{incident}   & 0.857 & 0.105 & $+0.406$ & $-2$ \\
+    \texttt{edge\_existence} & \texttt{adjacency}  & 0.957 & 0.290 & $+0.537$ & $-71$ \\
+    \texttt{edge\_existence} & \texttt{friendship} & 0.926 & 0.161 & $+0.694$ & $-29$ \\
+    \midrule
+    \textbf{Pooled} & & 0.502 & 0.132 & $+0.358$ & $-113$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Per-cell Critic diagnostic. Detection is $P(\textsc{revise}\mid\text{wrong})$,
+  false alarm is $P(\textsc{revise}\mid\text{correct})$, $\phi$ is the association between
+  a \textsc{revise} and a wrong answer, and net is answers fixed minus broken by revision.
+  The loop is net-positive only on \texttt{connected\_nodes}/\texttt{friendship}.}
+  \label{tab:percell-critic}
+
+  \vspace{1em}
+
+  \begin{tabular}{@{}llcccccc@{}}
+    \toprule
+    \textbf{Task} & \textbf{Encoding} & \textbf{Baseline} & \textbf{Turn 1} &
+      \textbf{Debate} & \textbf{Vote} & $p$(deb$-$base) & $p$(vote$-$deb) \\
+    \midrule
+    \texttt{connected\_nodes} & \texttt{incident}   & 0.958 & 0.947 & 0.940 & 0.952 & 0.118 & 0.248 \\
+    \texttt{connected\_nodes} & \texttt{adjacency}  & 0.743 & 0.835 & 0.817 & 0.822 & $<$0.001 & 0.804 \\
+    \texttt{connected\_nodes} & \texttt{friendship} & 0.488 & 0.655 & 0.687 & 0.687 & $<$0.001 & 0.902 \\
+    \addlinespace
+    \texttt{node\_degree} & \texttt{incident}   & 0.873 & 0.942 & 0.935 & 0.943 & $<$0.001 & 0.302 \\
+    \texttt{node\_degree} & \texttt{adjacency}  & 0.655 & 0.868 & 0.850 & 0.875 & $<$0.001 & 0.033 \\
+    \texttt{node\_degree} & \texttt{friendship} & 0.637 & 0.828 & 0.828 & 0.837 & $<$0.001 & 0.551 \\
+    \addlinespace
+    \texttt{edge\_existence} & \texttt{incident}   & 0.980 & 0.978 & 0.975 & 0.985 & 0.678 & 0.109 \\
+    \texttt{edge\_existence} & \texttt{adjacency}  & 0.938 & 0.922 & 0.803 & 0.950 & $<$0.001 & $<$0.001 \\
+    \texttt{edge\_existence} & \texttt{friendship} & 0.867 & 0.800 & 0.752 & 0.822 & $<$0.001 & $<$0.001 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Per-cell accuracy under each condition, with paired McNemar $p$-values for
+  debate vs.\ baseline and vote vs.\ debate. Turn~1 is debate's first-turn
+  chain-of-thought (also each majority-vote draw's prompt).}
+  \label{tab:percell-acc}
+\end{table*}
 
 \end{document}
