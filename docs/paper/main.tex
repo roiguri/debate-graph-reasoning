@@ -649,65 +649,77 @@ VERDICT: REVISE
 \end{verbatim}
 \end{promptblock}
 
+\clearpage
 \section{Per-cell results}
 \label{sec:percell}
-\begin{table*}[t]
+Table~\ref{tab:percell-acc} gives each cell's accuracy under the four conditions. The
+pooled means in Table~\ref{tab:main} and the spreads in Figure~\ref{fig:fragility} are
+computed from these cells.
+
+\begin{table}[h]
   \centering
   \small
-  \begin{tabular}{@{}llccc@{}}
+  \begin{tabular}{@{}lcccc@{}}
     \toprule
-    \textbf{Task} & \textbf{Encoding} & \textbf{Detection} & \textbf{False alarm} &
-      $\phi$ \\
+    \textbf{Encoding} & \textbf{Baseline} & \textbf{Turn 1} & \textbf{Debate} &
+      \textbf{Vote} \\
     \midrule
-    \texttt{connected\_nodes} & \texttt{incident}   & 0.327 & 0.102 & $+0.186$ \\
-    \texttt{connected\_nodes} & \texttt{adjacency}  & 0.423 & 0.201 & $+0.217$ \\
-    \texttt{connected\_nodes} & \texttt{friendship} & 0.308 & 0.085 & $+0.288$ \\
+    \multicolumn{5}{@{}l}{\texttt{connected\_nodes}} \\
+    \quad\texttt{incident} & 0.958 & 0.947 & 0.940 & 0.952 \\
+    \quad\texttt{adjacency} & 0.743 & 0.835 & 0.817 & 0.822 \\
+    \quad\texttt{friendship} & 0.488 & 0.655 & 0.687 & 0.687 \\
     \addlinespace
-    \texttt{node\_degree} & \texttt{incident}   & 0.260 & 0.070 & $+0.185$ \\
-    \texttt{node\_degree} & \texttt{adjacency}  & 0.298 & 0.102 & $+0.218$ \\
-    \texttt{node\_degree} & \texttt{friendship} & 0.208 & 0.059 & $+0.208$ \\
+    \multicolumn{5}{@{}l}{\texttt{node\_degree}} \\
+    \quad\texttt{incident} & 0.873 & 0.942 & 0.935 & 0.943 \\
+    \quad\texttt{adjacency} & 0.655 & 0.868 & 0.850 & 0.875 \\
+    \quad\texttt{friendship} & 0.637 & 0.828 & 0.828 & 0.837 \\
     \addlinespace
-    \texttt{edge\_existence} & \texttt{incident}   & 0.857 & 0.105 & $+0.406$ \\
-    \texttt{edge\_existence} & \texttt{adjacency}  & 0.957 & 0.290 & $+0.537$ \\
-    \texttt{edge\_existence} & \texttt{friendship} & 0.926 & 0.161 & $+0.694$ \\
+    \multicolumn{5}{@{}l}{\texttt{edge\_existence}} \\
+    \quad\texttt{incident} & 0.980 & 0.978 & 0.975 & 0.985 \\
+    \quad\texttt{adjacency} & 0.938 & 0.922 & 0.803 & 0.950 \\
+    \quad\texttt{friendship} & 0.867 & 0.800 & 0.752 & 0.822 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Per-cell accuracy under each condition. Turn~1 is debate's first-turn
+  chain-of-thought (also each majority-vote draw's prompt).}
+  \label{tab:percell-acc}
+\end{table}
+
+Table~\ref{tab:percell-critic} reports the Critic as a signal: how often a
+\textsc{revise} lands on a wrong answer, and how often on a correct one. Detection
+counts whether the Critic flagged a wrong answer, not whether the revision then
+repaired it: a flagged answer can be revised into another wrong answer, so detection
+bounds what the loop can rescue rather than measuring it.
+
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    \textbf{Encoding} & \textbf{Detection} & \textbf{False alarm} & $\phi$ \\
     \midrule
-    \textbf{Pooled} & & 0.502 & 0.132 & $+0.358$ \\
+    \multicolumn{4}{@{}l}{\texttt{connected\_nodes}} \\
+    \quad\texttt{incident} & 0.327 & 0.102 & $+0.186$ \\
+    \quad\texttt{adjacency} & 0.423 & 0.201 & $+0.217$ \\
+    \quad\texttt{friendship} & 0.308 & 0.085 & $+0.288$ \\
+    \addlinespace
+    \multicolumn{4}{@{}l}{\texttt{node\_degree}} \\
+    \quad\texttt{incident} & 0.260 & 0.070 & $+0.185$ \\
+    \quad\texttt{adjacency} & 0.298 & 0.102 & $+0.218$ \\
+    \quad\texttt{friendship} & 0.208 & 0.059 & $+0.208$ \\
+    \addlinespace
+    \multicolumn{4}{@{}l}{\texttt{edge\_existence}} \\
+    \quad\texttt{incident} & 0.857 & 0.105 & $+0.406$ \\
+    \quad\texttt{adjacency} & 0.957 & 0.290 & $+0.537$ \\
+    \quad\texttt{friendship} & 0.926 & 0.161 & $+0.694$ \\
+    \midrule
+    \textbf{Pooled} & 0.502 & 0.132 & $+0.358$ \\
     \bottomrule
   \end{tabular}
   \caption{Per-cell Critic diagnostic. Detection is $P(\textsc{revise}\mid\text{wrong})$,
   false alarm is $P(\textsc{revise}\mid\text{correct})$, and $\phi$ is the association
   between a \textsc{revise} and a wrong answer.}
   \label{tab:percell-critic}
-
-  \vspace{1em}
-
-  \begin{tabular}{@{}llcccc@{}}
-    \toprule
-    \textbf{Task} & \textbf{Encoding} & \textbf{Baseline} & \textbf{Turn 1} &
-      \textbf{Debate} & \textbf{Vote} \\
-    \midrule
-    \texttt{connected\_nodes} & \texttt{incident}   & 0.958 & 0.947 & 0.940 & 0.952 \\
-    \texttt{connected\_nodes} & \texttt{adjacency}  & 0.743 & 0.835 & 0.817 & 0.822 \\
-    \texttt{connected\_nodes} & \texttt{friendship} & 0.488 & 0.655 & 0.687 & 0.687 \\
-    \addlinespace
-    \texttt{node\_degree} & \texttt{incident}   & 0.873 & 0.942 & 0.935 & 0.943 \\
-    \texttt{node\_degree} & \texttt{adjacency}  & 0.655 & 0.868 & 0.850 & 0.875 \\
-    \texttt{node\_degree} & \texttt{friendship} & 0.637 & 0.828 & 0.828 & 0.837 \\
-    \addlinespace
-    \texttt{edge\_existence} & \texttt{incident}   & 0.980 & 0.978 & 0.975 & 0.985 \\
-    \texttt{edge\_existence} & \texttt{adjacency}  & 0.938 & 0.922 & 0.803 & 0.950 \\
-    \texttt{edge\_existence} & \texttt{friendship} & 0.867 & 0.800 & 0.752 & 0.822 \\
-    \bottomrule
-  \end{tabular}
-  \caption{Per-cell accuracy under each condition. Turn~1 is debate's first-turn
-  chain-of-thought (also each majority-vote draw's prompt).}
-  \label{tab:percell-acc}
-\end{table*}
-
-Tables~\ref{tab:percell-critic} and~\ref{tab:percell-acc} report every cell's numbers
-behind the pooled figures in \S\ref{sec:results}. Detection
-counts whether the Critic flagged a wrong answer, not whether the revision then
-repaired it: a flagged answer can be revised into another wrong answer, so detection
-bounds what the loop can rescue rather than measuring it.
+\end{table}
 
 \end{document}
