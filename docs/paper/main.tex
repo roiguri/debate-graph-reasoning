@@ -143,7 +143,7 @@ problem, since every claim is verifiable and any flaw can be caught.
 A simpler way to spend extra inference compute is to sample several answers
 independently and aggregate them. Chain-of-thought prompting \citep{wei2022cot}
 has the model produce intermediate reasoning steps before its answer, improving
-accuracy on multi-step problems; this is the same reasoning we isolate as debate's
+accuracy on multi-step problems. This is the same reasoning we isolate as debate's
 first turn. Self-consistency \citep{wang2023selfconsistency} samples several such
 reasoning paths independently and returns the majority answer, reliably improving
 accuracy - which is exactly our majority-vote arm. This makes voting the natural
@@ -172,7 +172,7 @@ the encoding alone and all comparisons across encodings are paired by graph.
 
 \paragraph{Tasks and encodings.}
 We study three tasks, spanning boolean, integer, and set answers, and three
-encodings from \citet{fatemi2024talk}; Table~\ref{tab:example} defines each with an
+encodings from \citet{fatemi2024talk}. Table~\ref{tab:example} defines each with an
 example. The encodings preserve the graph exactly and differ only in surface form,
 labeling nodes with integers except \texttt{friendship}, which uses popular names.
 Crossing $3$ tasks $\times$ $3$ encodings $\times$ $3$ seeds $\times$ $200$ graphs
@@ -235,14 +235,14 @@ conditions. The baseline is a
 single zero-shot answer-only response. Debate is a Proposer--Critic loop:
 the Proposer emits a numbered claim trace and a final answer, the Critic reviews it
 against the encoding and returns \textsc{agree} or \textsc{revise}, and the Proposer
-revises until agreement or a turn budget is reached; the Proposer and Critic are the
+revises until agreement or a turn budget is reached. The Proposer and Critic are the
 same model in different roles. Its first turn is a single-turn
 chain-of-thought answer under the same decoding, which lets us separate the
 reasoning (baseline\,$\rightarrow$\,turn~1) from the
 verify-and-revise loop (turn~1\,$\rightarrow$\,final) with no extra runs.
 Majority vote draws the same Proposer prompt $N{=}3$ times independently at
 the model's shipped sampling defaults and returns the majority answer across the
-three; it differs from debate in exactly one thing - whether the attempts see each
+three. It differs from debate in exactly one thing - whether the attempts see each
 other.
 
 \paragraph{Matched compute.}
@@ -251,22 +251,22 @@ $N{=}3$ was fixed before the run by matching debate's measured token spend
 $1{,}664$ tokens per instance for the vote against $1{,}554$ for debate, so the two
 arms are compute-matched to within $7\%$ and any advantage the vote shows is not an
 artifact of the budget. The sampling temperature is Llama's shipped
-default, fixed before any result; we report how often the three samples disagreed as
+default, fixed before any result. We report how often the three samples disagreed as
 a diagnostic, but never tuned the temperature to change it.
 
 \paragraph{Metrics and statistics.}
-The primary metric is accuracy; the secondary is encoding fragility, the
+The primary metric is accuracy. The secondary is encoding fragility, the
 cross-encoding accuracy spread (max\,$-$\,min) within a task. Because encodings are
 paired by graph, significance uses paired tests: Cochran's $Q$ as an overall test across
 a task's three encodings, and McNemar's test for pairwise gaps and for
-condition-vs-condition accuracy differences; cell accuracies carry Wilson intervals.
+condition-vs-condition accuracy differences. Cell accuracies carry Wilson intervals.
 The Critic diagnostic (does a \textsc{revise} track the answer actually being
 wrong?) is unpaired, one observation per verdict, so it takes a $\chi^2$ association
 test reported with the signed $\phi$. We report the fragility spread descriptively,
 supported by replication across the three independent seeds rather than by a test of
 the spread itself. Finally, \texttt{edge\_existence} is a single-pair lookup whose
 trace reduces to one atomic claim, so a claim-by-claim critique has nothing to work
-on and its baseline sits near ceiling; it behaves as a control rather than a
+on and its baseline sits near ceiling. It behaves as a control rather than a
 third fragile task, and we report every result both over all $9$ cells and over the
 $6$ cells that exclude it.
 
@@ -340,7 +340,7 @@ is the phenomenon the rest of the paper asks a reasoning procedure to repair.
     \addlegendentry{\texttt{edge\_existence}}
     \end{axis}
   \end{tikzpicture}
-  \caption{Cross-encoding accuracy spread (max$-$min) by stage for each task; lower
+  \caption{Cross-encoding accuracy spread (max$-$min) by stage for each task. Lower
   is less fragile.}
   \label{fig:fragility}
 \end{figure}
@@ -348,7 +348,7 @@ is the phenomenon the rest of the paper asks a reasoning procedure to repair.
 \subsection{Debate raises accuracy and narrows the gap}
 \label{sec:apparent}
 Debate raises mean accuracy over the baseline by $+0.050$ over all nine cells
-(McNemar $b/c=351/619$, $p<0.001$; Table~\ref{tab:main}), replicating in
+(McNemar $b/c=351/619$, $p<0.001$, Table~\ref{tab:main}), replicating in
 sign across all three independent seeds. It also narrows the encoding gap
 (Figure~\ref{fig:fragility}): the \texttt{connected\_nodes} spread falls
 $0.470\rightarrow0.253$ and \texttt{node\_degree} $0.237\rightarrow0.107$, reproducing
@@ -367,7 +367,7 @@ $+0.071$ over the baseline, while the loop then reduces accuracy by $0.021$. Tha
 damage falls on the \texttt{edge\_existence} control, where the Critic drags accuracy
 from $0.922$ to $0.803$ (Table~\ref{tab:percell-acc}). That task has a single atomic claim: there is nothing to critique, so the
 Critic only talks a correct answer down. The main takeaway is that asking
-the model to reason helps; having a Critic argue about the reasoning does not.
+the model to reason helps - having a Critic argue about the reasoning does not.
 
 \begin{table}[h!]
   \centering
@@ -401,7 +401,7 @@ $+0.120$, the loop is close to neutral ($-0.003$), and the compute-matched vote
 \label{sec:vote}
 The debate loop requires more compute without adding accuracy, so the natural comparison is
 against spending that same compute on independent attempts that never interact. Majority vote
-scores $0.875$ against debate's $0.843$ overall ($+0.032$; $p<0.001$) at matched
+scores $0.875$ against debate's $0.843$ overall ($+0.032$, $p<0.001$) at matched
 compute. The vote is at least as accurate as debate on every task and encoding
 (Table~\ref{tab:percell-acc}), and more accurate on three. The full
 ordering across the arm is baseline $0.793 <$ debate $0.843 <$ turn~1 $0.864 <$ vote
@@ -477,9 +477,9 @@ for a reason that is general. When a model is already mostly correct - as
 Llama-3.3-70B is here, six right for every one wrong - revision puts more correct
 answers at risk than it can rescue wrong ones, so it does more harm than good.
 
-\paragraph{Reasoning does the work; neither extra structure earns its compute.}
-Almost all of the gain over the baseline comes from a single reasoned pass; on top of
-that the vote adds only a little and the debate loop nothing (Table~\ref{tab:main}).
+\paragraph{Reasoning does the work - neither extra structure earns its compute.}
+Almost all of the gain over the baseline comes from a single reasoned pass. On top of
+that, the vote adds only a little and the debate loop nothing (Table~\ref{tab:main}).
 Between the two ways of spending the extra compute, aggregation wins - majority vote
 beats debate on every cell, because three independent draws cannot argue each other
 out of a correct answer, whereas a Critic can - but the vote is only the less
@@ -498,7 +498,7 @@ cost, reasoning once does the work and neither extra structure adds much.
     be better.
   \item \textbf{Single prompt.} We use one Proposer/Critic wording. The Critic's
     precision may depend heavily on it, so a different wording could change how much
-    the debate helps or hurts; testing several would tell us whether our result is a
+    the debate helps or hurts. Testing several would tell us whether our result is a
     property of debate itself or just of this prompt. We did not pursue this, since
     the loop fails on precision rather than on how well the Critic detects errors.
   \item \textbf{Debate structure.} We tested one minimal two-role loop. Richer
@@ -541,7 +541,7 @@ the one these results were produced on (seed $7$: \texttt{7030fa5d}, seed $11$:
 \paragraph{Model and decoding.} Every condition uses
 \texttt{Llama-3.3-70B-Instruct-Turbo}, served in FP8 through the Together API.
 Table~\ref{tab:runconfig} gives each arm's decoding and budget. One frozen prompt
-wording is used throughout; it is reproduced in full in \ref{sec:prompts}.
+wording is used throughout. It is reproduced in full in \ref{sec:prompts}.
 
 \begin{table}[h]
   \centering
@@ -556,19 +556,19 @@ wording is used throughout; it is reproduced in full in \ref{sec:prompts}.
     \bottomrule
   \end{tabular}
   \caption{Decoding and budgets per arm, as set in the run configs. \textbf{Cap} is
-  \texttt{max\_new\_tokens}; the vote's sampling values are the model's shipped
+  \texttt{max\_new\_tokens}. The vote's sampling values are the model's shipped
   defaults.}
   \label{tab:runconfig}
 \end{table}
 
 \paragraph{What a run records.} Every run stores one row per instance, carrying the
-model's answer, whether it was correct, and its token counts; debate also stores every
+model's answer, whether it was correct, and its token counts. Debate also stores every
 turn of its transcript. Alongside them a manifest records the model, the dataset, the
 decoding, and the token cap that produced those rows. The per-cell tables in this paper
 are computed from those rows, and the repository ships the code that computes them.
 
-\paragraph{Software.} Graph generation uses \texttt{networkx} \citep{hagberg2008networkx};
-all three datasets reproduce under Python $3.13.9$, \texttt{networkx} $3.6.1$ and
+\paragraph{Software.} Graph generation uses \texttt{networkx} \citep{hagberg2008networkx}.
+All three datasets reproduce under Python $3.13.9$, \texttt{networkx} $3.6.1$ and
 \texttt{numpy} $2.5.1$. The model is reached over HTTP, so no local inference stack is
 involved.
 
