@@ -654,30 +654,29 @@ VERDICT: REVISE
 \begin{table*}[t]
   \centering
   \small
-  \begin{tabular}{@{}llcccc@{}}
+  \begin{tabular}{@{}llccc@{}}
     \toprule
     \textbf{Task} & \textbf{Encoding} & \textbf{Detection} & \textbf{False alarm} &
-      $\phi$ & \textbf{Net fixed $-$ broken} \\
+      $\phi$ \\
     \midrule
-    \texttt{connected\_nodes} & \texttt{incident}   & 0.327 & 0.102 & $+0.186$ & $-4$ \\
-    \texttt{connected\_nodes} & \texttt{adjacency}  & 0.423 & 0.201 & $+0.217$ & $-11$ \\
-    \texttt{connected\_nodes} & \texttt{friendship} & 0.308 & 0.085 & $+0.288$ & $+19$ \\
+    \texttt{connected\_nodes} & \texttt{incident}   & 0.327 & 0.102 & $+0.186$ \\
+    \texttt{connected\_nodes} & \texttt{adjacency}  & 0.423 & 0.201 & $+0.217$ \\
+    \texttt{connected\_nodes} & \texttt{friendship} & 0.308 & 0.085 & $+0.288$ \\
     \addlinespace
-    \texttt{node\_degree} & \texttt{incident}   & 0.260 & 0.070 & $+0.185$ & $-4$ \\
-    \texttt{node\_degree} & \texttt{adjacency}  & 0.298 & 0.102 & $+0.218$ & $-11$ \\
-    \texttt{node\_degree} & \texttt{friendship} & 0.208 & 0.059 & $+0.208$ & $0$ \\
+    \texttt{node\_degree} & \texttt{incident}   & 0.260 & 0.070 & $+0.185$ \\
+    \texttt{node\_degree} & \texttt{adjacency}  & 0.298 & 0.102 & $+0.218$ \\
+    \texttt{node\_degree} & \texttt{friendship} & 0.208 & 0.059 & $+0.208$ \\
     \addlinespace
-    \texttt{edge\_existence} & \texttt{incident}   & 0.857 & 0.105 & $+0.406$ & $-2$ \\
-    \texttt{edge\_existence} & \texttt{adjacency}  & 0.957 & 0.290 & $+0.537$ & $-71$ \\
-    \texttt{edge\_existence} & \texttt{friendship} & 0.926 & 0.161 & $+0.694$ & $-29$ \\
+    \texttt{edge\_existence} & \texttt{incident}   & 0.857 & 0.105 & $+0.406$ \\
+    \texttt{edge\_existence} & \texttt{adjacency}  & 0.957 & 0.290 & $+0.537$ \\
+    \texttt{edge\_existence} & \texttt{friendship} & 0.926 & 0.161 & $+0.694$ \\
     \midrule
-    \textbf{Pooled} & & 0.502 & 0.132 & $+0.358$ & $-113$ \\
+    \textbf{Pooled} & & 0.502 & 0.132 & $+0.358$ \\
     \bottomrule
   \end{tabular}
   \caption{Per-cell Critic diagnostic. Detection is $P(\textsc{revise}\mid\text{wrong})$,
-  false alarm is $P(\textsc{revise}\mid\text{correct})$, $\phi$ is the association between
-  a \textsc{revise} and a wrong answer, and net is answers fixed minus broken by revision.
-  The loop is net-positive only on \texttt{connected\_nodes}/\texttt{friendship}.}
+  false alarm is $P(\textsc{revise}\mid\text{correct})$, and $\phi$ is the association
+  between a \textsc{revise} and a wrong answer.}
   \label{tab:percell-critic}
 
   \vspace{1em}
@@ -708,9 +707,7 @@ VERDICT: REVISE
 
 Tables~\ref{tab:percell-critic} and~\ref{tab:percell-acc} report every cell's numbers
 behind the pooled figures in \S\ref{sec:results}. $p$-values are paired McNemar tests
-(cells share graphs); values below $0.001$ are shown as \texttt{<0.001}. ``Net fixed
-$-$ broken'' is the number of answers a revision moved wrong$\to$right minus
-right$\to$wrong, so a positive value means the loop helped that cell. Detection
+(cells share graphs); values below $0.001$ are shown as \texttt{<0.001}. Detection
 counts whether the Critic flagged a wrong answer, not whether the revision then
 repaired it: a flagged answer can be revised into another wrong answer, so detection
 bounds what the loop can rescue rather than measuring it.
