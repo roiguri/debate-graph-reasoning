@@ -1,8 +1,10 @@
 # Llama-3.3-70B debate, seed 13. Stage 1 of the Llama re-run.
 #
-# Proposer-Critic loop at Proposer prompt v2, the one frozen wording. Paired with the
-# baseline in the same out_dir and run over the same frozen dataset, so debate-vs-baseline
-# is a within-instance comparison.
+# Proposer-Critic loop at the frozen Proposer/Critic wording (src/gedebate/prompts/debate.py).
+#
+# The baseline it is compared against lives in results/llama70b-*: it prompts from
+# prompts/__init__.py, which the debate wording does not touch, so it is not re-run and
+# the comparison joins across dirs on instance_id.
 #
 # max_new_tokens is 512, adopted matrix-wide on the strength of the two compliance
 # pilots. At 256 Llama ran into the cap hard on connected_nodes: Proposer truncation
@@ -31,9 +33,7 @@ dataset = "data/seed13.jsonl"
 n_samples = 10
 max_new_tokens = 512
 
-prompt_version = "v2"
-
 tasks = ["edge_existence", "node_degree", "connected_nodes"]
 encodings = ["adjacency", "incident", "friendship"]
 
-out_dir = "results/llama70b-seed13"
+out_dir = "results/llama70b-v3-seed13"

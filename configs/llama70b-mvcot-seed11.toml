@@ -35,23 +35,18 @@ provider = "together"
 condition = "majority_vote_cot"
 dataset = "data/seed11.jsonl"
 
-# CONFIRMED against the v3 debate run (5,400 instances, 3 seeds): debate spends
+# CONFIRMED against the debate run (5,400 instances, 3 seeds): debate spends
 # 1,395-1,659 tokens per instance against a turn-1 cost of 543-567, i.e. 2.57
 # (node_degree), 2.92 (connected_nodes) and 2.93 (edge_existence) turn-1-equivalents.
 # One uniform N=3 covers all three, so the budget is not a per-task confound.
 #
-# Matching on RESPONSES would say 2, because v3's loop still stops at turn 2 on 75-90%
+# Matching on RESPONSES would say 2, because the loop still stops at turn 2 on 75-90%
 # of instances. Two draws are not a vote -- they are either unanimous or a tie broken by
 # first index, which is just sample 0 -- so 3 is the smallest N that votes at all.
 n_samples = 3
 temperature = 0.6
 top_p = 0.9
 top_k = 0  # disables top-k; omitted from the request rather than sent as a literal 0
-
-# The Proposer wording these draws sample. Recorded per row and in the manifest, exactly
-# as debate records it -- without it two runs of this arm under different prompt texts
-# would be indistinguishable.
-prompt_version = "v3"
 
 # 512 matches the debate arm. The terse arm's 128 would truncate a claims-plus-ANSWER
 # trace, and a per-arm cap is a confound.
@@ -60,8 +55,8 @@ max_new_tokens = 512
 tasks = ["edge_existence", "node_degree", "connected_nodes"]
 encodings = ["adjacency", "incident", "friendship"]
 
-# Sits with the v3 DEBATE arm it controls for, not with the v2 rows in
-# results/llama70b-seed11: this arm samples the v3 Proposer prompt, so pairing it with
-# the v3 debate on instance_id is the comparison that means anything. The baseline
-# is joined across dirs at analysis time (its prompt is untouched by v2/v3).
+# Sits with the DEBATE arm it controls for: this arm samples the same turn-1 Proposer
+# prompt, so pairing it with the debate on instance_id is the comparison that means
+# anything. The baseline is joined across dirs at analysis time (it prompts differently
+# and is unaffected).
 out_dir = "results/llama70b-v3-seed11"

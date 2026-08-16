@@ -7,7 +7,6 @@ dataset          data/main.jsonl
 matrix           tasks=['edge_existence', 'node_degree', 'connected_nodes']  encodings=['adjacency', 'incident', 'friendship']
 max_new_tokens   512
 n_samples        3   (draws per instance, then voted)
-prompt_version   v3
 
 Each prompt below is sent as a SINGLE user message with no system prompt; the
 model's chat template wraps it (locally under provider 'hf', server-side under

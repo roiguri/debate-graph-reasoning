@@ -43,7 +43,7 @@ def test_converges_immediately_on_agree():
     inst = _inst()
     gt = inst.ground_truth
     stub = _ScriptStub([f"1. some claim\nANSWER: {gt}", "VERDICT: AGREE"])
-    rec, turns = run_debate(stub, inst, prompt_version="v2", max_responses=10)
+    rec, turns = run_debate(stub, inst, max_responses=10)
     assert rec["n_responses"] == 2 and rec["correct"] is True and rec["parsed_answer"] == gt
     assert [t["role"] for t in turns] == ["proposer", "critic"]
     assert rec["n_gen_tokens"] == 4 and rec["n_prompt_tokens"] == 20  # 2 turns x (2,10)
@@ -59,7 +59,7 @@ def test_revises_then_agrees():
         f"1. (0,3) is an edge\nANSWER: {gt}",       # revision correct
         "VERDICT: AGREE",
     ])
-    rec, turns = run_debate(stub, inst, prompt_version="v2", max_responses=10)
+    rec, turns = run_debate(stub, inst, max_responses=10)
     assert rec["n_responses"] == 4 and rec["correct"] is True and rec["parsed_answer"] == gt
     assert [t["role"] for t in turns] == ["proposer", "critic", "proposer", "critic"]
 
@@ -72,7 +72,7 @@ def test_no_progress_stops_on_repeated_answer():
         "VERDICT: REVISE\n- something",
         f"ANSWER: {wrong}",   # revision repeats the same answer -> no progress
     ])
-    rec, turns = run_debate(stub, inst, prompt_version="v2", max_responses=10)
+    rec, turns = run_debate(stub, inst, max_responses=10)
     assert rec["n_responses"] == 3 and rec["parsed_answer"] == wrong and rec["correct"] is False
 
 
@@ -82,7 +82,7 @@ def test_response_budget_caps_the_loop():
         "ANSWER: 7", "VERDICT: REVISE\n- x",
         "ANSWER: 8", "VERDICT: REVISE\n- y",   # len hits 4 -> no room to revise -> stop
     ])
-    rec, turns = run_debate(stub, inst, prompt_version="v2", max_responses=4)
+    rec, turns = run_debate(stub, inst, max_responses=4)
     assert rec["n_responses"] == 4
     assert rec["parsed_answer"] == 8  # final = last Proposer answer (turn 3)
 
@@ -91,18 +91,14 @@ def test_unparseable_verdict_counts_and_stops():
     inst = _inst()
     gt = inst.ground_truth
     stub = _ScriptStub([f"ANSWER: {gt}", "this looks fine to me"])  # no VERDICT line
-    rec, turns = run_debate(stub, inst, prompt_version="v2", max_responses=10)
+    rec, turns = run_debate(stub, inst, max_responses=10)
     assert rec["n_responses"] == 2 and rec["stopped_on_unparsed_verdict"] is True
     assert rec["correct"] is True  # unparseable -> AGREE, final is the correct Proposer answer
 
 
-def test_every_role_uses_the_configured_prompt_version():
-    """All three prompts must come from the SAME version.
-
-    The Critic call used to omit `prompt_version` and fall back to the module default, so
-    a v3 run sent v3 Proposer + revision prompts and a v2 Critic prompt -- a hybrid no
-    manifest could describe, and invisible while only one version existed.
-    """
+def test_every_role_is_built_from_the_transcript_before_it():
+    """Each of the three builders is called with the turns that preceded it, so a turn's
+    prompt is a function of `turns[:i]` and never of the turn being generated."""
     inst = _inst()
 
     class _Recorder:
@@ -118,12 +114,9 @@ def test_every_role_uses_the_configured_prompt_version():
     # proposer -> critic REVISE -> revision -> critic AGREE: exercises all three builders
     model = _Recorder(["1. a\nANSWER: 1", "VERDICT: REVISE\n- edge (0, 1)",
                        "1. b\nANSWER: 2", "VERDICT: AGREE"])
-    _record, turns = run_debate(model, inst, prompt_version="v3", max_responses=6)
+    _record, turns = run_debate(model, inst, max_responses=6)
 
-    assert model.prompts[0] == proposer_prompt(inst, "v3")
-    assert model.prompts[1] == critic_prompt(inst, turns[:1], "v3")
-    assert model.prompts[2] == revision_prompt(inst, turns[:2], "v3")
-    assert model.prompts[3] == critic_prompt(inst, turns[:3], "v3")
-    # and none of them leaked the other version's wording
-    for p in model.prompts:
-        assert p != critic_prompt(inst, turns[:1], "v2")
+    assert model.prompts[0] == proposer_prompt(inst)
+    assert model.prompts[1] == critic_prompt(inst, turns[:1])
+    assert model.prompts[2] == revision_prompt(inst, turns[:2])
+    assert model.prompts[3] == critic_prompt(inst, turns[:3])

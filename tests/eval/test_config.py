@@ -38,7 +38,7 @@ def test_from_dict_full():
     {"model": "m", "out_dir": "o", "dataset": "d", "condition": "quux"},  # unknown condition
     {"model": "m", "out_dir": "o", "dataset": "d", "n_samples": 0},      # must be >= 1
     {"model": "m", "out_dir": "o", "dataset": "d", "temperature": 0},    # must be > 0
-    {"model": "m", "out_dir": "o", "dataset": "d", "prompt_version": "v99"},  # unknown version
+    {"model": "m", "out_dir": "o", "dataset": "d", "prompt_version": "v3"},  # retired key
     {"model": "m", "out_dir": "o", "dataset": "d", "top_p": 0},          # must be in (0,1]
     {"model": "m", "out_dir": "o", "dataset": "d", "top_p": 1.5},        # must be <= 1
     {"model": "m", "out_dir": "o", "dataset": "d", "top_k": -1},         # must be >= 0
@@ -96,14 +96,9 @@ def test_repo_p3_matrix_config():
     assert "Qwen" in cfg.model
 
 
-def test_prompt_version_defaults_to_the_single_frozen_version():
-    # v1 was deleted when the project consolidated on one prompt; a config that names no
-    # version gets v2, the only one that exists.
-    cfg = RunConfig.from_dict({"model": "m", "out_dir": "o", "dataset": "d"})
-    assert cfg.prompt_version == "v2"
-
-
-def test_prompt_version_is_opt_in():
-    cfg = RunConfig.from_dict({"model": "m", "out_dir": "o", "dataset": "d",
-                               "condition": "debate", "prompt_version": "v2"})
-    assert cfg.prompt_version == "v2"
+def test_prompt_version_is_no_longer_a_config_key():
+    # One frozen wording, so there is nothing to select. An old config naming a version
+    # must fail loudly rather than run the current prompts under a stale label.
+    with pytest.raises(ValueError, match="unknown config keys"):
+        RunConfig.from_dict({"model": "m", "out_dir": "o", "dataset": "d",
+                             "condition": "debate", "prompt_version": "v3"})

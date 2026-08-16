@@ -60,13 +60,13 @@ def test_debate_prompts_are_the_builders_output(tmp_path):
     inst = mod.select_instances(cfg, encoding="adjacency")[0]
     turns = mod.placeholder_turns(1)
 
-    blocks = mod.debate_prompts(inst, turns, cfg.prompt_version)
+    blocks = mod.debate_prompts(inst, turns)
     labels = [lbl for lbl, _ in blocks]
     assert labels == ["PROPOSER (turn 1)", "CRITIC (turn 2)", "PROPOSER REVISION (turn 3)"]
     assert [p for _, p in blocks] == [
-        proposer_prompt(inst, cfg.prompt_version),
-        critic_prompt(inst, turns[:1], cfg.prompt_version),      # transcript before the turn
-        revision_prompt(inst, turns[:2], cfg.prompt_version),
+        proposer_prompt(inst),
+        critic_prompt(inst, turns[:1]),      # transcript before the turn
+        revision_prompt(inst, turns[:2]),
     ]
 
     text = mod.render(cfg, "cfg.toml", [inst])
@@ -87,8 +87,8 @@ def test_from_run_replays_the_recorded_transcript(tmp_path):
 
     assert mod.load_trace_turns(run, inst.instance_id) == turns
     text = mod.render(cfg, "cfg.toml", [inst], from_run=str(run))
-    assert critic_prompt(inst, turns[:1], cfg.prompt_version) in text
-    assert revision_prompt(inst, turns[:2], cfg.prompt_version) in text
+    assert critic_prompt(inst, turns[:1]) in text
+    assert revision_prompt(inst, turns[:2]) in text
     assert "PLACEHOLDER" not in text
 
 

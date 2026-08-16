@@ -137,12 +137,11 @@ def test_cot_arm_samples_the_debate_proposer_prompt():
     gold = "Yes" if inst.ground_truth else "No"
     model = _StubModel(f"1. The pair appears in the edge list.\nANSWER: {gold}")
 
-    rec = run_sample(model, inst, sample_index=1, temperature=0.6, top_p=0.9,
-                     prompt_version="v2")
+    rec = run_sample(model, inst, sample_index=1, temperature=0.6, top_p=0.9, cot=True)
 
     # A separate condition name, so the two arms can never pool into one accuracy.
     assert rec["condition"] == CONDITION_COT
-    assert model.prompts[0] == proposer_prompt(inst, "v2")
+    assert model.prompts[0] == proposer_prompt(inst)
     assert rec["correct"] is True and rec["parse_ok"] is True
     assert model.seen[0]["temperature"] == 0.6 and model.seen[0]["top_p"] == 0.9
     assert rec["seed"] == sample_seed(inst.instance_id, 1)
@@ -157,7 +156,7 @@ def test_cot_arm_reads_the_answer_line_not_the_whole_trace():
     raw = "1. Node 1 is connected to node 0.\n2. Node 1 is not connected to node 3.\nANSWER: 0"
     model = _StubModel(raw)
 
-    rec = run_sample(model, inst, sample_index=0, temperature=0.6, prompt_version="v2")
+    rec = run_sample(model, inst, sample_index=0, temperature=0.6, cot=True)
 
     expected, _ok, _claims = parse_proposer(raw, inst.task, encoding=inst.encoding,
                                             node_ids=inst.node_ids)

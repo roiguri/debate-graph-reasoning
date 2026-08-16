@@ -25,22 +25,20 @@ from gedebate.eval import results
 from gedebate.eval.scoring import score
 
 
-def _debate_rows(run_dirs: list[str], prompt_version: str | None) -> dict[str, dict]:
-    """instance_id -> debate row, for the rows the requested prompt version produced."""
+def _debate_rows(run_dirs: list[str]) -> dict[str, dict]:
+    """instance_id -> debate row."""
     rows: dict[str, dict] = {}
     for run_dir in run_dirs:
         for f in results.result_files(run_dir):
             for r in results.read_rows(f):
                 if r["condition"] != "debate":
                     continue
-                if prompt_version and results.row_prompt_version(r) != prompt_version:
-                    continue
                 rows[r["instance_id"]] = r
     return rows
 
 
-def ceiling(run_dirs: list[str], prompt_version: str | None) -> dict[tuple[str, str], dict]:
-    rows = _debate_rows(run_dirs, prompt_version)
+def ceiling(run_dirs: list[str]) -> dict[tuple[str, str], dict]:
+    rows = _debate_rows(run_dirs)
     cells: dict[tuple[str, str], dict] = defaultdict(
         lambda: {"n": 0, "turn1": 0, "actual": 0, "oracle": 0, "proposer_turns": 0})
 
@@ -48,7 +46,7 @@ def ceiling(run_dirs: list[str], prompt_version: str | None) -> dict[tuple[str, 
         for f in results.trace_files(run_dir):
             for trace in results.read_traces(f):
                 row = rows.get(trace["instance_id"])
-                if row is None:  # another prompt version, or a torn line
+                if row is None:  # no matching debate row, or a torn line
                     continue
                 proposer = [t for t in trace["turns"] if t["role"] == "proposer"]
                 if not proposer:
@@ -66,11 +64,9 @@ def ceiling(run_dirs: list[str], prompt_version: str | None) -> dict[tuple[str, 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("run_dir", nargs="+", help="one or more debate run dirs; pooled")
-    ap.add_argument("--prompt-version", default=None,
-                    help="only score debate rows from this Proposer wording (e.g. v2)")
     args = ap.parse_args()
 
-    cells = ceiling(args.run_dir, args.prompt_version)
+    cells = ceiling(args.run_dir)
     if not cells:
         raise SystemExit("no debate traces found in " + ", ".join(args.run_dir))
 

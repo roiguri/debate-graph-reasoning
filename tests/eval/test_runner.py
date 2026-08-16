@@ -222,8 +222,8 @@ def test_verify_sample_matches_and_detects_mismatch(tmp_path):
 
 def test_git_commit_falls_back_to_the_sync_stamp(tmp_path, monkeypatch):
     # Runs happen on an rsync copy with no .git, so `git rev-parse` fails there and every
-    # manifest recorded "unknown". Harmless until v2's prompts were edited in place: two
-    # runs now both say prompt_version "v2" and the commit is what separates them.
+    # manifest recorded "unknown". The prompts are frozen but not immutable, so the commit
+    # is the only thing that says which wording produced a row.
     from gedebate.eval import runner
 
     stamp = tmp_path / ".git_commit"
@@ -245,9 +245,9 @@ def test_git_commit_is_unknown_when_there_is_no_git_and_no_stamp(tmp_path, monke
 
 # --- the reasoned vote arm (same N-row persistence, Proposer prompt) -----------
 
-def test_majority_vote_cot_persists_n_rows_and_records_the_prompt_version(tmp_path):
+def test_majority_vote_cot_persists_n_rows(tmp_path):
     cfg = _cfg(tmp_path, condition="majority_vote_cot", n_samples=3, temperature=0.6,
-               prompt_version="v2", max_new_tokens=512)
+               max_new_tokens=512)
     instances = build_instances(cfg)
 
     model = _StubModel("1. The pair is in the edge list.\nANSWER: Yes")
@@ -257,9 +257,6 @@ def test_majority_vote_cot_persists_n_rows_and_records_the_prompt_version(tmp_pa
     rows = results.read_rows(results.shard_file(cfg.out_dir, "majority_vote_cot"))
     assert len(rows) == 15
     assert {r["condition"] for r in rows} == {"majority_vote_cot"}
-    # the wording is recorded per row, as debate records it -- two runs of this arm under
-    # different prompt texts must not be poolable.
-    assert {r["prompt_version"] for r in rows} == {"v2"}
     assert all(r["temperature"] == 0.6 and r["seed"] is not None for r in rows)
 
     # fully-done instances are skipped on resume, exactly like the terse arm
@@ -267,8 +264,7 @@ def test_majority_vote_cot_persists_n_rows_and_records_the_prompt_version(tmp_pa
 
 
 def test_majority_vote_cot_sends_the_proposer_prompt(tmp_path):
-    cfg = _cfg(tmp_path, condition="majority_vote_cot", n_samples=2, temperature=0.6,
-               prompt_version="v2")
+    cfg = _cfg(tmp_path, condition="majority_vote_cot", n_samples=2, temperature=0.6)
     inst = build_instances(cfg)[0]
 
     seen = []
@@ -279,19 +275,18 @@ def test_majority_vote_cot_sends_the_proposer_prompt(tmp_path):
             return super().generate(prompt, max_new_tokens=max_new_tokens, **kw)
 
     run_instances(_Recorder("ANSWER: Yes"), [inst], cfg, MANIFEST)
-    assert seen and all(p == proposer_prompt(inst, "v2") for p in seen)
+    assert seen and all(p == proposer_prompt(inst) for p in seen)
     assert build_prompt(inst) not in seen
 
 
-def test_manifest_records_the_vote_arms_budget_and_wording(tmp_path):
+def test_manifest_records_the_vote_arms_budget(tmp_path):
     terse = manifest_record(_cfg(tmp_path, condition="majority_vote", n_samples=4), "c.toml")
-    assert terse["n_samples"] == 4 and "prompt_version" not in terse
+    assert terse["n_samples"] == 4
     assert terse["decoding"].startswith("temperature=")
 
     cot = manifest_record(
-        _cfg(tmp_path, condition="majority_vote_cot", n_samples=3, prompt_version="v2"),
-        "c.toml")
-    assert cot["n_samples"] == 3 and cot["prompt_version"] == "v2"
+        _cfg(tmp_path, condition="majority_vote_cot", n_samples=3), "c.toml")
+    assert cot["n_samples"] == 3
     assert cot["decoding"].startswith("temperature=")
 
 
@@ -299,7 +294,7 @@ def test_verify_sample_only_reads_its_own_conditions_rows(tmp_path):
     """A run dir holds every condition side by side, and verify_sample re-runs each row
     as a greedy BASELINE answer -- so feeding it debate or vote rows would report a
     different condition's answer as a reproducibility failure."""
-    cfg = _cfg(tmp_path, condition="debate", n_samples=4, prompt_version="v2")
+    cfg = _cfg(tmp_path, condition="debate", n_samples=4)
     run_instances(_StubModel("1. a\nANSWER: 1"), build_instances(cfg), cfg, MANIFEST)
 
     # same out_dir, baseline config: the debate rows sitting there must not be verified

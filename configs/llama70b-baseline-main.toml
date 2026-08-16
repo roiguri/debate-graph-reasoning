@@ -7,7 +7,7 @@
 #
 # max_new_tokens is 256, not the Qwen baseline's 128. A cap is a safety limit rather
 # than a condition: it only affects a run if it binds, and Llama's verbosity already
-# forced the debate cap from 256 to 512 (see llama70b-pilot-cn-adjacency-cap512.toml).
+# forced the debate cap from 256 to 512 (see docs/llama70b-cap-decision.md).
 # Raising it here strictly removes a truncation artefact and costs nothing if it never
 # binds. Check `n_gen_tokens` against 256 when the run lands -- if anything is at the
 # cap, this cell needs looking at before the number is trusted.

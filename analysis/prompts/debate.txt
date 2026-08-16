@@ -6,7 +6,6 @@ condition        debate
 dataset          data/main.jsonl
 matrix           tasks=['edge_existence', 'node_degree', 'connected_nodes']  encodings=['adjacency', 'incident', 'friendship']
 max_new_tokens   512
-prompt_version   v2
 max_responses    10   (the response budget)
 transcript       placeholder turns
 
@@ -19,11 +18,11 @@ model's chat template wraps it (locally under provider 'hf', server-side under
 ######## edge_existence / adjacency (7/0/edge_existence/adjacency) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [630 chars, 11 lines]
+ PROPOSER (turn 1)  [608 chars, 11 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about the queried pair (whether that exact edge
-appears in the graph's edge list) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by Yes or No. Write nothing after
 that line.
@@ -34,13 +33,11 @@ Q: Is node 4 connected to node 0?
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,359 chars, 23 lines]
+ CRITIC (turn 2)  [1,178 chars, 21 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 In an undirected graph, (i,j) means that node i and node j are connected with an undirected edge. G describes a graph among nodes 0, 1, 2, 3, and 4.
 The edges in G are: (0, 1) (2, 3).
@@ -84,11 +81,11 @@ that line.
 ######## edge_existence / incident (7/0/edge_existence/incident) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [636 chars, 15 lines]
+ PROPOSER (turn 1)  [614 chars, 15 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about the queried pair (whether that exact edge
-appears in the graph's edge list) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by Yes or No. Write nothing after
 that line.
@@ -103,13 +100,11 @@ Q: Is node 4 connected to node 0?
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,365 chars, 27 lines]
+ CRITIC (turn 2)  [1,184 chars, 25 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 G describes a graph among nodes 0, 1, 2, 3, and 4.
 In this graph:
@@ -161,11 +156,11 @@ that line.
 ######## edge_existence / friendship (7/0/edge_existence/friendship) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [632 chars, 13 lines]
+ PROPOSER (turn 1)  [610 chars, 13 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about the queried pair (whether that exact edge
-appears in the graph's edge list) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by Yes or No. Write nothing after
 that line.
@@ -178,13 +173,11 @@ Q: Is node David connected to node James?
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,361 chars, 25 lines]
+ CRITIC (turn 2)  [1,180 chars, 23 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 G describes a friendship graph among nodes James, Robert, John, Michael, and David.
 We have the following edges in G:
@@ -232,11 +225,11 @@ that line.
 ######## node_degree / adjacency (7/0/node_degree/adjacency) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [646 chars, 11 lines]
+ PROPOSER (turn 1)  [626 chars, 11 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about a single edge (that it exists,
-or that no further edge involves the node) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by a single integer, the degree. Write nothing after
 that line.
@@ -247,26 +240,21 @@ Q: What is the degree of node 1?
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,654 chars, 27 lines]
+ CRITIC (turn 2)  [1,194 chars, 22 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 In an undirected graph, (i,j) means that node i and node j are connected with an undirected edge. G describes a graph among nodes 0, 1, 2, 3, and 4.
 The edges in G are: (0, 1) (2, 3).
 Q: What is the degree of node 1?
 A: <<< PLACEHOLDER: the Proposer's turn-1 output (numbered claims + an ANSWER: line) >>>
 
-Work only from the graph text. First, independently go through the graph's edge list and
-pick out every edge that involves the queried node, copying each exactly as written (an
-edge counts only if it is in the list; never introduce one that is not there). Those
-edges determine the correct answer. Then compare them to the Proposer's claims and final
+Work only from the graph text. Review the Proposer's claims and final
 answer, in both directions:
-- did the Proposer MISS an edge that is in the list?
-- did the Proposer INCLUDE an edge that is not in the list?
+- did the Proposer MISS an edge that is in the graph?
+- did the Proposer INCLUDE an edge that is not in the graph?
 AGREE only if the Proposer's supporting edges are exactly the ones in the graph and the
 answer follows. Otherwise REVISE and name each wrong edge, quoting it from the graph's
 edge list. Every problem you raise must cite an edge that actually appears in the list;
@@ -301,11 +289,11 @@ that line.
 ######## node_degree / incident (7/0/node_degree/incident) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [652 chars, 15 lines]
+ PROPOSER (turn 1)  [632 chars, 15 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about a single edge (that it exists,
-or that no further edge involves the node) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by a single integer, the degree. Write nothing after
 that line.
@@ -320,13 +308,11 @@ Q: What is the degree of node 1?
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,660 chars, 31 lines]
+ CRITIC (turn 2)  [1,200 chars, 26 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 G describes a graph among nodes 0, 1, 2, 3, and 4.
 In this graph:
@@ -337,13 +323,10 @@ Node 3 is connected to node 2.
 Q: What is the degree of node 1?
 A: <<< PLACEHOLDER: the Proposer's turn-1 output (numbered claims + an ANSWER: line) >>>
 
-Work only from the graph text. First, independently go through the graph's edge list and
-pick out every edge that involves the queried node, copying each exactly as written (an
-edge counts only if it is in the list; never introduce one that is not there). Those
-edges determine the correct answer. Then compare them to the Proposer's claims and final
+Work only from the graph text. Review the Proposer's claims and final
 answer, in both directions:
-- did the Proposer MISS an edge that is in the list?
-- did the Proposer INCLUDE an edge that is not in the list?
+- did the Proposer MISS an edge that is in the graph?
+- did the Proposer INCLUDE an edge that is not in the graph?
 AGREE only if the Proposer's supporting edges are exactly the ones in the graph and the
 answer follows. Otherwise REVISE and name each wrong edge, quoting it from the graph's
 edge list. Every problem you raise must cite an edge that actually appears in the list;
@@ -382,11 +365,11 @@ that line.
 ######## node_degree / friendship (7/0/node_degree/friendship) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [645 chars, 13 lines]
+ PROPOSER (turn 1)  [625 chars, 13 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about a single edge (that it exists,
-or that no further edge involves the node) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by a single integer, the degree. Write nothing after
 that line.
@@ -399,13 +382,11 @@ Q: What is the degree of node Robert?
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,653 chars, 29 lines]
+ CRITIC (turn 2)  [1,193 chars, 24 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 G describes a friendship graph among nodes James, Robert, John, Michael, and David.
 We have the following edges in G:
@@ -414,13 +395,10 @@ John and Michael are friends.
 Q: What is the degree of node Robert?
 A: <<< PLACEHOLDER: the Proposer's turn-1 output (numbered claims + an ANSWER: line) >>>
 
-Work only from the graph text. First, independently go through the graph's edge list and
-pick out every edge that involves the queried node, copying each exactly as written (an
-edge counts only if it is in the list; never introduce one that is not there). Those
-edges determine the correct answer. Then compare them to the Proposer's claims and final
+Work only from the graph text. Review the Proposer's claims and final
 answer, in both directions:
-- did the Proposer MISS an edge that is in the list?
-- did the Proposer INCLUDE an edge that is not in the list?
+- did the Proposer MISS an edge that is in the graph?
+- did the Proposer INCLUDE an edge that is not in the graph?
 AGREE only if the Proposer's supporting edges are exactly the ones in the graph and the
 answer follows. Otherwise REVISE and name each wrong edge, quoting it from the graph's
 edge list. Every problem you raise must cite an edge that actually appears in the list;
@@ -457,11 +435,11 @@ that line.
 ######## connected_nodes / adjacency (7/0/connected_nodes/adjacency) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [732 chars, 11 lines]
+ PROPOSER (turn 1)  [712 chars, 11 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about a single edge (that it exists,
-or that no further edge involves the node) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by the connected nodes, comma-separated, written exactly as the graph writes them, or none. Write nothing after
 that line.
@@ -472,26 +450,21 @@ Q: List all the nodes connected to 1 in alphabetical order.
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,681 chars, 27 lines]
+ CRITIC (turn 2)  [1,221 chars, 22 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 In an undirected graph, (i,j) means that node i and node j are connected with an undirected edge. G describes a graph among nodes 0, 1, 2, 3, and 4.
 The edges in G are: (0, 1) (2, 3).
 Q: List all the nodes connected to 1 in alphabetical order.
 A: <<< PLACEHOLDER: the Proposer's turn-1 output (numbered claims + an ANSWER: line) >>>
 
-Work only from the graph text. First, independently go through the graph's edge list and
-pick out every edge that involves the queried node, copying each exactly as written (an
-edge counts only if it is in the list; never introduce one that is not there). Those
-edges determine the correct answer. Then compare them to the Proposer's claims and final
+Work only from the graph text. Review the Proposer's claims and final
 answer, in both directions:
-- did the Proposer MISS an edge that is in the list?
-- did the Proposer INCLUDE an edge that is not in the list?
+- did the Proposer MISS an edge that is in the graph?
+- did the Proposer INCLUDE an edge that is not in the graph?
 AGREE only if the Proposer's supporting edges are exactly the ones in the graph and the
 answer follows. Otherwise REVISE and name each wrong edge, quoting it from the graph's
 edge list. Every problem you raise must cite an edge that actually appears in the list;
@@ -526,11 +499,11 @@ that line.
 ######## connected_nodes / incident (7/0/connected_nodes/incident) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [738 chars, 15 lines]
+ PROPOSER (turn 1)  [718 chars, 15 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about a single edge (that it exists,
-or that no further edge involves the node) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by the connected nodes, comma-separated, written exactly as the graph writes them, or none. Write nothing after
 that line.
@@ -545,13 +518,11 @@ Q: List all the nodes connected to 1 in alphabetical order.
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,687 chars, 31 lines]
+ CRITIC (turn 2)  [1,227 chars, 26 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 G describes a graph among nodes 0, 1, 2, 3, and 4.
 In this graph:
@@ -562,13 +533,10 @@ Node 3 is connected to node 2.
 Q: List all the nodes connected to 1 in alphabetical order.
 A: <<< PLACEHOLDER: the Proposer's turn-1 output (numbered claims + an ANSWER: line) >>>
 
-Work only from the graph text. First, independently go through the graph's edge list and
-pick out every edge that involves the queried node, copying each exactly as written (an
-edge counts only if it is in the list; never introduce one that is not there). Those
-edges determine the correct answer. Then compare them to the Proposer's claims and final
+Work only from the graph text. Review the Proposer's claims and final
 answer, in both directions:
-- did the Proposer MISS an edge that is in the list?
-- did the Proposer INCLUDE an edge that is not in the list?
+- did the Proposer MISS an edge that is in the graph?
+- did the Proposer INCLUDE an edge that is not in the graph?
 AGREE only if the Proposer's supporting edges are exactly the ones in the graph and the
 answer follows. Otherwise REVISE and name each wrong edge, quoting it from the graph's
 edge list. Every problem you raise must cite an edge that actually appears in the list;
@@ -607,11 +575,11 @@ that line.
 ######## connected_nodes / friendship (7/0/connected_nodes/friendship) ########
 
 ========================================================================================
- PROPOSER (turn 1)  [731 chars, 13 lines]
+ PROPOSER (turn 1)  [711 chars, 13 lines]
 ========================================================================================
 Answer the question below using the graph. Build the answer as a numbered list of
-atomic claims -- each claim one verifiable fact about a single edge (that it exists,
-or that no further edge involves the node) -- then give the final answer.
+concise, atomic claims -- each stating exactly one simple, verifiable fact about
+the graph's nodes or edges -- then give the final answer.
 Number your claims 1., 2., 3., and so on, one claim per line. Then write a
 final line that begins with ANSWER: followed by the connected nodes, comma-separated, written exactly as the graph writes them, or none. Write nothing after
 that line.
@@ -624,13 +592,11 @@ Q: List all the nodes connected to Robert in alphabetical order.
 A: 
 
 ========================================================================================
- CRITIC (turn 2)  [1,680 chars, 29 lines]
+ CRITIC (turn 2)  [1,220 chars, 24 lines]
 ========================================================================================
 Another model is answering the graph question below by writing numbered atomic claims
-(each about one edge) and a final answer. You are the checker. The graph text is the
-ONLY source of truth: an edge exists only if it appears in the graph's edge list. Work
-the answer out yourself from the graph, then verify the LATEST Proposer answer; the
-debate so far is shown.
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
 G describes a friendship graph among nodes James, Robert, John, Michael, and David.
 We have the following edges in G:
@@ -639,13 +605,10 @@ John and Michael are friends.
 Q: List all the nodes connected to Robert in alphabetical order.
 A: <<< PLACEHOLDER: the Proposer's turn-1 output (numbered claims + an ANSWER: line) >>>
 
-Work only from the graph text. First, independently go through the graph's edge list and
-pick out every edge that involves the queried node, copying each exactly as written (an
-edge counts only if it is in the list; never introduce one that is not there). Those
-edges determine the correct answer. Then compare them to the Proposer's claims and final
+Work only from the graph text. Review the Proposer's claims and final
 answer, in both directions:
-- did the Proposer MISS an edge that is in the list?
-- did the Proposer INCLUDE an edge that is not in the list?
+- did the Proposer MISS an edge that is in the graph?
+- did the Proposer INCLUDE an edge that is not in the graph?
 AGREE only if the Proposer's supporting edges are exactly the ones in the graph and the
 answer follows. Otherwise REVISE and name each wrong edge, quoting it from the graph's
 edge list. Every problem you raise must cite an edge that actually appears in the list;

@@ -64,28 +64,7 @@ ROW_FIELDS = (
     "n_gen_tokens",
     "n_responses",   # model calls this row represents: 1 for baseline/majority-vote
                      # (per sample), = # turns for debate. Sums to the compute metric.
-    "prompt_version",  # debate only (None elsewhere): which Proposer wording produced
-                     # this row. Persisted PER ROW, not just in the manifest, so a v1 and
-                     # a v2 debate row can never be pooled into one accuracy by accident
-                     # -- rows from different run dirs are routinely read together.
-                     # Rows written before this field existed are all v1 (see
-                     # DEFAULT_ROW_PROMPT_VERSION).
 )
-
-# What a row without a `prompt_version` means: the single pre-versioning wording, v1.
-#
-# No such rows remain in the tree -- the v1 debate rows were deleted when the project
-# consolidated on the frozen v2 prompt, and every debate row on disk now carries
-# `prompt_version: "v2"`. This stays as a guard rather than being deleted with them: an
-# unlabelled debate row can only have come from before the field existed, and defaulting
-# it to the surviving version would silently pool a v1 answer into a v2 accuracy. It must
-# never be "helpfully" changed to v2.
-DEFAULT_ROW_PROMPT_VERSION = "v1"
-
-
-def row_prompt_version(row: dict) -> str:
-    """The Proposer wording a row was produced under, defaulting old rows to v1."""
-    return row.get("prompt_version") or DEFAULT_ROW_PROMPT_VERSION
 
 
 def make_row(
@@ -97,7 +76,6 @@ def make_row(
     temperature: float | None = None,
     seed: int | None = None,
     n_responses: int = 1,
-    prompt_version: str | None = None,
 ) -> dict:
     """Assemble one persisted row from an instance + a condition's attempt record.
 
@@ -122,7 +100,6 @@ def make_row(
         "n_prompt_tokens": attempt["n_prompt_tokens"],
         "n_gen_tokens": attempt["n_gen_tokens"],
         "n_responses": n_responses,
-        "prompt_version": prompt_version,
     }
 
 

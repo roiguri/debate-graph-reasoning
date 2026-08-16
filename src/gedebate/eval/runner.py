@@ -64,10 +64,9 @@ def _git_commit() -> str:
 
     Falls back to a `.git_commit` file because runs happen on the cluster, where the
     tree is an rsync copy with no `.git` -- which is why every existing manifest records
-    "unknown". That was survivable while a run was identified by `prompt_version` alone,
-    and stopped being so once v2's text was edited in place: two runs can now both say
-    `prompt_version: "v2"` and mean different prompts, and the commit is what separates
-    them. Write the file as part of the sync (see docs/cluster-runbook.md).
+    "unknown". The prompts are frozen but not immutable, so the commit is the only thing
+    that says which wording produced a row. Write the file as part of the sync (see
+    docs/cluster-runbook.md).
     """
     try:
         return subprocess.check_output(
@@ -98,13 +97,8 @@ def manifest_record(cfg: RunConfig, config_path: str) -> dict:
     }
     if cfg.condition in results.VOTE_CONDITIONS:
         rec["n_samples"] = cfg.n_samples
-    if cfg.condition == CONDITION_COT:
-        # The reasoned arm samples the Proposer prompt, so its rows depend on that wording
-        # exactly as debate's do -- record it or two arms run months apart look identical.
-        rec["prompt_version"] = cfg.prompt_version
     if cfg.condition == "debate":
         rec["max_responses"] = cfg.n_samples  # debate's response budget (= MV's N)
-        rec["prompt_version"] = cfg.prompt_version  # which Proposer wording produced these rows
     return rec
 
 
@@ -132,11 +126,9 @@ def run_instances(model, instances: list, cfg: RunConfig, manifest: dict, *, sha
             skipped += 1
         elif cfg.condition == "debate":
             record, turns = run_debate(
-                model, inst, max_new_tokens=cfg.max_new_tokens, max_responses=cfg.n_samples,
-                prompt_version=cfg.prompt_version)
+                model, inst, max_new_tokens=cfg.max_new_tokens, max_responses=cfg.n_samples)
             results.append_row(path, results.make_row(
-                inst, cfg.model, record, n_responses=record["n_responses"],
-                prompt_version=cfg.prompt_version))
+                inst, cfg.model, record, n_responses=record["n_responses"]))
             results.append_trace(trace_path, inst.instance_id, turns)
             progress.setdefault((cfg.condition, inst.instance_id), set()).add(0)
             written += 1
@@ -156,19 +148,18 @@ def _run_vote_samples(model, inst, cfg: RunConfig, path, progress) -> int:
     """
     missing = results.missing_samples(progress, cfg.condition, inst.instance_id, cfg.n_samples)
     seen = progress.setdefault((cfg.condition, inst.instance_id), set())
-    # None for the terse arm (baseline prompt); the config's version for the reasoned one,
-    # which is what selects the Proposer prompt inside `run_sample`.
-    prompt_version = cfg.prompt_version if cfg.condition == CONDITION_COT else None
+    # False for the terse arm (baseline prompt), True for the reasoned one, which is what
+    # selects the Proposer prompt inside `run_sample`.
+    cot = cfg.condition == CONDITION_COT
     for si in missing:
         attempt = run_sample(
             model, inst, sample_index=si,
             temperature=cfg.temperature, top_p=cfg.top_p, top_k=cfg.top_k,
-            max_new_tokens=cfg.max_new_tokens, prompt_version=prompt_version,
+            max_new_tokens=cfg.max_new_tokens, cot=cot,
         )
         row = results.make_row(
             inst, cfg.model, attempt,
             sample_index=si, temperature=cfg.temperature, seed=attempt["seed"],
-            prompt_version=prompt_version,
         )
         results.append_row(path, row)
         seen.add(si)

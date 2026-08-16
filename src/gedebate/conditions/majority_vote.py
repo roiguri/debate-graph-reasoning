@@ -54,7 +54,7 @@ def run_sample(
     top_p: float | None = None,
     top_k: int | None = None,
     max_new_tokens: int = 128,
-    prompt_version: str | None = None,
+    cot: bool = False,
 ) -> dict:
     """One sampled draw -> parse -> score -> attempt record (baseline's shape + seed).
 
@@ -63,35 +63,34 @@ def run_sample(
     through to the model so the sampling truncation is explicit, not the model's
     shipped default.
 
-    `prompt_version` selects the ARM, because the two differ only in what is sampled:
+    `cot` selects the ARM, because the two differ only in what is sampled:
 
-    * `None` -- the terse baseline prompt, read by the shared answer parser. Voting over
-      a near-single-token answer; this is what `results/main` holds.
-    * a version string -- the debate's turn-1 Proposer prompt, read by `parse_proposer`.
-      Same generation format the Proposer uses, N independent draws, no Critic.
+    * `False` -- the terse baseline prompt, read by the shared answer parser. Voting over
+      a near-single-token answer.
+    * `True` -- the debate's turn-1 Proposer prompt, read by `parse_proposer`. Same
+      generation format the Proposer uses, N independent draws, no Critic.
 
     The parser must follow the prompt: `scoring.parse` scans the whole text, which on a
     numbered-claim trace harvests every label it sees ("Robert is *not* connected to
     Susan" would put Susan in the answer). `parse_proposer` takes the `ANSWER:` line, with
     the last-non-empty-line fallback and the claim-number strip the Proposer format needs.
     """
-    if prompt_version is None:
-        condition, prompt = CONDITION, build_prompt(instance)
+    if cot:
+        condition, prompt = CONDITION_COT, proposer_prompt(instance)
     else:
-        condition = CONDITION_COT
-        prompt = proposer_prompt(instance, prompt_version)
+        condition, prompt = CONDITION, build_prompt(instance)
     seed = sample_seed(instance.instance_id, sample_index)
     gen = model.generate(
         prompt, max_new_tokens=max_new_tokens, temperature=temperature,
         top_p=top_p, top_k=top_k, seed=seed,
     )
-    if prompt_version is None:
-        parsed, parse_ok = parse(
-            instance.task, gen.text, encoding=instance.encoding, node_ids=instance.node_ids
-        )
-    else:
+    if cot:
         parsed, parse_ok, _claims = parse_proposer(
             gen.text, instance.task, encoding=instance.encoding, node_ids=instance.node_ids
+        )
+    else:
+        parsed, parse_ok = parse(
+            instance.task, gen.text, encoding=instance.encoding, node_ids=instance.node_ids
         )
     correct = score(parsed, instance.ground_truth)
     return {

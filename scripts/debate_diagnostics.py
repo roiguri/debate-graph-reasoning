@@ -64,57 +64,10 @@ def _edgelists(run_dirs: list[str], override: str | None) -> dict[str, list]:
     return out
 
 
-def dir_prompt_version(run_dir: str) -> str | None:
-    """The Proposer wording a run dir's debate rows were produced under (None if no
-    debate rows). Reads the manifest, falling back to the rows for dirs that predate
-    the manifest field."""
-    man = results.read_manifest(run_dir) or {}
-    pv = man.get("conditions", {}).get("debate", {}).get("prompt_version")
-    if pv:
-        return pv
-    versions = {results.row_prompt_version(r)
-                for f in results.result_files(run_dir) for r in results.read_rows(f)
-                if r["condition"] == "debate"}
-    return versions.pop() if len(versions) == 1 else None
-
-
-def select_debate_dirs(run_dirs: list[str], requested: str | None) -> list[str]:
-    """Which run dirs' debate output to analyse, refusing to silently pool two versions.
-
-    Selection is per **run dir**, not per row: v1 and v2 runs cover the SAME instance
-    ids, so filtering traces by instance id would keep both. Pooling two wordings would
-    average two different experiments into one accuracy, which is a wrong number rather
-    than a noisy one, so a mixed set is an error unless `--prompt-version` picks one.
-    Dirs with no debate rows (a baseline-only dir) are always kept: they contribute the
-    baseline the CoT column needs.
-    """
-    versions = {d: dir_prompt_version(d) for d in run_dirs}
-    present = sorted({v for v in versions.values() if v})
-    if requested is None:
-        if len(present) > 1:
-            raise SystemExit(
-                f"run dirs mix debate prompt versions {present}; these are different "
-                f"experiments and must not be pooled. Re-run with "
-                f"--prompt-version {present[0]} (or {present[1]})."
-            )
-        return list(run_dirs)
-    if requested not in present:
-        raise SystemExit(f"no debate rows with prompt_version={requested!r}; present: {present}")
-    kept = [d for d in run_dirs if versions[d] in (requested, None)]
-    dropped = [d for d in run_dirs if d not in kept]
-    if dropped:
-        print(f"note: prompt_version={requested}; ignoring debate output from "
-              f"{', '.join(dropped)}")
-    return kept
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir", nargs="+",
                     help="one or more run dirs; multiple are pooled (replication)")
-    ap.add_argument("--prompt-version", default=None,
-                    help="which Proposer wording's debate rows to analyse (e.g. v1, v2). "
-                         "Required when the given run dirs contain more than one.")
     ap.add_argument("--dataset", default=None,
                     help="dataset JSONL for the Critic-grounding audit "
                          "(default: each run's manifest `dataset`)")
@@ -122,14 +75,11 @@ def main() -> None:
                     help="write the diagnostic CSVs here (e.g. analysis/main)")
     args = ap.parse_args()
 
-    # Baseline is version-independent, so it is read from every dir given; debate output
-    # comes only from the dirs matching the selected prompt version.
     base_rows = [r for d in args.run_dir for f in results.result_files(d)
                  for r in results.read_rows(f) if r["condition"] == "baseline"]
-    debate_dirs = select_debate_dirs(args.run_dir, args.prompt_version)
-    debate_rows = [r for d in debate_dirs for f in results.result_files(d)
+    debate_rows = [r for d in args.run_dir for f in results.result_files(d)
                    for r in results.read_rows(f) if r["condition"] == "debate"]
-    traces = [t for d in debate_dirs for f in results.trace_files(d)
+    traces = [t for d in args.run_dir for f in results.trace_files(d)
               for t in results.read_traces(f)]
 
     if not debate_rows or not traces:

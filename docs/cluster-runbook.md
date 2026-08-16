@@ -48,11 +48,10 @@ The env + model weights must live on netapp, NOT `$HOME` (home has a tiny quota)
 
    **Write `.git_commit` every time you sync.** `.git` is excluded, so `git rev-parse`
    fails on the cluster and every manifest produced there records
-   `"git_commit": "unknown"`. That was tolerable while a run was identified by its
-   `prompt_version`, and stopped being so once v2's prompts were edited in place:
-   `results/v2-*` and `results/v2b-*` both say `prompt_version: "v2"` and were produced
-   by different text. The commit is what tells them apart, and a stale `.git_commit`
-   is worse than none — it will claim the wrong one.
+   `"git_commit": "unknown"`. The prompts are frozen but not immutable, so the commit is
+   the only thing in a manifest that says which wording produced a run's rows: two runs
+   months apart are otherwise indistinguishable. A stale `.git_commit` is worse than
+   none — it will claim the wrong one.
 
 2. **Create `.env`** (on the **cluster**, once — holds the netapp path + token):
    ```bash

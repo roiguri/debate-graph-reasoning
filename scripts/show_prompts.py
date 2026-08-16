@@ -13,8 +13,8 @@ you read the new prompt.
     python scripts/show_prompts.py C --from-run          # real transcript, not placeholders
     python scripts/show_prompts.py C --rounds 2          # a longer placeholder transcript
 
-Everything comes from the config: condition, `prompt_version`, the tasks x encodings
-matrix, and the frozen dataset the questions are taken from. One instance per cell (the
+Everything comes from the config: condition, the tasks x encodings matrix, and the
+frozen dataset the questions are taken from. One instance per cell (the
 first in the dataset, so the choice is deterministic); the graph differs per instance but
 the scaffold around it does not.
 
@@ -111,7 +111,7 @@ def load_trace_turns(run_dir: str | Path, instance_id: str) -> list[dict] | None
     return None
 
 
-def debate_prompts(instance, turns: list[dict], version: str) -> list[tuple[str, str]]:
+def debate_prompts(instance, turns: list[dict]) -> list[tuple[str, str]]:
     """(label, prompt) for every turn in `turns`, rebuilt the way `run_debate` builds them.
 
     Each turn is generated from the transcript BEFORE it, so turn i's prompt is a function
@@ -121,13 +121,13 @@ def debate_prompts(instance, turns: list[dict], version: str) -> list[tuple[str,
     prompts = []
     for i, turn in enumerate(turns):
         if i == 0:
-            label, prompt = "PROPOSER (turn 1)", proposer_prompt(instance, version)
+            label, prompt = "PROPOSER (turn 1)", proposer_prompt(instance)
         elif turn["role"] == "critic":
             label = f"CRITIC (turn {i + 1})"
-            prompt = critic_prompt(instance, turns[:i], version)
+            prompt = critic_prompt(instance, turns[:i])
         else:
             label = f"PROPOSER REVISION (turn {i + 1})"
-            prompt = revision_prompt(instance, turns[:i], version)
+            prompt = revision_prompt(instance, turns[:i])
         prompts.append((label, prompt))
     return prompts
 
@@ -156,14 +156,11 @@ def _header(cfg: RunConfig, config_path: str, source: str) -> str:
     ]
     if cfg.condition == "debate":
         lines += [
-            f"prompt_version   {cfg.prompt_version}",
             f"max_responses    {cfg.n_samples}   (the response budget)",
             f"transcript       {source}",
         ]
     elif cfg.condition in VOTE_CONDITIONS:
         lines.append(f"n_samples        {cfg.n_samples}   (draws per instance, then voted)")
-        if cfg.condition == "majority_vote_cot":
-            lines.append(f"prompt_version   {cfg.prompt_version}")
     lines += [
         "",
         "Each prompt below is sent as a SINGLE user message with no system prompt; the",
@@ -191,13 +188,12 @@ def render(
                 if turns is None:
                     out.append(f"[no trace for {instance.instance_id} under {from_run}; "
                                f"falling back to placeholder turns]\n")
-            blocks = debate_prompts(instance, turns or placeholder_turns(rounds),
-                                    cfg.prompt_version)
+            blocks = debate_prompts(instance, turns or placeholder_turns(rounds))
             blocks = [(lbl, p) for lbl, p in blocks if _role_of(lbl) in roles]
         elif cfg.condition == "majority_vote_cot":
             # The reasoned vote arm samples the debate's turn-1 Proposer prompt N times.
             blocks = [(f"PROPOSER PROMPT (x{cfg.n_samples} sampled draws, then voted)",
-                       proposer_prompt(instance, cfg.prompt_version))]
+                       proposer_prompt(instance))]
         else:
             # baseline and the terse vote arm send the same single prompt; MV re-samples it.
             blocks = [(f"{cfg.condition.upper()} PROMPT", build_prompt(instance))]
