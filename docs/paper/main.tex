@@ -520,153 +520,137 @@ not why.
 
 \renewcommand{\thesection}{Appendix~\Alph{section}}
 
-\section{Prompts}
+% A prompt template: indented a little, but keeping the full column measure so the
+% reflowed prompt prose does not hyphenate every other line.
+\newenvironment{promptblock}%
+  {\begin{list}{}{\setlength{\leftmargin}{1em}\setlength{\rightmargin}{0pt}%
+   \setlength{\topsep}{4pt}\setlength{\partopsep}{0pt}\setlength{\parsep}{4pt}}%
+   \item[]\small}%
+  {\end{list}}
+
+\section{Debate prompts}
 \label{sec:prompts}
-Every prompt is sent as a single user message with no system prompt; the model's
-chat template supplies the wrapper tokens. The question block -- the encoded graph
-followed by \texttt{Q:\ \ldots} and a trailing \texttt{A:} -- is GraphQA's
-\citep{fatemi2024talk} verbatim (examples in Table~\ref{tab:example}); we show the
-instruction scaffolding wrapped around it, with \texttt{\{slots\}} for the
-question, the running transcript, and per-task text.
+Below we describe the prompts used for debate, with \texttt{\{slots\}} marking
+substituted text.
 
-\paragraph{Baseline.}
-The task instruction, then the question:
-
-{\footnotesize
-\begin{verbatim}
-{task instruction}
-
-{question}
-\end{verbatim}}
-
-\noindent where \texttt{\{task instruction\}} is one of:
-
-{\footnotesize
-\begin{verbatim}
-edge_existence:   Answer with exactly "Yes" or "No"
-                  and nothing else.
-node_degree:      Answer with a single integer (the
-                  degree) and nothing else.
-connected_nodes:  Answer with the connected nodes as a
-                  comma-separated list (or "none" if
-                  there are none) and nothing else.
-\end{verbatim}}
+Every template wraps the same \texttt{\{question\}} block, taken from GraphQA
+\citep{fatemi2024talk} unchanged: the graph serialized under one of the three
+encodings, followed by the task's question and a trailing \texttt{A:}.
+Table~\ref{tab:example} shows the three encodings and the three tasks for one graph. 
 
 \paragraph{Proposer (turn 1).}
-Also used for each of the three majority-vote draws.
+Sent for turn~1 of the debate and for each majority-vote draw.
 
-{\footnotesize
-\begin{verbatim}
-Answer the question below using the graph. Build the
-answer as a numbered list of concise, atomic claims
--- each stating exactly one simple, verifiable fact
-about the graph's nodes or edges -- then give the
-final answer.
-Number your claims 1., 2., 3., and so on, one claim
-per line. Then write a final line that begins with
-ANSWER: followed by {answer}. Write nothing after
+\begin{promptblock}
+Answer the question below using the graph. Build the answer as a numbered list of
+concise, atomic claims -{}- each stating exactly one simple, verifiable fact about the
+graph's nodes or edges -{}- then give the final answer.\\
+Number your claims 1., 2., 3., and so on, one claim per line. Then write a final line
+that begins with \texttt{ANSWER:} followed by \texttt{\{answer\}}. Write nothing after
 that line.
 
-{question}
-\end{verbatim}}
+\texttt{\{question\}}
+\end{promptblock}
 
-\noindent \texttt{\{answer\}} is \texttt{Yes or No} (edge\_existence), \texttt{a
-single integer, the degree} (node\_degree), or \texttt{the connected nodes,
-comma-separated, written exactly as the graph writes them, or none}
-(connected\_nodes).
+\noindent The \texttt{\{answer\}} slot, used here and in the Revision template, is the
+only part of either that depends on the task (Table~\ref{tab:answerslot}).
+
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{@{}l p{0.50\columnwidth}@{}}
+    \toprule
+    \textbf{Task} & \textbf{\texttt{\{answer\}}} \\
+    \midrule
+    \texttt{edge\_existence}  & Yes or No \\
+    \addlinespace
+    \texttt{node\_degree}     & a single integer, the degree \\
+    \addlinespace
+    \texttt{connected\_nodes} & the connected nodes, comma-separated, written exactly
+                                as the graph writes them, or none \\
+    \bottomrule
+  \end{tabular}
+  \caption{The \texttt{\{answer\}} slot in the Proposer and Revision templates.}
+  \label{tab:answerslot}
+\end{table}
 
 \paragraph{Critic.}
-The transcript is the question, the Proposer's turn-1 answer, and any later turns.
+Sent after each Proposer turn.
 
-{\footnotesize
-\begin{verbatim}
-Another model is answering the graph question below
-by writing numbered atomic claims (each about one
-edge or node) and a final answer. You are the
-checker; the debate so far is shown.
+\begin{promptblock}
+Another model is answering the graph question below by writing numbered atomic claims
+(each about one edge or node) and a final answer. You are the checker; the debate so
+far is shown.
 
-{transcript}
+\texttt{\{transcript\}}
 
-{critic cue}
-\end{verbatim}}
+\texttt{\{review instruction\}}
+\end{promptblock}
 
-\noindent For \texttt{node\_degree} and \texttt{connected\_nodes} the
-\texttt{\{critic cue\}} is:
-
-{\footnotesize
-\begin{verbatim}
-Work only from the graph text. Review the Proposer's
-claims and final answer, in both directions:
-- did the Proposer MISS an edge that is in the graph?
-- did the Proposer INCLUDE an edge not in the graph?
-AGREE only if the Proposer's supporting edges are
-exactly the ones in the graph and the answer follows.
-Otherwise REVISE and name each wrong edge, quoting it
-from the graph's edge list. Every problem you raise
-must cite an edge that actually appears in the list;
-do not repeat a problem the Proposer has already
-fixed. Respond in exactly this format and nothing
-else:
-VERDICT: AGREE
-or
-VERDICT: REVISE
-- <an edge the Proposer missed or wrongly included,
-  quoted from the graph's edge list>
-\end{verbatim}}
-
-\noindent For \texttt{edge\_existence} it is:
-
-{\footnotesize
-\begin{verbatim}
-Work only from the graph text. Look in the graph's
-edge list for the exact pair the question asks about,
-in either order. If that pair appears, the answer is
-Yes; if it does not, the answer is No -- decide this
-yourself from the list. Then check the Proposer's
-answer.
-AGREE if the Proposer's Yes/No matches the edge list.
-Otherwise REVISE and ground it: quote the queried
-edge from the list if it is there, or state that no
-such edge appears. Every problem you raise must be
-grounded in the edge list; never invent an edge.
-Respond in exactly this format and nothing else:
-VERDICT: AGREE
-or
-VERDICT: REVISE
-- <the queried edge quoted from the list, or a note
-  that it does not appear>
-\end{verbatim}}
+\noindent The \texttt{\{transcript\}} slot, used here and in the Revision template, is
+the question, the Proposer's turn-1 answer, and any later turns.
 
 \paragraph{Revision.}
 The Proposer's corrected answer, given the Critic's verdict.
 
-{\footnotesize
-\begin{verbatim}
-You are the Proposer in the debate below. A checker
-verified your latest claims against the graph and
-found problems. Produce a corrected answer that fixes
-them, using the whole exchange.
+\begin{promptblock}
+You are the Proposer in the debate below. A checker verified your latest claims against
+the graph and found problems. Produce a corrected answer that fixes them, using the
+whole exchange.
 
-{transcript}
+\texttt{\{transcript\}}
 
-Give your corrected answer.
-Number your claims 1., 2., 3., and so on, one claim
-per line. Then write a final line that begins with
-ANSWER: followed by {answer}. Write nothing after
+Give your corrected answer.\\
+Number your claims 1., 2., 3., and so on, one claim per line. Then write a final line
+that begins with \texttt{ANSWER:} followed by \texttt{\{answer\}}. Write nothing after
 that line.
-\end{verbatim}}
+\end{promptblock}
+
+\paragraph{Critic review instruction.}
+This slot has two forms. For \texttt{node\_degree} and \texttt{connected\_nodes},
+where the Proposer's claims are a set of edges:
+
+\begin{promptblock}
+Work only from the graph text. Review the Proposer's claims and final answer, in both
+directions:\\
+- did the Proposer MISS an edge that is in the graph?\\
+- did the Proposer INCLUDE an edge that is not in the graph?\\
+AGREE only if the Proposer's supporting edges are exactly the ones in the graph and the
+answer follows. Otherwise REVISE and name each wrong edge, quoting it from the graph's
+edge list. Every problem you raise must cite an edge that actually appears in the list;
+do not repeat a problem the Proposer has already fixed. Respond in exactly this format
+and nothing else:
+\begin{verbatim}
+VERDICT: AGREE
+or
+VERDICT: REVISE
+- <an edge the Proposer missed or wrongly
+  included, quoted from the graph's edge list>
+\end{verbatim}
+\end{promptblock}
+
+\noindent For \texttt{edge\_existence}, where the question is a single pair lookup:
+
+\begin{promptblock}
+Work only from the graph text. Look in the graph's edge list for the exact pair the
+question asks about, in either order. If that pair appears, the answer is Yes; if it
+does not, the answer is No -{}- decide this yourself from the list. Then check the
+Proposer's answer.\\
+AGREE if the Proposer's Yes/No matches the edge list. Otherwise REVISE and ground it:
+quote the queried edge from the list if it is there, or state that no such edge appears.
+Every problem you raise must be grounded in the edge list; never invent an edge. Respond
+in exactly this format and nothing else:
+\begin{verbatim}
+VERDICT: AGREE
+or
+VERDICT: REVISE
+- <the queried edge quoted from the list, or a
+  note that it does not appear>
+\end{verbatim}
+\end{promptblock}
 
 \section{Per-cell results}
 \label{sec:percell}
-Tables~\ref{tab:percell-critic} and~\ref{tab:percell-acc} report every cell's numbers
-behind the pooled figures in \S\ref{sec:results}. $p$-values are paired McNemar tests
-(cells share graphs); values below $0.001$ are shown as \texttt{<0.001}. ``Net fixed
-$-$ broken'' is the number of answers a revision moved wrong$\to$right minus
-right$\to$wrong, so a positive value means the loop helped that cell. Detection
-counts whether the Critic flagged a wrong answer, not whether the revision then
-repaired it: a flagged answer can be revised into another wrong answer, so detection
-bounds what the loop can rescue rather than measuring it.
-
 \begin{table*}[t]
   \centering
   \small
@@ -721,5 +705,14 @@ bounds what the loop can rescue rather than measuring it.
   chain-of-thought (also each majority-vote draw's prompt).}
   \label{tab:percell-acc}
 \end{table*}
+
+Tables~\ref{tab:percell-critic} and~\ref{tab:percell-acc} report every cell's numbers
+behind the pooled figures in \S\ref{sec:results}. $p$-values are paired McNemar tests
+(cells share graphs); values below $0.001$ are shown as \texttt{<0.001}. ``Net fixed
+$-$ broken'' is the number of answers a revision moved wrong$\to$right minus
+right$\to$wrong, so a positive value means the loop helped that cell. Detection
+counts whether the Critic flagged a wrong answer, not whether the revision then
+repaired it: a flagged answer can be revised into another wrong answer, so detection
+bounds what the loop can rescue rather than measuring it.
 
 \end{document}
