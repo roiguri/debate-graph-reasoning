@@ -19,29 +19,45 @@ Three conditions, compared per task and per encoding at a matched token budget:
   raw encoding, and the Proposer revises.
 
 Tasks: edge existence, node degree, connected nodes. Encodings: adjacency, incident,
-friendship. The baseline condition is implemented; the vote and debate conditions
-build on the same harness and dataset.
+friendship.
 
 ## Setup
 
 ```bash
 pip install -e .             # dataset build/verify + analysis (CPU only)
-pip install -e .[inference]  # + the model stack to run conditions (needs a CUDA GPU)
+pip install -e .[inference]  # + the local model stack, only for `provider = "hf"` runs
 ```
 
-Running a condition needs a GPU that fits the model (Qwen2.5-3B is about 6 GB fp16);
-CPU works but is slow.
+The reported runs are served by the Together API (`provider = "together"`, needs
+`TOGETHER_API_KEY`), which the core install covers. Only a `provider = "hf"` config
+loads weights locally and needs the `[inference]` extra plus a CUDA GPU.
 
 ## Reproduce
 
-The dataset is a frozen, committed artifact (`data/main.jsonl`); every run loads it
-rather than regenerating. Full walkthrough in [docs/reproduce.md](docs/reproduce.md):
+The dataset is a frozen, committed artifact (`data/main.jsonl`, plus `seed11`/`seed13`);
+every run loads it rather than regenerating. Verification is deterministic and needs
+neither a GPU nor an API key:
 
 ```bash
-python scripts/build_dataset.py --verify                          # verify the dataset reproduces
-python -m gedebate.eval.runner --config configs/matrix.toml       # run the baseline over the matrix
-python scripts/show_results.py results/main --fragility           # per-encoding accuracy + spread
+python scripts/build_dataset.py --verify                            # rebuild from the recorded
+                                                                    # spec, assert the sha256
 ```
+
+A run evaluates one condition into a run dir and is resumable and shardable
+(`--shard i/n`); analysis reads the run dirs and needs no model:
+
+```bash
+python -m gedebate.eval.runner --config configs/llama70b-baseline-main.toml
+python -m gedebate.eval.runner --config configs/llama70b-debate-main.toml
+python -m gedebate.eval.runner --config configs/llama70b-mvcot-main.toml
+python scripts/show_results.py <run_dir> --fragility                 # accuracy + encoding spread
+python scripts/debate_diagnostics.py <run_dir>                       # turn split + Critic diagnostic
+```
+
+Each run writes `manifest.json`: model, dataset path and `sha256`, decoding,
+`max_new_tokens`, git commit. Resuming against a different model or dataset is refused.
+Seeds 11 and 13 are the replication; swap the config and pool the run dirs by passing
+several to `show_results.py`.
 
 The prompts are stored as small pieces that only meet inside the builders, so the text
 sent to the model is assembled, never written down anywhere. `scripts/show_prompts.py`
@@ -71,7 +87,7 @@ scripts/        entry points (build_dataset, show_results, show_prompts, debate_
 slurm/          batch-job scripts, specific to our compute setup
 results/        run outputs, JSON/CSV (gitignored)
 analysis/       derived tables and figures (gitignored)
-docs/           proposal, reproduce guide, cluster runbook, debate viewer, design notes,
+docs/           proposal, cluster runbook, debate viewer, design notes, the paper,
                 findings (what the runs showed)
 ```
 

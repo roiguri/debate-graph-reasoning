@@ -2,8 +2,8 @@
 
 Everything in this folder is **derived** from `results/` and fully regenerable, so
 the CSVs are gitignored (this README is not). They are the tables the writeup cites.
-For the full pipeline (dataset -> cluster run -> pull), see
-[../docs/reproduce.md](../docs/reproduce.md); this file covers the **analysis step**.
+For the dataset -> run pipeline see the repo README; this file covers the
+**analysis step**.
 
 ## Entrypoint: `scripts/show_results.py`
 

@@ -71,5 +71,5 @@ python -m gedebate.eval.runner --config configs/debate-pilot.toml   # -> results
   pull results back for local viewing. See [cluster-runbook.md](cluster-runbook.md).
   Then point the viewer at the pulled run dir.
 
-For the broader dataset -> run -> analysis pipeline (not viewer specific), see
-[reproduce.md](reproduce.md).
+For the broader dataset -> run -> analysis pipeline (not viewer specific), see the
+repo README.

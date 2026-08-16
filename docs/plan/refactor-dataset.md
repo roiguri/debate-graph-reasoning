@@ -69,10 +69,10 @@ Prove the artifact equals today's generation and is consistent with existing res
 - Update `configs/*` (→ `dataset = data/main.jsonl`) and docs (p3-matrix.md, notes).
 
 ### Docs: how to reproduce
-[reproduce.md](../reproduce.md) is the human walkthrough (dataset verify + run +
-analysis), complementing the machine records (dataset `meta.json`, run manifest).
-Dataset section is live now; the results section's manifest-record + `--verify-sample`
-are finalized with R2.
+`docs/reproduce.md` was the human walkthrough (dataset verify + run + analysis),
+complementing the machine records (dataset `meta.json`, run manifest). It was later
+removed and its content folded into the repo README and the paper's reproducibility
+appendix.
 
 ## Done when
 `data/main.jsonl` + meta are committed and hash-verify; `load_dataset` proves
