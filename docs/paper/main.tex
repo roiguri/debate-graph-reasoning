@@ -394,7 +394,7 @@ the model to reason helps - having a Critic argue about the reasoning does not.
 
 Excluding the \texttt{edge\_existence} control leaves every conclusion intact
 (Table~\ref{tab:main}): without the near-ceiling control, the reasoning gain grows to
-$+0.120$, the loop is close to neutral ($-0.003$), and the compute-matched vote
+$+0.120$, the debate loop is close to neutral ($-0.003$), and the compute-matched vote
 (\S\ref{sec:vote}) still beats debate ($+0.010$).
 
 \subsection{A compute-matched vote beats debate}
@@ -500,8 +500,8 @@ cost, reasoning on the first turn does the work and neither extra structure adds
     precision may depend heavily on it, so a different wording could change how much
     the debate helps or hurts. Testing several would tell us whether our result is a
     property of debate itself or just of this prompt. We did not pursue this, since
-    the loop fails on precision rather than on how well the Critic detects errors.
-  \item \textbf{Debate structure.} We tested one minimal two-role loop. Richer
+    the debate fails on precision rather than on how well the Critic detects errors.
+  \item \textbf{Debate structure.} We tested one minimal two-role debate. Richer
     structures - more agents or independent proposers that then interact with an LLM judge - may improve results.
 \end{itemize}
 
