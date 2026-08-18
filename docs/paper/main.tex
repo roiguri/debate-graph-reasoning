@@ -357,7 +357,7 @@ worst - the three largest per-cell gains are the three lowest baseline cells
 (Table~\ref{tab:percell-acc}) - so
 debate works by lifting the floor, which is what narrows the spread.
 
-\subsection{The gain is the reasoning, not the loop}
+\subsection{The gain is the reasoning, not the debate}
 \label{sec:decomp}
 Debate's first turn is a single-turn chain-of-thought answer under identical
 decoding, so the split baseline\,$\rightarrow$\,turn~1\,$\rightarrow$\,final
@@ -405,7 +405,7 @@ scores $0.875$ against debate's $0.843$ overall ($+0.032$, $p<0.001$) at matched
 compute. The vote is at least as accurate as debate on every task and encoding
 (Table~\ref{tab:percell-acc}), and more accurate on three. The full
 ordering across the arm is baseline $0.793 <$ debate $0.843 <$ turn~1 $0.864 <$ vote
-$0.875$, so debate is the worst of the three reasoning conditions and is
+$0.875$, so debate is the worst of the three conditions and is
 beaten even by its own single first turn. The vote's advantage is largest on
 \texttt{edge\_existence}, exactly where we would not expect
 debate to help. This comparison shows that the interaction between the models is what harms the debate.
@@ -465,33 +465,33 @@ revising breaks more than it fixes and lowers accuracy overall (Figure~\ref{fig:
 
 \paragraph{Reasoning repairs fragility - debate does not.}
 The encoding gap does shrink under debate, but the decomposition locates the cause:
-the single-turn reasoning produces most of the encoding variance reduction (Table~\ref{tab:main}). What reduces a model's
+the single-turn reasoning produces most of the encoding variance reduction (Figure~\ref{fig:fragility}). What reduces a model's
 sensitivity to how a graph is written down is being asked to reason about it, not the
 debate framework around that reasoning.
 
 \paragraph{The asymmetry holds - the debate still loses.}
 Debate's premise - that recognizing a wrong claim is cheaper than producing a right
 one - was satisfied here: the Critic's \textsc{revise} verdicts land on genuinely
-wrong answers far more often than on correct ones (Table~\ref{tab:percell-critic}). Yet the loop still lost accuracy,
+wrong answers far more often than on correct ones (Table~\ref{tab:percell-critic}). Yet the debate still lost accuracy,
 for a reason that is general. When a model is already mostly correct - as
-Llama-3.3-70B is here, six right for every one wrong - revision puts more correct
+Llama-3.3-70B is here - revision puts more correct
 answers at risk than it can rescue wrong ones, so it does more harm than good.
 
-\paragraph{Reasoning does the work - neither extra structure earns its compute.}
+\paragraph{Reasoning does the work - neither structure earns its compute.}
 Almost all of the gain over the baseline comes from a single reasoned pass. On top of
 that, the vote adds only a little and the debate loop nothing (Table~\ref{tab:main}).
-Between the two ways of spending the extra compute, aggregation wins - majority vote
+Between the two ways of spending the extra compute, aggregation wins. Majority vote
 beats debate on every cell, because three independent draws cannot argue each other
-out of a correct answer, whereas a Critic can - but the vote is only the less
+out of a correct answer, whereas a Critic can. The vote is only the less
 wasteful option, not a strong one. This does not refute debate in general: it may
 still help where the base error rate is high, or where a reliable external verifier
 replaces the model's own Critic. On encoding-fragile graph reasoning, at matched
-cost, reasoning once does the work and neither extra structure adds much.
+cost, reasoning on the first turn does the work and neither extra structure adds much.
 
 \section{Limitations and future work}
 \label{sec:future}
 \begin{itemize}[nosep,leftmargin=*]
-  \item \textbf{Single model and graph regime.} Our results come from one model
+  \item \textbf{Single model and simple graph tasks.} Our results come from one model
     (Llama-3.3-70B) on small Erd\H{o}s--R\'enyi graphs, where the model is already
     mostly correct. Because the debate hurts precisely when errors are rare, harder
     tasks and weaker models - where errors are more common - are where the results could
@@ -502,8 +502,7 @@ cost, reasoning once does the work and neither extra structure adds much.
     property of debate itself or just of this prompt. We did not pursue this, since
     the loop fails on precision rather than on how well the Critic detects errors.
   \item \textbf{Debate structure.} We tested one minimal two-role loop. Richer
-    structures - more agents, independent proposers that then interact, or multiple
-    rounds - may improve results.
+    structures - more agents or independent proposers that then interact with an LLM judge - may improve results.
 \end{itemize}
 
 \section{Conclusion}
@@ -732,7 +731,7 @@ computed from these cells.
     \bottomrule
   \end{tabular}
   \caption{Per-cell accuracy under each condition. Turn~1 is debate's first-turn
-  chain-of-thought (also each majority-vote draw's prompt).}
+  chain-of-thought.}
   \label{tab:percell-acc}
 \end{table}
 
@@ -740,7 +739,7 @@ Table~\ref{tab:percell-critic} reports the Critic as a signal: how often a
 \textsc{revise} lands on a wrong answer, and how often on a correct one. Detection
 counts whether the Critic flagged a wrong answer, not whether the revision then
 repaired it: a flagged answer can be revised into another wrong answer, so detection
-bounds what the loop can rescue rather than measuring it.
+measures what the critic detected as a wrong answer, not what answers were actually rescued.
 
 \begin{table}[h]
   \centering
