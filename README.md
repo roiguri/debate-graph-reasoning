@@ -11,9 +11,11 @@ compute. Built on [GraphQA](https://github.com/google-research/google-research/t
 
 ## Approach
 
-Three conditions, compared per task and per encoding at a matched token budget:
+Four conditions, compared per task and per encoding at a matched token budget:
 
 - **Baseline:** one zero-shot answer.
+- **Turn 1:** the Proposer's first answer, before the Critic (isolates single-turn
+  reasoning). Read off the debate run's turn split, not a separate run.
 - **Majority vote:** N samples aggregated by vote (isolates the effect of extra compute).
 - **Debate:** the Proposer emits atomic claims, a Critic verifies each against the
   raw encoding, and the Proposer revises.
@@ -92,7 +94,7 @@ docs/           proposal, the paper, debate viewer
 
 ## Data and attribution
 
-The dataset is generated with the vendored GraphQA code under
-`src/gedebate/graphqa/` (Apache-2.0; see its `NOTICE.md`). Please cite Fatemi,
-Halcrow, and Perozzi, *Talk like a Graph: Encoding Graphs for Large Language
-Models*, ICLR 2024.
+The dataset and encodings come from GraphQA (Fatemi, Halcrow, and Perozzi,
+*Talk like a Graph: Encoding Graphs for Large Language Models*, ICLR 2024),
+whose code is vendored under `src/gedebate/graphqa/` (Apache-2.0; see its
+`NOTICE.md`). Please cite it if you use this dataset.
